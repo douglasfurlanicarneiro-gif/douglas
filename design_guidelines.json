@@ -1,0 +1,180 @@
+{
+  "app_name": "Contratipos Ateliê",
+  "personality": "6 Glass / Luxe DARK",
+  "personality_one_liner": "A cinematic, expensive, and deeply immersive digital vitrine where dark ink, gold accents, and elegant typography sell the allure of luxury fragrances.",
+  "color": {
+    "surface": "#15130F",
+    "onSurface": "#EDE7D8",
+    "surfaceSecondary": "#1F1B14",
+    "onSurfaceSecondary": "#A79C87",
+    "surfaceTertiary": "#29241B",
+    "onSurfaceTertiary": "#A79C87",
+    "surfaceInverse": "#EDE7D8",
+    "onSurfaceInverse": "#15130F",
+    "brand": "#C7A25C",
+    "brandPrimary": "#C7A25C",
+    "onBrandPrimary": "#15130F",
+    "brandSecondary": "#8C3A4A",
+    "onBrandSecondary": "#EDE7D8",
+    "brandTertiary": "#3A3327",
+    "onBrandTertiary": "#EDE7D8",
+    "success": "#8FA07A",
+    "onSuccess": "#15130F",
+    "warning": "#C9A227",
+    "onWarning": "#15130F",
+    "error": "#C1552F",
+    "onError": "#EDE7D8",
+    "info": "#8C3A4A",
+    "onInfo": "#EDE7D8",
+    "border": "#3A3327",
+    "borderStrong": "#C7A25C",
+    "divider": "#3A3327",
+    "topNote": "#C9A227",
+    "heartNote": "#C06E7E",
+    "baseNote": "#8A6438"
+  },
+  "typography": {
+    "displayFontFamily": "Fraunces",
+    "textFontFamily": "Manrope",
+    "monoFontFamily": "SpaceMono",
+    "scale": {
+      "sm": 12,
+      "base": 14,
+      "lg": 16,
+      "xl": 20,
+      "2xl": 24
+    }
+  },
+  "spacing": {
+    "rule": "Generous vertical breathing room for luxury feel, let typography and empty dark space frame the content.",
+    "xs": 4,
+    "sm": 8,
+    "md": 12,
+    "lg": 16,
+    "xl": 24,
+    "2xl": 32,
+    "3xl": 48
+  },
+  "radius_tokens": {
+    "sm": 6,
+    "md": 12,
+    "lg": 20,
+    "pill": 999
+  },
+  "shadow_tier": 0,
+  "navigation": "stack_only (Vitrine) and bottom_tabs (Ateliê)",
+  "icon_set": "Phosphor",
+  "glassmorphism": {
+    "enabled": true,
+    "do's": [
+      "Use glassmorphism for bottom tab bar, floating suggestion action, and modal scrims.",
+      "Apply translucent tinted base beneath glass to ensure text readability over dark imagery.",
+      "Use glass headers for smooth scroll fades."
+    ],
+    "dont's": [
+      "Never blur body text regions or form fields.",
+      "Do not use heavy drop shadows; replace them with soft blur or flat tonal elevation."
+    ]
+  },
+  "platform_libraries": {
+    "glass": {
+      "ios": "expo-glass-effect",
+      "android": "expo-blur",
+      "low_end_android_fallback": "solid surfaceSecondary"
+    },
+    "image": "expo-image",
+    "blur": "expo-blur",
+    "bottom_sheet": "@gorhom/bottom-sheet",
+    "animation": "react-native-reanimated",
+    "gesture": "react-native-gesture-handler"
+  },
+  "screens": [
+    {
+      "name": "Vitrine",
+      "purpose": "Public showcase displaying the perfume catalog, families, and detailed fragrance cards.",
+      "states": {
+        "loading": "Centered minimalist spinner with a subtle 'Preparando as fragrâncias...' text.",
+        "empty": "No perfumes found illustration with a button to clear filters.",
+        "error": "Elegant error message asking the user to reconnect."
+      },
+      "layout": "Hero image banner with a vertical gradient scrim fading to 'surface'. Search bar and horizontal scrollable filter chips directly beneath. Vertical list of perfume cards. Each card must have a vertical 3-color pyramid bar on the left edge. A floating action button (FAB) for 'Sugestões' positioned above a hidden 'Ateliê' entry trigger."
+    },
+    {
+      "name": "Ateliê Login",
+      "purpose": "Password-locked entry for the owner.",
+      "states": {
+        "loading": "Button disabled with small spinner.",
+        "empty": "Standard form.",
+        "error": "Inline rust red text for invalid credentials."
+      },
+      "layout": "Bottom sheet layout, never full screen. Standard single-column form (user/password) with an elegant 'Entrar' button."
+    },
+    {
+      "name": "Ateliê Dashboard",
+      "purpose": "High-level overview of the atelier's operations.",
+      "states": {
+        "loading": "Skeleton cards.",
+        "empty": "Zero state with prompt to add first perfume.",
+        "error": "Error fetching metrics."
+      },
+      "layout": "Four 2-column grid stat cards at the top. 'Últimos Pedidos' list underneath with status pills showing current operations. Use 'SpaceMono' for metric values."
+    },
+    {
+      "name": "Catálogo",
+      "purpose": "CRUD interface for the owner to manage the perfume collection.",
+      "states": {
+        "loading": "Spinner.",
+        "empty": "Minimalist dark empty room image, 'Nenhum perfume no catálogo'.",
+        "error": "Error loading catalog."
+      },
+      "layout": "List of perfumes identical in style to Vitrine but with Edit/Delete icon actions. A FAB 'Adicionar' uses a bottom sheet to open a creation form (with color pickers or numeric inputs for the top/heart/base pyramid)."
+    },
+    {
+      "name": "Estoque",
+      "purpose": "Manage stock levels and view recent movements (in/out).",
+      "states": {
+        "loading": "Skeleton list.",
+        "empty": "No stock data available.",
+        "error": "Error loading stock."
+      },
+      "layout": "Split view or toggle between 'Níveis Atuais' and 'Movimentações'. Uses success (sage) for IN and warning (rust/gold) for OUT movements."
+    },
+    {
+      "name": "Pedidos & Opiniões",
+      "purpose": "Manage customer orders and reviews.",
+      "states": {
+        "loading": "Spinner.",
+        "empty": "No active orders/reviews.",
+        "error": "Error loading."
+      },
+      "layout": "Standard vertical list with prominent status pills (pendente/preparando/enviado/entregue/cancelado) in Pedidos, and Phosphor star icons in Opiniões."
+    }
+  ],
+  "images": {
+    "vitrine_hero": {
+      "url": "https://images.pexels.com/photos/31622917/pexels-photo-31622917.jpeg",
+      "alt": "Abstract dynamic dark gold sculpture representing luxury perfume essence"
+    },
+    "perfume_placeholder": {
+      "url": "https://images.unsplash.com/photo-1608721279136-cd41b752fa41?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Clear glass luxury perfume bottle against a dark moody background"
+    },
+    "empty_state_dark": {
+      "url": "https://images.unsplash.com/photo-1757278502487-a46174e5d642?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Minimalist dark empty room illuminated by a single warm light"
+    }
+  },
+  "instructions_to_main_agent": [
+    "Design personality is 'Glass / Luxe DARK'. Strict adherence to the provided color palette: Ink (#15130F) background, Gold (#C7A25C) accents. Do not use generic blues, indigos, or purples.",
+    "Typography: Use 'Fraunces' (weight 400 or 500 max) for Display headers and titles. Use 'Manrope' for body text. Use 'SpaceMono' specifically for prices, numeric stats, and numbering (e.g., 'Nº 001').",
+    "Signature Element: On the perfume cards in both the Vitrine and Catálogo, implement the vertical 3-color pyramid bar on the left edge. The bar should smoothly divide or stack the three custom colors: topNote (#C9A227), heartNote (#C06E7E), and baseNote (#8A6438).",
+    "For all background or hero images, ensure a gradient scrim (expo-linear-gradient) is applied. The scrim must fade from transparent (top) to at least 70% 'surfaceInverse' or 'surface' (bottom) to guarantee text contrast. Use absolute positioning.",
+    "The Ateliê mode is completely hidden from the public Vitrine. Provide a discreet access point (e.g., long-pressing the header or a small subtle icon button in the footer) that triggers the 'Ateliê Login' bottom sheet.",
+    "All form creations (CRUD for Perfumes, Stock movements) must open in a '@gorhom/bottom-sheet' modal, not full-screen navigation.",
+    "Vitrine Actions: Each perfume card in the public Vitrine must have actions to 'Buy' (request purchase) and 'Suggestion'. No WhatsApp integration for now.",
+    "Status Pills: Ensure status pills map semantically to colors: Pendente (warning), Enviado/Entregue (success), Cancelado (error).",
+    "Make sure the active tab indicator or active chips use 'brandPrimary' with a subtle elevated appearance.",
+    "Do NOT use emoji anywhere. Use Phosphor icons (filled/outlined depending on state).",
+    "Use Haptics for all primary buttons, tab switches, and bottom sheet opening."
+  ]
+}
