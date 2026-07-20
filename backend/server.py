@@ -352,7 +352,16 @@ async def get_vitrine():
     doc = await db.vitrine.find_one({"key": "snapshot"}, {"_id": 0, "key": 0})
     if not doc:
         return {"atualizadoEm": None, "itens": []}
-    return doc
+    # Recalcula disponibilidade em tempo real (estoque atual)
+    movs = await db.movimentos.find({}, {"_id": 0}).to_list(20000)
+    estoque = {}
+    for m in movs:
+        delta = m["quantidadeMl"] if m["tipo"] == "entrada" else -m["quantidadeMl"]
+        estoque[m["perfumeId"]] = estoque.get(m["perfumeId"], 0) + delta
+    itens = []
+    for it in doc.get("itens", []):
+        itens.append({**it, "disponivel": estoque.get(it["id"], 0) > 0})
+    return {"atualizadoEm": doc.get("atualizadoEm"), "itens": itens}
 
 
 @api_router.post("/vitrine/publish")

@@ -1,0 +1,28 @@
+{
+  "summary": "Bug fix VERIFIED end-to-end. GET /api/vitrine now recomputes 'disponivel' in real time from the 'movimentos' collection (soma de entradas - saidas por perfumeId), independently of the frozen snapshot. All 7 backend tests pass (7/7). Frontend Vitrine card for Nº 001 'Ab Autentica' now renders the green 'disponível' pill (was 'em falta' before). Other 417 perfumes without stock correctly show 'em falta'. Pull-to-refresh confirmed — after a swipe-down the state remains 'disponível'. POST /api/vitrine/publish still works and regenerates the 418-item snapshot. Dynamic flip test (entrada 100ml -> disponivel=true, saida 100ml -> disponivel=false) passes without needing a re-publish. Regression: /api/vitrine still returns 418 itens with all fields (id, seq, nome, inspiracao, familia, concentracao, notasSaida, notasCoracao, notasFundo, precos, disponivel) and atualizadoEm.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Vitrine.tsx (fabSuggestion and possibly card shadows)", "issue": "Console warning still present: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Reference: /app/frontend/src/components/Vitrine.tsx (fabSuggestion). Pre-existing, not related to this bug fix."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_vitrine_disponivel_dynamic.py",
+    "/app/test_reports/pytest/vitrine_dynamic.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "backend/server.py:350-364 GET /api/vitrine correctly loads snapshot then overwrites 'disponivel' per-item using aggregated movimentos — clean and side-effect free.",
+    "The estoque aggregation is O(N movimentos) computed on every GET; acceptable now (small dataset) but consider caching or a dedicated aggregation index if movimentos grows large."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (Vitrine card state verified)"},
+  "seed_data_creation": "None persisted. Dynamic test created and then deleted TEST_ entrada/saida movimentos for a perfume, restoring initial state. Ab Autentica still has 200ml as expected.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Test file /app/backend/tests/test_vitrine_disponivel_dynamic.py can be reused for future regression. It validates shape, item count (418), dynamic disponivel flip via movimentos, and publish regeneration. Frontend Vitrine confirmed on mobile viewport (375x667): first card = Nº 001 Ab Autentica with green 'disponível' pill.",
+  "rca_of_issue": "Root cause: publish_vitrine snapshotted 'disponivel' at publish-time. New estoque movements after publish did not update the snapshot, so vitrine kept the stale flag. Fix (applied in /app/backend/server.py:350-364): GET /api/vitrine now loads the snapshot for names/prices/notes but recomputes 'disponivel' from the live movimentos collection on every call. Verified via 7 pytest cases and mobile UI check."
+}
