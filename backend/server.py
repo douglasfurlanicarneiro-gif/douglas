@@ -332,8 +332,7 @@ async def list_opinioes():
 
 
 @api_router.post("/opinioes", response_model=Opiniao)
-async def create_opiniao(inp: OpiniaoIn, x_atelie_token: Optional[str] = Header(None)):
-    check_atelie(x_atelie_token)
+async def create_opiniao(inp: OpiniaoIn):
     o = Opiniao(id=new_id(), data=now_iso(), **inp.model_dump())
     await db.opinioes.insert_one(o.model_dump())
     return o

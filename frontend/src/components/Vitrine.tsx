@@ -5,8 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import { COLORS, SPACING, RADIUS, brl, padSeq } from '../theme';
 import { PyramidBar } from './PyramidBar';
 import { BottomSheet } from './BottomSheet';
-import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Chip } from './atoms';
-import { createCompra, createSugestao, getVitrine } from '../api';
+import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Chip, Stars } from './atoms';
+import { createCompra, createOpiniao, createSugestao, getVitrine } from '../api';
 
 type VitrineItem = {
   id: string; seq: number; nome: string; inspiracao: string; familia: string; concentracao: string;
@@ -82,10 +82,12 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [familiaAtiva, setFamiliaAtiva] = useState('Todas');
   const [buyItem, setBuyItem] = useState<{ item: VitrineItem; ml: number; preco: number } | null>(null);
   const [sugestaoOpen, setSugestaoOpen] = useState(false);
+  const [reviewItem, setReviewItem] = useState<VitrineItem | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
   const [buyForm, setBuyForm] = useState({ cliente: '', contato: '', observacoes: '' });
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
+  const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
   const [enviando, setEnviando] = useState(false);
 
   const load = useCallback(async () => {
@@ -133,6 +135,22 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     finally { setEnviando(false); }
   };
 
+  const submitReview = async () => {
+    if (!reviewItem || !reviewForm.comentario.trim()) return;
+    setEnviando(true);
+    try {
+      await createOpiniao({
+        perfumeId: reviewItem.id,
+        cliente: reviewForm.cliente,
+        nota: reviewForm.nota,
+        comentario: reviewForm.comentario,
+      });
+      setReviewItem(null); setReviewForm({ cliente: '', nota: 5, comentario: '' });
+      setInfo('Avaliação enviada! Obrigado.');
+    } catch (e) { setInfo('Não foi possível enviar. Tente novamente.'); }
+    finally { setEnviando(false); }
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
@@ -162,7 +180,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         data={filtrados}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
-          <VitrineCard item={item} onBuy={(ml, preco) => setBuyItem({ item, ml, preco })} />
+          <VitrineCard item={item} onBuy={(ml, preco) => setBuyItem({ item, ml, preco })} onReview={() => setReviewItem(item)} />
         )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={COLORS.gold} />}
         ListHeaderComponent={
@@ -255,6 +273,25 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
       <BottomSheet visible={!!info} onClose={() => setInfo(null)} title="Aviso">
         <Text style={{ color: COLORS.bone, marginBottom: SPACING.lg }}>{info}</Text>
         <PrimaryButton label="Entendi" onPress={() => setInfo(null)} testID="info-ok" />
+      </BottomSheet>
+
+      {/* Review (avaliação do cliente) */}
+      <BottomSheet visible={!!reviewItem} onClose={() => setReviewItem(null)} title="Deixar avaliação" testID="review-sheet">
+        {reviewItem && (
+          <View>
+            <View style={{ padding: SPACING.md, borderRadius: 12, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
+              <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(reviewItem.seq)}</Text>
+              <Text style={{ color: COLORS.bone, fontSize: 16, fontWeight: '500' }}>{reviewItem.nome}</Text>
+            </View>
+            <Field label="Seu nome (opcional)"><TInput value={reviewForm.cliente} onChangeText={(v) => setReviewForm({ ...reviewForm, cliente: v })} testID="review-cliente" /></Field>
+            <Field label="Nota"><Stars value={reviewForm.nota} onChange={(n) => setReviewForm({ ...reviewForm, nota: n })} size={26} /></Field>
+            <Field label="Comentário"><TInput value={reviewForm.comentario} onChangeText={(v) => setReviewForm({ ...reviewForm, comentario: v })} multiline style={{ minHeight: 100, textAlignVertical: 'top' }} placeholder="Conte o que achou do perfume..." testID="review-comentario" /></Field>
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
+              <SecondaryButton label="Cancelar" onPress={() => setReviewItem(null)} />
+              <PrimaryButton label={enviando ? 'Enviando…' : 'Enviar avaliação'} onPress={submitReview} disabled={enviando || !reviewForm.comentario.trim()} testID="review-submit" />
+            </View>
+          </View>
+        )}
       </BottomSheet>
     </SafeAreaView>
   );

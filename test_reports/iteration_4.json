@@ -1,0 +1,37 @@
+{
+  "summary": "Backend 100% (11/11) — POST /api/opinioes is now correctly PUBLIC (accepts requests without x-atelie-token, persists opinion, returns full object) and DELETE /api/opinioes/{id} still returns 401 without token. All regression endpoints (auth, vitrine, perfumes, pedidos, sugestoes, compras) unchanged. Frontend has 2 CRITICAL misses: (1) Header no Ateliê ainda mostra 'ATELIÊ' (eyebrow) + 'Painel' em vez de 'Painel de Controle' — feature #1 NÃO implementada; (2) O link 'deixar avaliação' NÃO existe nos cards da Vitrine — o componente VitrineCard (Vitrine.tsx:17) não desestrutura o prop onReview nem renderiza o link com testID review-<id>, apesar do parent passar onReview. Isso quebra o fluxo cliente→envio de avaliação (feature #4 lado Vitrine). O restante das mudanças de frontend está OK: Catálogo sem 'Padronizar tamanhos' (Importar ainda presente); Pedidos com search 'item-search-0' funcionando (digitar 'ceh' filtra 24 opções, todas contendo 'ceh'; seleção fecha o expansor e mostra o perfume); aba Opiniões sem FAB (só lista, sem botão criar); sheet 'Nova opinião' removido do Ateliê. Deprecated packages detected: nenhum novo. React Native warning 'shadow* deprecated' persiste (pré-existente, já reportado).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Atelie.tsx header (linhas 555-559)", "issue": "Header ainda mostra Text 'ATELIÊ' (eyebrow gold, letterSpacing 2) na linha 557 e Text 'Painel' na linha 558. O usuário pediu para ser um único título 'Painel de Controle'. Substituir os dois <Text> por um único <Text style={{ color: COLORS.bone, fontSize: 22, fontWeight: '500' }}>Painel de Controle</Text>.", "testID": "N/A (header não tem testID)", "priority": "HIGH"},
+      {"component": "Vitrine.tsx VitrineCard (linha 17)", "issue": "Prop onReview não é aceito pela assinatura do VitrineCard e não é renderizado. O parent (linha 183) passa onReview={() => setReviewItem(item)}, mas a função é function VitrineCard({ item, onBuy }: {...}) — precisa incluir onReview e adicionar um <Pressable testID={`review-${item.id}`} onPress={onReview}> com ícone star + 'deixar avaliação' abaixo dos botões de preço (dentro do card). Sem esse link, o bottom sheet 'Deixar avaliação' nunca abre e o fluxo cliente-envia-avaliação está totalmente quebrado.", "testID": "review-<id> (ausente)", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "Cliente envia avaliação pela Vitrine → aparece em Opiniões do Ateliê", "issue": "Bloqueado pelo bug crítico do VitrineCard: não há como acionar a bottom sheet 'Deixar avaliação'. Backend testado standalone e funciona (POST /api/opinioes público retorna 200 e persiste; GET /api/opinioes lista corretamente).", "affected_testIDs": ["review-<id>", "review-sheet", "review-cliente", "review-comentario", "review-submit"]}
+    ],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "Vitrine.tsx", "issue": "Warning persistente: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Pré-existente, já reportado na iteration_3."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_opinioes_public.py",
+    "/app/test_reports/pytest/opinioes_public.xml"
+  ],
+  "action_items": [
+    "Substituir header do Ateliê em Atelie.tsx (linhas 556-559): remover o Text 'ATELIÊ' eyebrow e trocar 'Painel' por 'Painel de Controle' em um único Text.",
+    "Corrigir Vitrine.tsx linha 17: alterar assinatura para `function VitrineCard({ item, onBuy, onReview }: { item: VitrineItem; onBuy: (ml: number, preco: number) => void; onReview: () => void })` e adicionar dentro do card (após os botões de preço, antes do fechamento da View com padding) um Pressable com testID={`review-${item.id}`} onPress={onReview} contendo um <Feather name='star' size={12}/> + <Text>deixar avaliação</Text>."
+  ],
+  "critical_code_review_comments": [
+    "Vitrine.tsx: TypeScript não pegou o mismatch de props porque o projeto provavelmente não roda tsc em CI; o Metro/Expo tolera a prop extra silenciosamente.",
+    "Backend/server.py:334-338 POST /api/opinioes ficou perfeitamente público (sem parâmetro Header/x_atelie_token), enquanto DELETE (linha 342) continua com check_atelie — implementação correta.",
+    "Atelie.tsx:582 — condição para esconder o FAB (`tab !== 'opinioes'`) está correta; a aba não mostra o botão + como esperado.",
+    "Atelie.tsx PedidoForm search filter (linhas 170, 189-217): implementado como pedido, com limite de 40 resultados, autoFocus, e fechamento ao selecionar. Funciona corretamente."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "60% — 3 de 5 features do Ateliê OK (Catálogo, Pedidos, Opiniões FAB oculto), mas header incorreto; feature Vitrine 'deixar avaliação' totalmente quebrada"},
+  "seed_data_creation": "Nenhum dado persistido. Testes backend criaram 2 opiniões TEST_ e as removeram no final. GET /api/opinioes retorna array vazio após execução.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Após main agent corrigir os 2 bugs de frontend (header + VitrineCard onReview link), rodar novamente: (1) UI Vitrine — verificar review-<id> visível, clicar abre sheet, preencher e submit; (2) UI Ateliê — header mostra 'Painel de Controle'; abrir aba Opiniões e confirmar que a avaliação recém-criada aparece. Backend não precisa reteste (11/11 verde). Test file /app/backend/tests/test_opinioes_public.py pode ser reusado."
+}

@@ -45,7 +45,7 @@ export const deletePedido = (id: string) => request<any>(`/pedidos/${id}`, { met
 
 // Opinioes
 export const listOpinioes = () => request<any[]>('/opinioes');
-export const createOpiniao = (data: any) => request<any>('/opinioes', { method: 'POST', body: JSON.stringify(data) }, true);
+export const createOpiniao = (data: any) => request<any>('/opinioes', { method: 'POST', body: JSON.stringify(data) });
 export const deleteOpiniao = (id: string) => request<any>(`/opinioes/${id}`, { method: 'DELETE' }, true);
 
 // Vitrine

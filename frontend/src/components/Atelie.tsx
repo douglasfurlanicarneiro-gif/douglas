@@ -17,7 +17,7 @@ import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 
 type Perfume = any; type Movimento = any; type Pedido = any; type Opiniao = any; type Sugestao = any; type Compra = any;
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
-  | { type: 'opiniao'; data?: Opiniao } | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean }
+  | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean }
   | { type: 'info'; label: string };
 
 const TABS = [
@@ -151,10 +151,14 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
 
 function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
   const [f, setF] = useState<any>(initial || { cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [] });
+  const [searchingIdx, setSearchingIdx] = useState<number | null>(null);
+  const [q, setQ] = useState('');
   const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
   const addItem = () => {
     if (!perfumes[0]) return;
     setF((s: any) => ({ ...s, itens: [...s.itens, { perfumeId: perfumes[0].id, ml: perfumes[0].precos?.[0]?.ml || 30, quantidade: 1 }] }));
+    setSearchingIdx(f.itens.length);
+    setQ('');
   };
   const setItem = (i: number, k: string, v: any) => setF((s: any) => ({ ...s, itens: s.itens.map((it: any, idx: number) => idx === i ? { ...it, [k]: v } : it) }));
   const rmItem = (i: number) => setF((s: any) => ({ ...s, itens: s.itens.filter((_: any, idx: number) => idx !== i) }));
@@ -163,6 +167,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
     return p?.precos.find((pr: any) => pr.ml === Number(it.ml))?.preco || 0;
   };
   const total = f.itens.reduce((s: number, it: any) => s + precoDo(it) * it.quantidade, 0);
+  const filtrados = perfumes.filter((p: any) => (p.nome + (p.inspiracao || '')).toLowerCase().includes(q.toLowerCase())).slice(0, 40);
   return (
     <View>
       <Field label="Cliente"><TInput value={f.cliente} onChangeText={(v) => set('cliente', v)} testID="pedido-cliente" /></Field>
@@ -170,21 +175,48 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
       <Text style={{ color: COLORS.muted, fontSize: 12, marginBottom: 6 }}>Itens do pedido</Text>
       {f.itens.map((it: any, i: number) => {
         const p = perfumes.find((pf: any) => pf.id === it.perfumeId);
+        const editando = searchingIdx === i;
         return (
           <View key={i} style={{ padding: SPACING.md, backgroundColor: COLORS.ink, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.sm }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  {perfumes.map((p2: any) => (
-                    <Pressable key={p2.id} onPress={() => setItem(i, 'perfumeId', p2.id)} style={[styles.miniChip, { flexShrink: 0 }, it.perfumeId === p2.id && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                      <Text style={{ color: it.perfumeId === p2.id ? COLORS.ink : COLORS.muted, fontSize: 11 }} numberOfLines={1}>{p2.nome}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <Pressable onPress={() => { setSearchingIdx(editando ? null : i); setQ(''); }} style={{ flex: 1 }} testID={`item-select-${i}`}>
+                <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p?.seq || 0)}</Text>
+                <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '500' }} numberOfLines={1}>{p?.nome || 'Selecionar perfume'}</Text>
+                <Text style={{ color: COLORS.muted, fontSize: 11 }}>{editando ? 'toque para fechar' : 'toque para trocar'}</Text>
+              </Pressable>
+              <Pressable onPress={() => rmItem(i)} hitSlop={8}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>
+            </View>
+            {editando && (
+              <View style={{ marginTop: SPACING.sm }}>
+                <View style={styles.searchBox}>
+                  <Feather name="search" size={14} color={COLORS.muted} />
+                  <TextInput
+                    value={q}
+                    onChangeText={setQ}
+                    placeholder="Buscar contratipo..."
+                    placeholderTextColor={COLORS.muted + 'BB'}
+                    style={styles.searchInput}
+                    testID={`item-search-${i}`}
+                    autoFocus
+                  />
+                </View>
+                <ScrollView style={{ maxHeight: 200, borderRadius: 8, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border }} nestedScrollEnabled>
+                  {filtrados.length === 0 && <Text style={{ color: COLORS.muted, fontSize: 12, padding: 12 }}>Nenhum resultado.</Text>}
+                  {filtrados.map((p2: any) => (
+                    <Pressable
+                      key={p2.id}
+                      onPress={() => { setItem(i, 'perfumeId', p2.id); setItem(i, 'ml', p2.precos?.[0]?.ml || 30); setSearchingIdx(null); setQ(''); }}
+                      style={{ paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: it.perfumeId === p2.id ? COLORS.surfaceRaised : 'transparent' }}
+                      testID={`item-option-${p2.id}`}
+                    >
+                      <Text style={{ color: COLORS.gold, fontSize: 10 }}>Nº {padSeq(p2.seq)}</Text>
+                      <Text style={{ color: COLORS.bone, fontSize: 13 }} numberOfLines={1}>{p2.nome}</Text>
                     </Pressable>
                   ))}
-                </View>
-              </ScrollView>
-              <Pressable onPress={() => rmItem(i)} hitSlop={8}><Feather name="x" size={14} color={COLORS.rust} /></Pressable>
-            </View>
-            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                </ScrollView>
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: SPACING.sm }}>
               {(p?.precos || []).map((pr: any) => (
                 <Pressable key={pr.ml} onPress={() => setItem(i, 'ml', pr.ml)} style={[styles.miniChip, Number(it.ml) === pr.ml && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
                   <Text style={{ color: Number(it.ml) === pr.ml ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{pr.ml}ml · {brl(pr.preco)}</Text>
@@ -195,7 +227,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
           </View>
         );
       })}
-      <Pressable onPress={addItem}><Text style={{ color: COLORS.gold, fontSize: 12, marginBottom: SPACING.md }}>+ adicionar item</Text></Pressable>
+      <Pressable onPress={addItem} testID="pedido-add-item"><Text style={{ color: COLORS.gold, fontSize: 12, marginBottom: SPACING.md }}>+ adicionar item</Text></Pressable>
       <Field label="Status">
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           {STATUS.map((s) => (
@@ -218,30 +250,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
   );
 }
 
-function OpiniaoForm({ perfumes, initial, onSave, onCancel }: any) {
-  const [f, setF] = useState<any>(initial || { perfumeId: perfumes[0]?.id || '', cliente: '', nota: 5, comentario: '' });
-  const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
-  return (
-    <View>
-      <Field label="Perfume">
-        <ScrollView style={{ maxHeight: 180 }}>
-          {perfumes.map((p: any) => (
-            <Pressable key={p.id} onPress={() => set('perfumeId', p.id)} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border }}>
-              <Text style={{ color: f.perfumeId === p.id ? COLORS.gold : COLORS.bone, fontSize: 13 }}>{p.nome}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </Field>
-      <Field label="Cliente (opcional)"><TInput value={f.cliente} onChangeText={(v) => set('cliente', v)} /></Field>
-      <Field label="Nota"><Stars value={f.nota} onChange={(n) => set('nota', n)} size={24} /></Field>
-      <Field label="Comentário"><TInput value={f.comentario} onChangeText={(v) => set('comentario', v)} multiline style={{ minHeight: 80, textAlignVertical: 'top' }} /></Field>
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
-        <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <PrimaryButton label="Salvar" onPress={() => f.perfumeId && onSave(f)} testID="opiniao-save" />
-      </View>
-    </View>
-  );
-}
+function OpiniaoForm() { return null; } // desativado — clientes deixam opinião pela Vitrine
 
 export function Atelie({ onSair }: { onSair: () => void }) {
   const [tab, setTab] = useState('dashboard');
@@ -315,7 +324,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     sheet.type === 'perfume' ? (sheet.data ? 'Editar contratipo' : 'Novo contratipo') :
     sheet.type === 'movimento' ? 'Lançar estoque' :
     sheet.type === 'pedido' ? (sheet.data ? 'Editar pedido' : 'Novo pedido') :
-    sheet.type === 'opiniao' ? 'Nova opinião' :
     sheet.type === 'confirm' ? 'Confirmar' : 'Aviso';
 
   const openCreate = () => {
@@ -376,14 +384,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           >
             <Text style={{ color: COLORS.gold, fontSize: 12 }}>Importar lista do fornecedor ({PRESET_FORNECEDOR.length})</Text>
           </Pressable>
-          {perfumes.length > 0 && (
-            <Pressable
-              onPress={() => setSheet({ type: 'confirm', label: `Padronizar tamanhos 30/50/100ml em ${perfumes.length} contratipo(s)?`, onConfirm: doPadronizar, confirmLabel: 'Aplicar' })}
-              style={styles.actionBtn}
-            >
-              <Text style={{ color: COLORS.muted, fontSize: 12 }}>Padronizar tamanhos (30/50/100ml)</Text>
-            </Pressable>
-          )}
           {perfumesFiltrados.length === 0 && <EmptyState text="Nenhum contratipo. Toque em + para começar." />}
           {perfumesFiltrados.map((p) => {
             const baixo = estoqueDe(p.id) <= (p.estoqueMinimoMl || 0);
@@ -579,7 +579,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
         {renderContent()}
       </ScrollView>
 
-      {tab !== 'dashboard' && tab !== 'mensagens' && (
+      {tab !== 'dashboard' && tab !== 'mensagens' && tab !== 'opinioes' && (
         <Pressable onPress={openCreate} style={styles.fab} testID="fab-add">
           <Feather name="plus" size={24} color={COLORS.ink} />
         </Pressable>
@@ -601,7 +601,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
         {sheet?.type === 'perfume' && <PerfumeForm initial={sheet.data} onSave={doSavePerfume} onCancel={() => setSheet(null)} />}
         {sheet?.type === 'movimento' && <MovimentoForm perfumes={perfumes} onSave={doMov} onCancel={() => setSheet(null)} />}
         {sheet?.type === 'pedido' && <PedidoForm perfumes={perfumes} initial={sheet.data} onSave={doSavePedido} onCancel={() => setSheet(null)} />}
-        {sheet?.type === 'opiniao' && <OpiniaoForm perfumes={perfumes} onSave={doSaveOpiniao} onCancel={() => setSheet(null)} />}
         {sheet?.type === 'confirm' && (
           <View>
             <Text style={{ color: COLORS.bone, marginBottom: SPACING.lg }}>{sheet.label}</Text>
