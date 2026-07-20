@@ -1,0 +1,37 @@
+{
+  "summary": "Backend: 17/17 pytest cases passed (100%). Frontend: main flows validated on mobile viewport (390x844) — Vitrine loads, long-press lock opens login sheet, bad credentials show error, correct credentials (douglasfurlani/Dfc160201) navigate to Ateliê with 6 tabs, Import/Publish/Sair/FAB buttons all present. All critical business flows working end-to-end.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": [
+      {"component": "global styles", "issue": "Non-blocking warning in console: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' — consider migrating shadow* to boxShadow for RN Web compatibility."}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Replace deprecated shadow* style props with boxShadow to silence RN Web warnings."
+  ],
+  "critical_code_review_comments": [
+    "server.py: MongoDB _id correctly excluded in all queries via projections — good.",
+    "Auth token is a hardcoded fixed string; acceptable given single-user product spec, but rotate if repo becomes public.",
+    "Pedido → movimento de saída logic verified (estoque decrementa corretamente). Estorno on update/delete also implemented.",
+    "All admin endpoints correctly gated by x-atelie-token header (401 returned when missing)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py (new comprehensive pytest suite: auth, public endpoints, auth-guard, full flow perfume→estoque→pedido→vitrine, cleanup)"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "~95% (all critical flows verified via screenshots; minor test-script issue with tab id 'dashboard' vs 'inicio' — not an app bug)"},
+  "seed_data_creation": "Test-created data (TEST_Contratipo_A, TEST_Bulk1, TEST_Bulk2, TEST_Cliente pedido, TEST_ opinioes/sugestoes/compras) cleaned up in test_zzz_cleanup. Note: some TEST_ perfumes/vitrine snapshot may remain visible in UI screenshots from parallel run — main agent may want to POST /api/vitrine/publish again after tests to refresh public snapshot.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "The 'Início' tab has id='dashboard' in Atelie.tsx (testID='tab-dashboard'), NOT 'tab-inicio'. Full tab list: dashboard, catalogo, estoque, pedidos, opinioes, mensagens. Long-press on '[data-testid=\"atelie-access-button\"]' requires ~1s mouse.down/up. FAB (testID='fab-add') should be hidden on dashboard and mensagens tabs.",
+  "rca_of_issue": "N/A — no bugs found. Implementation matches all 22 test cases in the review request."
+}
