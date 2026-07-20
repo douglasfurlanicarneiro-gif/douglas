@@ -1,0 +1,30 @@
+{
+  "summary": "Focused regression test on the reported bug (single tap on lock icon must open Ateliê login sheet). Bug is FIXED and verified. All 5 requested items pass: (1) single page.click on testID='atelie-access-button' opens the 'Acesso do Ateliê' bottom sheet with usuario/senha fields; (2) no long-press required; (3) login with douglasfurlani/Dfc160201 navigates to Ateliê — 'Painel' is visible and all 6 bottom tabs are present (tab-dashboard, tab-catalogo, tab-estoque, tab-pedidos, tab-opinioes, tab-mensagens); (4) Vitrine shows real perfumes — first card is 'Ab Autentica' Nº 001 (not TEST_), and Ateliê Dashboard reports 418 Contratipos; (5) sugestao-fab is visible and rendered on the Vitrine.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Vitrine", "issues": ["All 418 perfumes render with price R$ 0,00 and 'em falta' status — not part of the bug scope, but worth confirming with product owner if seed data prices/availability should be non-zero."]}
+    ],
+    "react_native_issues": [
+      {"component": "Vitrine (fabSuggestion) / others using shadow props", "issue": "Console warning: '\"shadow*\" style props are deprecated. Use \"boxShadow\".' Reference: /app/frontend/src/components/Vitrine.tsx:277 (fabSuggestion uses shadowColor/shadowOpacity/shadowRadius/shadowOffset). Consider migrating to boxShadow for react-native-web compatibility."}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_2.json"],
+  "action_items": [
+    "Optional: update /app/memory/test_credentials.md — it still instructs to 'Toque e segure (long-press ~0.8s)'. After the fix, a simple tap opens the sheet; docs should be corrected.",
+    "Optional cleanup: migrate deprecated shadow* style props to boxShadow in Vitrine.tsx (fabSuggestion) to silence the RN Web deprecation warning."
+  ],
+  "critical_code_review_comments": [
+    "Vitrine.tsx: Pressable now uses onPress={onAtelieClick} with hitSlop={12} — correct fix. testID present.",
+    "app/index.tsx LoginForm handles trim() on usuario, sets error state, disables submit while loading — behaviour is correct."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only test as requested)", "frontend": "100% (5/5 scenarios pass)"},
+  "seed_data_creation": "None. Verified existing snapshot returns 418 real perfumes (first item 'Ab Autentica' Nº 001, second 'Af Fierce') and no TEST_ leftovers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Fix (onLongPress -> onPress on testID='atelie-access-button') is verified via mobile viewport (375x667). Full flow Vitrine → tap lock → login → Ateliê Painel with 6 tabs works. Backend was not tested this iteration per request.",
+  "rca_of_issue": "Root cause: the lock icon used onLongPress with delayLongPress=800ms, so a normal tap never triggered the handler. Fix (already applied by main agent) is to use onPress. Verified with Playwright single click — sheet opens immediately."
+}

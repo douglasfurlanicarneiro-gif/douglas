@@ -148,10 +148,9 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['top']}>
-      {/* Discrete Ateliê access */}
+      {/* Discrete Ateliê access (toque simples, protegido por senha) */}
       <Pressable
-        onLongPress={onAtelieClick}
-        delayLongPress={800}
+        onPress={onAtelieClick}
         style={styles.atelieAccess}
         testID="atelie-access-button"
         hitSlop={12}
