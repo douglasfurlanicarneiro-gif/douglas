@@ -1,45 +1,26 @@
 from fastapi import FastAPI, HTTPException
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
-from pydantic import BaseModel
-from typing import List, Optional
+from fastapi.middleware.cors import CORSMiddleware
 import os
 
 app = FastAPI()
 
-# Conexão Banco
+# Permite que o celular conecte no servidor sem bloqueios
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Conexão com as variáveis que você configurou no Render
 MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = os.getenv("DB_NAME", "atelier_perfumes")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[DB_NAME]
 
-# ROTA DE PEDIDOS - Agora com baixa por ML
-@app.post("/pedidos")
-async def criar_pedido(pedido: dict):
-    # O pedido deve vir com: perfume_id, nome_perfume, ml_escolhido (30, 50 ou 100)
-    perfume_id = pedido.get("perfume_id")
-    ml_venda = int(pedido.get("ml_escolhido", 0))
-    
-    # 1. Registra o Pedido na "gaveta" de Pedidos
-    novo_pedido = await db.pedidos.insert_one(pedido)
-    
-    # 2. Busca o perfume e retira do estoque (em ml ou unidades)
-    if perfume_id:
-        # Aqui ele subtrai o valor de ML do campo 'estoque' do perfume
-        await db.perfumes.update_one(
-            {"_id": ObjectId(perfume_id)},
-            {"$inc": {"estoque": -ml_venda}} 
-        )
-    
-    return {"status": "Pedido registrado e estoque atualizado"}
-
-# ROTA DE OPINIÕES - Vai para a gaveta de opiniões, não mensagens
-@app.post("/opinioes")
-async def salvar_opiniao(opiniao: dict):
-    await db.opinioes.insert_one(opiniao)
-    return {"status": "Opinião salva com sucesso"}
-
-# ROTA DE PERFUMES (Lista para a Vitrine)
+# --- ROTA 1: LISTAR PERFUMES NA VITRINE ---
 @app.get("/perfumes")
 async def listar_perfumes():
     perfumes = await db.perfumes.find().to_list(1000)
@@ -47,12 +28,35 @@ async def listar_perfumes():
         p["_id"] = str(p["_id"])
     return perfumes
 
-# ROTA DE LANÇAMENTO DE ESTOQUE (Manual pelo Ateliê)
+# --- ROTA 2: PEDIDOS COM BAIXA AUTOMÁTICA POR ML ---
+@app.post("/pedidos")
+async def criar_pedido(pedido: dict):
+    # Salva na gaveta de PEDIDOS
+    novo_pedido = await db.pedidos.insert_one(pedido)
+    
+    perfume_id = pedido.get("perfume_id")
+    ml_venda = int(pedido.get("ml_escolhido", 0))
+    
+    # Se o pedido tem ID, tira do estoque de perfumes
+    if perfume_id:
+        await db.perfumes.update_one(
+            {"_id": ObjectId(perfume_id)},
+            {"$inc": {"estoque": -ml_venda}} 
+        )
+    return {"status": "Pedido realizado e estoque baixado"}
+
+# --- ROTA 3: OPINIÕES (GAVETA DE AVALIAÇÕES) ---
+@app.post("/opinioes")
+async def salvar_opiniao(opiniao: dict):
+    await db.opinioes.insert_one(opiniao)
+    return {"status": "Opinião salva"}
+
+# --- ROTA 4: LANÇAMENTO DE ESTOQUE MANUAL (ATELIÊ) ---
 @app.patch("/perfumes/{id}/estoque")
 async def atualizar_estoque(id: str, dados: dict):
-    nova_qtd = dados.get("quantidade")
+    nova_qtd = int(dados.get("quantidade", 0))
     await db.perfumes.update_one(
         {"_id": ObjectId(id)},
         {"$set": {"estoque": nova_qtd}}
     )
-    return {"status": "Estoque atualizado manualmente"}
+    return {"status": "Estoque atualizado"}
