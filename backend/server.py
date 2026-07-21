@@ -33,15 +33,15 @@ async def listar_perfumes():
 async def criar_pedido(pedido: dict):
     # Salva na gaveta de PEDIDOS
     novo_pedido = await db.pedidos.insert_one(pedido)
-    
+
     perfume_id = pedido.get("perfume_id")
     ml_venda = int(pedido.get("ml_escolhido", 0))
-    
+
     # Se o pedido tem ID, tira do estoque de perfumes
     if perfume_id:
         await db.perfumes.update_one(
             {"_id": ObjectId(perfume_id)},
-            {"$inc": {"estoque": -ml_venda}} 
+            {"$inc": {"estoque": -ml_venda}}
         )
     return {"status": "Pedido realizado e estoque baixado"}
 
@@ -60,3 +60,35 @@ async def atualizar_estoque(id: str, dados: dict):
         {"$set": {"estoque": nova_qtd}}
     )
     return {"status": "Estoque atualizado"}
+
+# --- ROTA 5: LISTAR PEDIDOS (PARA O RESUMO E A ABA PEDIDOS DO PAINEL) ---
+@app.get("/pedidos")
+async def listar_pedidos():
+    pedidos = await db.pedidos.find().to_list(1000)
+    for p in pedidos:
+        p["_id"] = str(p["_id"])
+    return pedidos
+
+# --- ROTA 6: ATUALIZAR UM PEDIDO (EX: MARCAR COMO CONCLUÍDO) ---
+@app.patch("/pedidos/{id}")
+async def atualizar_pedido(id: str, dados: dict):
+    resultado = await db.pedidos.update_one(
+        {"_id": ObjectId(id)},
+        {"$set": dados}
+    )
+    if resultado.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    return {"status": "Pedido atualizado"}
+
+# --- ROTA 7: EDITAR DADOS DO PERFUME (NOME, IMAGEM, INSPIRAÇÃO) ---
+# O estoque continua controlado só pela ROTA 4, pra não ter dois jeitos de mexer no mesmo número.
+@app.patch("/perfumes/{id}")
+async def editar_perfume(id: str, dados: dict):
+    dados.pop("estoque", None)
+    resultado = await db.perfumes.update_one(
+        {"_id": ObjectId(id)},
+        {"$set": dados}
+    )
+    if resultado.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Perfume não encontrado")
+    return {"status": "Perfume atualizado"}
