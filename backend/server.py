@@ -69,7 +69,7 @@ async def listar_pedidos():
         p["_id"] = str(p["_id"])
     return pedidos
 
-# --- ROTA 6: ATUALIZAR UM PEDIDO (EX: MARCAR COMO CONCLUÍDO) ---
+# --- ROTA 6: ATUALIZAR UM PEDIDO (EX: MUDAR STATUS) ---
 @app.patch("/pedidos/{id}")
 async def atualizar_pedido(id: str, dados: dict):
     resultado = await db.pedidos.update_one(
@@ -79,6 +79,14 @@ async def atualizar_pedido(id: str, dados: dict):
     if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
     return {"status": "Pedido atualizado"}
+
+# --- ROTA 6B: APAGAR UM PEDIDO ---
+@app.delete("/pedidos/{id}")
+async def apagar_pedido(id: str):
+    resultado = await db.pedidos.delete_one({"_id": ObjectId(id)})
+    if resultado.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado")
+    return {"status": "Pedido apagado"}
 
 # --- ROTA 7: EDITAR DADOS DO PERFUME (NOME, IMAGEM, INSPIRAÇÃO) ---
 # O estoque continua controlado só pela ROTA 4, pra não ter dois jeitos de mexer no mesmo número.
