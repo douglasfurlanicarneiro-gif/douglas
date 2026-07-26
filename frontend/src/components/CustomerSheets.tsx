@@ -6,7 +6,7 @@ import { acompanharPedido } from '../api';
 import { brl, COLORS, fmtDate, OCASIOES, RADIUS, SPACING, STATUS } from '../theme';
 import type { Acompanhamento, Perfume } from '../types';
 import { BottomSheet } from './BottomSheet';
-import { Chip, EmptyState, PrimaryButton, SecondaryButton } from './atoms';
+import { Chip, PrimaryButton, SecondaryButton } from './atoms';
 
 export function PerfumeDetailSheet({
   perfume,
@@ -195,7 +195,27 @@ export function OrdersSheet({
     <BottomSheet visible={visible} onClose={onClose} title="Meus pedidos">
       {loading && <ActivityIndicator color={COLORS.gold} style={{ margin: 30 }} />}
       {!loading && orders.length === 0 && (
-        <EmptyState text="Seus pedidos feitos neste aparelho aparecerão aqui." />
+        <View style={styles.emptyOrders}>
+          <View style={styles.emptyOrdersGlow}>
+            <View style={styles.emptyOrdersIcon}>
+              <Feather name="package" size={30} color={COLORS.ink} />
+            </View>
+          </View>
+          <Text style={styles.emptyEyebrow}>SUA JORNADA L’ESSENCE</Text>
+          <Text style={styles.emptyTitle}>Sua próxima essência começa aqui</Text>
+          <Text style={styles.emptyText}>
+            Quando você fizer uma compra neste aparelho, poderá acompanhar cada etapa do pedido por aqui.
+          </Text>
+          <View style={styles.privacyNote}>
+            <Feather name="shield" size={16} color={COLORS.gold} />
+            <Text style={styles.privacyText}>
+              Este espaço é exclusivo deste aparelho. Seus pedidos permanecem privados.
+            </Text>
+          </View>
+          <View style={{ width: '100%', marginTop: SPACING.lg }}>
+            <PrimaryButton label="Descobrir fragrâncias" onPress={onClose} />
+          </View>
+        </View>
       )}
       {!loading && orders.map((order) => {
         const status = STATUS.find((item) => item.id === order.status) || STATUS[0];
@@ -278,4 +298,12 @@ const styles = StyleSheet.create({
   timelineDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   timelineText: { color: COLORS.bone, fontSize: 12, flex: 1 },
   timelineDate: { color: COLORS.muted, fontSize: 10 },
+  emptyOrders: { alignItems: 'center', paddingHorizontal: SPACING.sm, paddingTop: SPACING.xl, paddingBottom: SPACING.xl },
+  emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
+  emptyOrdersIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.gold, shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
+  emptyEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.8, textAlign: 'center' },
+  emptyTitle: { color: COLORS.bone, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center', marginTop: 8, maxWidth: 300 },
+  emptyText: { color: COLORS.muted, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 10, maxWidth: 315 },
+  privacyNote: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginTop: SPACING.xl, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '45', backgroundColor: COLORS.ink },
+  privacyText: { flex: 1, color: COLORS.bone, fontSize: 11, lineHeight: 17 },
 });
