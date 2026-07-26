@@ -192,7 +192,12 @@ export function OrdersSheet({
   }, [codes, visible]);
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title="Meus pedidos">
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      title="Meus pedidos"
+      contentContainerStyle={!loading && orders.length === 0 ? styles.emptyOrdersContent : undefined}
+    >
       {loading && <ActivityIndicator color={COLORS.gold} style={{ margin: 30 }} />}
       {!loading && orders.length === 0 && (
         <View style={styles.emptyOrders}>
@@ -295,7 +300,8 @@ const styles = StyleSheet.create({
   timelineDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   timelineText: { color: COLORS.bone, fontSize: 12, flex: 1 },
   timelineDate: { color: COLORS.muted, fontSize: 10 },
-  emptyOrders: { alignItems: 'center', paddingHorizontal: SPACING.sm, paddingTop: SPACING.xl, paddingBottom: SPACING.xl },
+  emptyOrdersContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACING.lg },
+  emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg },
   emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
   emptyOrdersIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.gold, shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
   emptyEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.8, textAlign: 'center' },

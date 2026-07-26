@@ -1,11 +1,27 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../theme';
 
-type Props = { visible: boolean; onClose: () => void; title: string; children: React.ReactNode; testID?: string; compact?: boolean };
+type Props = {
+  visible: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+  testID?: string;
+  compact?: boolean;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+};
 
-export function BottomSheet({ visible, onClose, title, children, testID, compact = false }: Props) {
+export function BottomSheet({
+  visible,
+  onClose,
+  title,
+  children,
+  testID,
+  compact = false,
+  contentContainerStyle,
+}: Props) {
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -30,7 +46,7 @@ export function BottomSheet({ visible, onClose, title, children, testID, compact
             <ScrollView
               ref={scrollRef}
               style={[styles.body, compact && styles.bodyCompact]}
-              contentContainerStyle={styles.bodyContent}
+              contentContainerStyle={[styles.bodyContent, contentContainerStyle]}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
               automaticallyAdjustKeyboardInsets
