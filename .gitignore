@@ -88,3 +88,4 @@ credentials.json
 *.key
 .credentials
 !**/.env.example
+frontend/expo-tunnel*.log
