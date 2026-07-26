@@ -202,14 +202,11 @@ export function OrdersSheet({
             </View>
           </View>
           <Text style={styles.emptyEyebrow}>SUA JORNADA L’ESSENCE</Text>
-          <Text style={styles.emptyTitle}>Sua próxima essência começa aqui</Text>
-          <Text style={styles.emptyText}>
-            Quando você fizer uma compra neste aparelho, poderá acompanhar cada etapa do pedido por aqui.
-          </Text>
+          <Text style={styles.emptyTitle}>Seu próximo perfume está aqui ✨!</Text>
           <View style={styles.privacyNote}>
             <Feather name="shield" size={16} color={COLORS.gold} />
             <Text style={styles.privacyText}>
-              Este espaço é exclusivo deste aparelho. Seus pedidos permanecem privados.
+              Este espaço é exclusivamente seu! Seus pedidos e suas informações serão todos privados.
             </Text>
           </View>
           <View style={{ width: '100%', marginTop: SPACING.lg }}>
@@ -303,7 +300,6 @@ const styles = StyleSheet.create({
   emptyOrdersIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.gold, shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
   emptyEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.8, textAlign: 'center' },
   emptyTitle: { color: COLORS.bone, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center', marginTop: 8, maxWidth: 300 },
-  emptyText: { color: COLORS.muted, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 10, maxWidth: 315 },
-  privacyNote: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginTop: SPACING.xl, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '45', backgroundColor: COLORS.ink },
+  privacyNote: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginTop: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '45', backgroundColor: COLORS.ink },
   privacyText: { flex: 1, color: COLORS.bone, fontSize: 11, lineHeight: 17 },
 });
