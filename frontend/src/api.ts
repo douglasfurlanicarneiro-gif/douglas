@@ -1,13 +1,15 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { storage } from './utils/storage';
 
 const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 export const API = `${BASE}/api`;
 
 const TOKEN_KEY = 'atelie-token-v1';
 
-export async function saveToken(token: string) { await AsyncStorage.setItem(TOKEN_KEY, token); }
-export async function getToken(): Promise<string | null> { return AsyncStorage.getItem(TOKEN_KEY); }
-export async function clearToken() { await AsyncStorage.removeItem(TOKEN_KEY); }
+// Token do Ateliê guardado no armazenamento seguro (Keychain/EncryptedSharedPreferences),
+// não em AsyncStorage puro — é uma credencial de acesso ao painel administrativo.
+export async function saveToken(token: string) { await storage.secureSet(TOKEN_KEY, token); }
+export async function getToken(): Promise<string | null> { return storage.secureGet(TOKEN_KEY, null); }
+export async function clearToken() { await storage.secureRemove(TOKEN_KEY); }
 
 async function request<T>(path: string, opts: RequestInit = {}, needsAuth = false): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(opts.headers as any) };

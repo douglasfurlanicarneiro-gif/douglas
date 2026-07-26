@@ -14,7 +14,7 @@ type VitrineItem = {
   precos: { ml: number; preco: number }[]; disponivel: boolean;
 };
 
-function VitrineCard({ item, onBuy }: { item: VitrineItem; onBuy: (ml: number, preco: number) => void }) {
+function VitrineCard({ item, onBuy, onReview }: { item: VitrineItem; onBuy: (ml: number, preco: number) => void; onReview: () => void }) {
   const [expandido, setExpandido] = useState(false);
   const temNotas = item.notasSaida || item.notasCoracao || item.notasFundo;
   return (
@@ -37,11 +37,16 @@ function VitrineCard({ item, onBuy }: { item: VitrineItem; onBuy: (ml: number, p
           <View style={styles.tag}><Text style={{ color: COLORS.gold, fontSize: 11 }}>{item.familia}</Text></View>
           <View style={styles.tag}><Text style={{ color: COLORS.muted, fontSize: 11 }}>{item.concentracao}</Text></View>
         </View>
-        {temNotas ? (
-          <Pressable onPress={() => setExpandido((v) => !v)} testID={`toggle-notas-${item.id}`}>
-            <Text style={{ color: COLORS.gold, fontSize: 12, marginTop: SPACING.sm }}>{expandido ? 'ocultar notas' : 'ver pirâmide olfativa'}</Text>
+        <View style={{ flexDirection: 'row', gap: 16, marginTop: SPACING.sm }}>
+          {temNotas ? (
+            <Pressable onPress={() => setExpandido((v) => !v)} testID={`toggle-notas-${item.id}`}>
+              <Text style={{ color: COLORS.gold, fontSize: 12 }}>{expandido ? 'ocultar notas' : 'ver pirâmide olfativa'}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={onReview} testID={`review-trigger-${item.id}`}>
+            <Text style={{ color: COLORS.muted, fontSize: 12 }}>avaliar</Text>
           </Pressable>
-        ) : null}
+        </View>
         {expandido ? (
           <View style={{ marginTop: SPACING.sm }}>
             {!!item.notasSaida && <Text style={{ color: COLORS.topNote, fontSize: 12 }}>Saída: {item.notasSaida}</Text>}
