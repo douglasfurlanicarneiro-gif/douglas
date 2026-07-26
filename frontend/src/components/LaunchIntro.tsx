@@ -1,14 +1,22 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../theme';
+
+const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.88)).current;
-  const auraOpacity = useRef(new Animated.Value(0)).current;
-  const auraScale = useRef(new Animated.Value(0.72)).current;
+  const logoScale = useRef(new Animated.Value(0.94)).current;
   const captionOpacity = useRef(new Animated.Value(0)).current;
+  const shineOpacity = useRef(new Animated.Value(0)).current;
+  const shineProgress = useRef(new Animated.Value(0)).current;
+
+  const shineTranslateX = shineProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-320, 520],
+  });
 
   useEffect(() => {
     const animation = Animated.sequence([
@@ -21,64 +29,54 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
         }),
         Animated.spring(logoScale, {
           toValue: 1,
-          speed: 8,
-          bounciness: 2,
+          speed: 7,
+          bounciness: 0,
           useNativeDriver: true,
         }),
         Animated.sequence([
-          Animated.timing(auraOpacity, {
-            toValue: 0.28,
-            duration: 500,
+          Animated.delay(300),
+          Animated.timing(captionOpacity, {
+            toValue: 1,
+            duration: 550,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+      Animated.parallel([
+        Animated.timing(shineProgress, {
+          toValue: 1,
+          duration: 1050,
+          easing: Easing.inOut(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(shineOpacity, {
+            toValue: 0.42,
+            duration: 260,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
-          Animated.timing(auraOpacity, {
-            toValue: 0.08,
-            duration: 650,
-            easing: Easing.inOut(Easing.quad),
+          Animated.delay(470),
+          Animated.timing(shineOpacity, {
+            toValue: 0,
+            duration: 320,
+            easing: Easing.in(Easing.quad),
             useNativeDriver: true,
           }),
         ]),
-        Animated.timing(auraScale, {
-          toValue: 1.18,
-          duration: 1150,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
       ]),
-      Animated.parallel([
-        Animated.sequence([
-          Animated.timing(logoScale, {
-            toValue: 1.035,
-            duration: 380,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(logoScale, {
-            toValue: 1,
-            duration: 420,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.timing(captionOpacity, {
-          toValue: 1,
-          duration: 650,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.delay(250),
+      Animated.delay(180),
       Animated.parallel([
         Animated.timing(overlayOpacity, {
           toValue: 0,
-          duration: 650,
+          duration: 580,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(logoScale, {
-          toValue: 1.06,
-          duration: 650,
+          toValue: 1.025,
+          duration: 580,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
@@ -90,7 +88,7 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
     });
 
     return () => animation.stop();
-  }, [auraOpacity, auraScale, captionOpacity, logoOpacity, logoScale, onFinish, overlayOpacity]);
+  }, [captionOpacity, logoOpacity, logoScale, onFinish, overlayOpacity, shineOpacity, shineProgress]);
 
   return (
     <Animated.View
@@ -99,15 +97,6 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
       testID="launch-intro"
     >
       <View style={styles.stage}>
-        <Animated.View
-          style={[
-            styles.aura,
-            {
-              opacity: auraOpacity,
-              transform: [{ scale: auraScale }],
-            },
-          ]}
-        />
         <Animated.Image
           source={require('../../assets/images/icon.png')}
           resizeMode="contain"
@@ -116,6 +105,27 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
             {
               opacity: logoOpacity,
               transform: [{ scale: logoScale }],
+            },
+          ]}
+        />
+        <AnimatedGradient
+          colors={[
+            'rgba(239, 211, 157, 0)',
+            'rgba(255, 239, 204, 0.92)',
+            'rgba(199, 162, 92, 0)',
+          ]}
+          locations={[0, 0.5, 1]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          pointerEvents="none"
+          style={[
+            styles.shine,
+            {
+              opacity: shineOpacity,
+              transform: [
+                { translateX: shineTranslateX },
+                { rotate: '16deg' },
+              ],
             },
           ]}
         />
@@ -139,26 +149,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stage: {
-    width: '74%',
-    maxWidth: 360,
+    width: '88%',
+    maxWidth: 520,
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  aura: {
-    position: 'absolute',
-    width: '76%',
-    aspectRatio: 1,
-    borderRadius: 999,
-    backgroundColor: COLORS.gold,
-    shadowColor: COLORS.gold,
-    shadowOpacity: 0.45,
-    shadowRadius: 36,
-    shadowOffset: { width: 0, height: 0 },
+    overflow: 'hidden',
   },
   logo: {
     width: '100%',
     height: '100%',
+    zIndex: 1,
+  },
+  shine: {
+    position: 'absolute',
+    zIndex: 2,
+    top: '-18%',
+    left: 0,
+    width: '28%',
+    height: '136%',
   },
   captionWrap: {
     position: 'absolute',
