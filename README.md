@@ -27,3 +27,21 @@ preços estavam zerados e não havia movimentos de entrada de estoque. Esses
 dados precisam ser definidos pelo proprietário antes da publicação e venda.
 
 Consulte `AUDITORIA_TECNICA.md` para detalhes técnicos e pendências de produção.
+
+## Publicação permanente
+
+O arquivo `render.yaml` prepara a vitrine como um site estático no Render. O
+build usa `npm ci && npm run build:web`, publica a pasta `frontend/dist` e
+mantém a API no serviço já existente.
+
+Depois de conectar o repositório ao Render como Blueprint, cada atualização do
+branch configurado gera uma nova versão automaticamente. Configure no backend
+as variáveis descritas em `backend/.env.example`; nunca envie o arquivo `.env`
+real para o repositório.
+
+## Privacidade dos pedidos
+
+O histórico no aparelho é identificado por códigos de acompanhamento longos e
+aleatórios. O cliente pode adicionar o mesmo pedido em outro aparelho usando
+esse código. Nome, telefone, e-mail e endereço não são retornados pela rota
+pública de acompanhamento.

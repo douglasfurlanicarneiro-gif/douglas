@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: lessence-furlani-vitrine
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build:web
+    staticPublishPath: dist
+    autoDeployTrigger: commit
+    envVars:
+      - key: EXPO_PUBLIC_BACKEND_URL
+        value: https://douglas-8rer.onrender.com
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=()

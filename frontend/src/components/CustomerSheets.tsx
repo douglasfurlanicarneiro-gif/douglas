@@ -6,7 +6,7 @@ import { acompanharPedido } from '../api';
 import { brl, COLORS, fmtDate, OCASIOES, RADIUS, SPACING, STATUS } from '../theme';
 import type { Acompanhamento, Perfume } from '../types';
 import { BottomSheet } from './BottomSheet';
-import { Chip, PrimaryButton, SecondaryButton } from './atoms';
+import { Chip, PrimaryButton, SecondaryButton, TInput } from './atoms';
 
 export function PerfumeDetailSheet({
   perfume,
@@ -171,14 +171,20 @@ export function OrdersSheet({
   codes,
   onClose,
   onRebuy,
+  onAddCode,
 }: {
   visible: boolean;
   codes: string[];
   onClose: () => void;
   onRebuy: (order: Acompanhamento) => void;
+  onAddCode: (code: string) => void;
 }) {
   const [orders, setOrders] = useState<Acompanhamento[]>([]);
   const [loading, setLoading] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryCode, setRecoveryCode] = useState('');
+  const [recoveryError, setRecoveryError] = useState('');
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     if (!visible || !codes.length) return;
@@ -190,6 +196,78 @@ export function OrdersSheet({
       ))
       .finally(() => setLoading(false));
   }, [codes, visible]);
+
+  const recoverOrder = async () => {
+    const code = recoveryCode.trim();
+    if (!code) {
+      setRecoveryError('Digite o código do pedido.');
+      return;
+    }
+    setRecovering(true);
+    setRecoveryError('');
+    try {
+      await acompanharPedido(code);
+      onAddCode(code);
+      setRecoveryCode('');
+      setRecoveryOpen(false);
+    } catch {
+      setRecoveryError('Código não encontrado. Confira os caracteres e tente novamente.');
+    } finally {
+      setRecovering(false);
+    }
+  };
+
+  const recovery = (
+    <View style={styles.recoveryArea}>
+      {!recoveryOpen ? (
+        <Pressable
+          onPress={() => {
+            setRecoveryError('');
+            setRecoveryOpen(true);
+          }}
+          style={styles.recoveryLink}
+          testID="order-recovery-open"
+        >
+          <Feather name="key" size={14} color={COLORS.gold} />
+          <Text style={styles.recoveryLinkText}>Adicionar pedido de outro aparelho</Text>
+        </Pressable>
+      ) : (
+        <View style={styles.recoveryCard}>
+          <Text style={styles.recoveryTitle}>Recuperar pedido</Text>
+          <Text style={styles.recoveryText}>
+            Digite o código exclusivo exibido na confirmação da compra.
+          </Text>
+          <TInput
+            value={recoveryCode}
+            onChangeText={(value) => {
+              setRecoveryCode(value);
+              setRecoveryError('');
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder="Código do pedido"
+            testID="order-recovery-code"
+          />
+          {!!recoveryError && <Text style={styles.recoveryError}>{recoveryError}</Text>}
+          <View style={styles.recoveryActions}>
+            <SecondaryButton
+              label="Cancelar"
+              onPress={() => {
+                setRecoveryOpen(false);
+                setRecoveryError('');
+              }}
+            />
+            <PrimaryButton
+              label={recovering ? 'Buscando…' : 'Adicionar'}
+              onPress={recoverOrder}
+              disabled={recovering || !recoveryCode.trim()}
+              testID="order-recovery-submit"
+            />
+          </View>
+        </View>
+      )}
+    </View>
+  );
 
   return (
     <BottomSheet
@@ -217,8 +295,10 @@ export function OrdersSheet({
           <View style={{ width: '100%', marginTop: SPACING.lg }}>
             <PrimaryButton label="Descobrir fragrâncias" onPress={onClose} />
           </View>
+          {recovery}
         </View>
       )}
+      {!loading && orders.length > 0 && recovery}
       {!loading && orders.map((order) => {
         const status = STATUS.find((item) => item.id === order.status) || STATUS[0];
         return (
@@ -308,4 +388,12 @@ const styles = StyleSheet.create({
   emptyTitle: { color: COLORS.bone, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center', marginTop: 8, maxWidth: 300 },
   privacyNote: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginTop: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '45', backgroundColor: COLORS.ink },
   privacyText: { flex: 1, color: COLORS.bone, fontSize: 11, lineHeight: 17 },
+  recoveryArea: { width: '100%', marginTop: SPACING.md },
+  recoveryLink: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  recoveryLinkText: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
+  recoveryCard: { width: '100%', padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
+  recoveryTitle: { color: COLORS.bone, fontSize: 15, fontWeight: '700' },
+  recoveryText: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 3, marginBottom: SPACING.sm },
+  recoveryError: { color: COLORS.rust, fontSize: 11, marginTop: 7 },
+  recoveryActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
 });

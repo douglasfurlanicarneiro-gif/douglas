@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -15,6 +15,8 @@ import type { Acompanhamento, Compra, Perfume } from '../types';
 type VitrineItem = Perfume;
 const FAVORITES_KEY = 'favorite-perfumes-v1';
 const ORDERS_KEY = 'customer-orders-v1';
+const CART_KEY = 'customer-cart-v1';
+type SavedCartLine = { perfumeId: string; ml: number; quantidade: number };
 const normalize = (value: string) => value
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
@@ -139,6 +141,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [orderCodes, setOrderCodes] = useState<string[]>([]);
   const [successOrder, setSuccessOrder] = useState<Compra | null>(null);
+  const cartRestored = useRef(false);
 
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
@@ -169,6 +172,43 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   }, []);
 
   const itens = useMemo(() => snapshot?.itens || [], [snapshot?.itens]);
+
+  useEffect(() => {
+    if (!itens.length || cartRestored.current) return;
+    storage.getItem(CART_KEY, '')
+      .then((saved) => {
+        if (!saved || cartRestored.current) return;
+        const lines = JSON.parse(saved) as SavedCartLine[];
+        const restored = lines.flatMap((line) => {
+          const perfume = itens.find((item) => item.id === line.perfumeId && item.disponivel);
+          const option = perfume?.precos.find((price) => price.ml === line.ml);
+          if (!perfume || !option || option.preco <= 0) return [];
+          return [{
+            perfume,
+            option,
+            quantidade: Math.max(1, Math.min(Number(line.quantidade) || 1, 20)),
+          }];
+        });
+        setCart(restored);
+      })
+      .catch(() => storage.removeItem(CART_KEY))
+      .finally(() => { cartRestored.current = true; });
+  }, [itens]);
+
+  useEffect(() => {
+    if (!cartRestored.current) return;
+    if (!cart.length) {
+      storage.removeItem(CART_KEY);
+      return;
+    }
+    const lines: SavedCartLine[] = cart.map((line) => ({
+      perfumeId: line.perfume.id,
+      ml: line.option.ml,
+      quantidade: line.quantidade,
+    }));
+    storage.setItem(CART_KEY, JSON.stringify(lines));
+  }, [cart]);
+
   const familias = useMemo(() => ['Todas', 'Favoritos', ...Array.from(new Set(itens.map((i) => i.familia)))], [itens]);
   const ocasioes = useMemo(
     () => ['Todas', ...Array.from(new Set(itens.flatMap((i) => i.ocasioes || [])))],
@@ -217,6 +257,14 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     if (!order.codigoAcompanhamento) return;
     setOrderCodes((current) => {
       const next = [order.codigoAcompanhamento!, ...current.filter((code) => code !== order.codigoAcompanhamento)].slice(0, 30);
+      storage.setItem(ORDERS_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const addOrderCode = (code: string) => {
+    setOrderCodes((current) => {
+      const next = [code, ...current.filter((saved) => saved !== code)].slice(0, 30);
       storage.setItem(ORDERS_KEY, JSON.stringify(next));
       return next;
     });
@@ -454,6 +502,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         codes={orderCodes}
         onClose={() => setOrdersOpen(false)}
         onRebuy={rebuy}
+        onAddCode={addOrderCode}
       />
 
       {/* Sugestão sheet */}
@@ -491,6 +540,24 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
             <Feather name="message-circle" size={18} color={COLORS.gold} />
             <Text style={styles.successNextText}>{orderSuccess}</Text>
           </View>
+          {!!successOrder?.codigoAcompanhamento && (
+            <View style={styles.trackingCodeCard}>
+              <Text style={styles.trackingCodeLabel}>CÓDIGO PARA ACESSAR EM OUTRO APARELHO</Text>
+              <Text selectable style={styles.trackingCode}>{successOrder.codigoAcompanhamento}</Text>
+              <Pressable
+                onPress={() => {
+                  void Share.share({
+                    message: `Meu pedido L’Essence Furlani pode ser acompanhado com este código: ${successOrder.codigoAcompanhamento}`,
+                  });
+                }}
+                style={styles.shareCodeButton}
+                testID="share-tracking-code"
+              >
+                <Feather name="share-2" size={14} color={COLORS.gold} />
+                <Text style={styles.shareCodeText}>Compartilhar código</Text>
+              </Pressable>
+            </View>
+          )}
           <View style={{ width: '100%', gap: 8 }}>
             {!!successOrder?.codigoAcompanhamento && (
               <SecondaryButton
@@ -599,4 +666,9 @@ const styles = StyleSheet.create({
   successText: { color: COLORS.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7, marginBottom: SPACING.lg, maxWidth: 330 },
   successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink, marginBottom: SPACING.lg },
   successNextText: { flex: 1, color: COLORS.bone, fontSize: 12, lineHeight: 18 },
+  trackingCodeCard: { width: '100%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.gold + '0C', marginBottom: SPACING.lg },
+  trackingCodeLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, textAlign: 'center' },
+  trackingCode: { color: COLORS.bone, fontSize: 17, fontWeight: '700', letterSpacing: 1.2, marginTop: 8 },
+  shareCodeButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 12, marginTop: 7 },
+  shareCodeText: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
 });
