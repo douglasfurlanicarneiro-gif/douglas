@@ -327,6 +327,13 @@ export function Atelie({ onSair }: { onSair: () => void }) {
 
     const atuais: PedidoPainel[] = pedidos.map((pedido) => ({
       ...pedido,
+      cliente: pedido.cliente || 'Cliente não informado',
+      contato: pedido.contato || '',
+      status: statusValido(pedido.status),
+      observacoes: pedido.observacoes || '',
+      itens: Array.isArray(pedido.itens) ? pedido.itens : [],
+      total: pedido.total || 0,
+      criadoEm: pedido.criadoEm || '',
       fonte: 'pedidos',
     }));
     const legados: PedidoPainel[] = compras.map((compra) => ({
@@ -571,7 +578,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
                   <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: 11 }}>{st.label}</Text></View>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                  <Text style={{ color: COLORS.muted, fontSize: 12 }}>{p.itens.length} item(ns) · {fmtDate(p.criadoEm)}</Text>
+                  <Text style={{ color: COLORS.muted, fontSize: 12 }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
                   <Text style={{ color: COLORS.bone, fontSize: 13 }}>{brl(p.total)}</Text>
                 </View>
                 <Pressable
