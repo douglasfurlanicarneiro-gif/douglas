@@ -100,6 +100,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [reviewItem, setReviewItem] = useState<VitrineItem | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
+  const [suggestionSuccess, setSuggestionSuccess] = useState(false);
 
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
@@ -151,7 +152,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     try {
       await createSugestao({ cliente: sugForm.cliente, contato: sugForm.contato, mensagem: sugForm.mensagem });
       setSugestaoOpen(false); setSugForm({ cliente: '', contato: '', mensagem: '' });
-      setInfo('Sugestão enviada! Obrigado por compartilhar.');
+      setSuggestionSuccess(true);
     } catch { setInfo('Não foi possível enviar. Tente novamente.'); }
     finally { setEnviando(false); }
   };
@@ -324,6 +325,18 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
             <Text style={styles.successNextText}>{orderSuccess}</Text>
           </View>
           <PrimaryButton label="Voltar à vitrine" onPress={() => setOrderSuccess(null)} testID="success-close" />
+        </View>
+      </BottomSheet>
+
+      <BottomSheet visible={suggestionSuccess} onClose={() => setSuggestionSuccess(false)} title="Sugestão recebida" compact testID="suggestion-success-sheet">
+        <View style={styles.successContent}>
+          <View style={styles.successIcon}>
+            <Feather name="message-circle" size={28} color={COLORS.ink} />
+          </View>
+          <Text style={styles.successEyebrow}>OBRIGADO POR COMPARTILHAR</Text>
+          <Text style={styles.successTitle}>Sua opinião é muito importante!</Text>
+          <Text style={styles.successText}>Recebemos sua sugestão com carinho e vamos trabalhar em cima do seu feedback para tornar a experiência L’Essence Furlani ainda mais especial.</Text>
+          <PrimaryButton label="Continuar explorando" onPress={() => setSuggestionSuccess(false)} testID="suggestion-success-close" />
         </View>
       </BottomSheet>
 
