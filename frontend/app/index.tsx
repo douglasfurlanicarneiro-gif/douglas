@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../src/theme';
@@ -6,6 +6,7 @@ import { Vitrine } from '../src/components/Vitrine';
 import { Atelie } from '../src/components/Atelie';
 import { BottomSheet } from '../src/components/BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton } from '../src/components/atoms';
+import { LaunchIntro } from '../src/components/LaunchIntro';
 import { login, saveToken, getToken, clearToken } from '../src/api';
 
 function LoginForm({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () => void }) {
@@ -49,6 +50,7 @@ export default function Index() {
   const [modo, setModo] = useState<'vitrine' | 'atelie'>('vitrine');
   const [pedindoSenha, setPedindoSenha] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [showIntro, setShowIntro] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -59,25 +61,27 @@ export default function Index() {
   }, []);
 
   const sair = async () => { await clearToken(); setModo('vitrine'); };
-
-  if (!checked) {
-    return <View style={{ flex: 1, backgroundColor: COLORS.ink }} />;
-  }
+  const finishIntro = useCallback(() => setShowIntro(false), []);
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.ink} />
-      {modo === 'atelie' ? (
-        <Atelie onSair={sair} />
+      <StatusBar barStyle="light-content" backgroundColor={showIntro ? '#080706' : COLORS.ink} />
+      {checked ? (
+        modo === 'atelie' ? (
+          <Atelie onSair={sair} />
+        ) : (
+          <Vitrine onAtelieClick={() => setPedindoSenha(true)} />
+        )
       ) : (
-        <Vitrine onAtelieClick={() => setPedindoSenha(true)} />
+        <View style={{ flex: 1, backgroundColor: COLORS.ink }} />
       )}
-      <BottomSheet visible={pedindoSenha} onClose={() => setPedindoSenha(false)} title="Painel de Controle" testID="login-sheet">
+      <BottomSheet visible={checked && pedindoSenha} onClose={() => setPedindoSenha(false)} title="Painel de Controle" testID="login-sheet">
         <LoginForm
           onUnlock={() => { setPedindoSenha(false); setModo('atelie'); }}
           onCancel={() => setPedindoSenha(false)}
         />
       </BottomSheet>
+      {showIntro && <LaunchIntro onFinish={finishIntro} />}
     </SafeAreaProvider>
   );
 }
