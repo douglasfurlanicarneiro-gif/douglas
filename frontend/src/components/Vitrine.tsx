@@ -99,6 +99,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [sugestaoOpen, setSugestaoOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState<VitrineItem | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
 
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
@@ -285,7 +286,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         onSuccess={(message) => {
           setCart([]);
           setCartOpen(false);
-          setInfo(message);
+          setOrderSuccess(message);
           load();
         }}
       />
@@ -305,9 +306,25 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
       </BottomSheet>
 
       {/* Info sheet */}
-      <BottomSheet visible={!!info} onClose={() => setInfo(null)} title="Aviso">
+      <BottomSheet visible={!!info} onClose={() => setInfo(null)} title="Aviso" compact>
         <Text style={{ color: COLORS.bone, marginBottom: SPACING.lg }}>{info}</Text>
         <PrimaryButton label="Entendi" onPress={() => setInfo(null)} testID="info-ok" />
+      </BottomSheet>
+
+      <BottomSheet visible={!!orderSuccess} onClose={() => setOrderSuccess(null)} title="Pedido confirmado" compact testID="order-success-sheet">
+        <View style={styles.successContent}>
+          <View style={styles.successIcon}>
+            <Feather name="check" size={30} color={COLORS.ink} />
+          </View>
+          <Text style={styles.successEyebrow}>OBRIGADO PELA SUA COMPRA</Text>
+          <Text style={styles.successTitle}>Seu pedido foi recebido!</Text>
+          <Text style={styles.successText}>A L’Essence Furlani agradece por fazer parte deste momento.</Text>
+          <View style={styles.successNextStep}>
+            <Feather name="message-circle" size={18} color={COLORS.gold} />
+            <Text style={styles.successNextText}>{orderSuccess}</Text>
+          </View>
+          <PrimaryButton label="Voltar à vitrine" onPress={() => setOrderSuccess(null)} testID="success-close" />
+        </View>
       </BottomSheet>
 
       {/* Review (avaliação do cliente) */}
@@ -375,4 +392,11 @@ const styles = StyleSheet.create({
   navText: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   cartBadge: { position: 'absolute', top: -7, right: -10, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   cartBadgeText: { color: COLORS.ink, fontSize: 9, fontWeight: '700' },
+  successContent: { alignItems: 'center', paddingTop: 4 },
+  successIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
+  successEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.6, textAlign: 'center' },
+  successTitle: { color: COLORS.bone, fontSize: 21, fontWeight: '700', textAlign: 'center', marginTop: 6 },
+  successText: { color: COLORS.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7, marginBottom: SPACING.lg, maxWidth: 330 },
+  successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink, marginBottom: SPACING.lg },
+  successNextText: { flex: 1, color: COLORS.bone, fontSize: 12, lineHeight: 18 },
 });

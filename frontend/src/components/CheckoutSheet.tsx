@@ -154,8 +154,8 @@ export function CheckoutSheet({
       const order = await createCompra(payload);
       await storage.setItem(CUSTOMER_KEY, JSON.stringify(form));
       const paymentMessage = order.pagamento?.status === 'gateway_nao_configurado'
-        ? 'Pedido recebido. O pagamento por cartão será combinado no atendimento.'
-        : 'Pedido recebido. A confirmação do pagamento aparecerá no acompanhamento.';
+        ? 'Nossa equipe entrará em contato pelo WhatsApp para combinar o pagamento e os próximos passos.'
+        : 'Em breve você receberá pelo WhatsApp a confirmação do pedido e os próximos passos.';
       onSuccess(paymentMessage);
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Não foi possível finalizar o pedido.');

@@ -3,9 +3,9 @@ import { View, Text, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingV
 import { Feather } from '@expo/vector-icons';
 import { COLORS, SPACING } from '../theme';
 
-type Props = { visible: boolean; onClose: () => void; title: string; children: React.ReactNode; testID?: string };
+type Props = { visible: boolean; onClose: () => void; title: string; children: React.ReactNode; testID?: string; compact?: boolean };
 
-export function BottomSheet({ visible, onClose, title, children, testID }: Props) {
+export function BottomSheet({ visible, onClose, title, children, testID, compact = false }: Props) {
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -20,7 +20,7 @@ export function BottomSheet({ visible, onClose, title, children, testID }: Props
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={styles.backdrop} onPress={onClose} testID="bottom-sheet-backdrop">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.avoider}>
-          <Pressable style={styles.sheet} onPress={() => {}} testID={testID}>
+          <Pressable style={[styles.sheet, compact && styles.sheetCompact]} onPress={() => {}} testID={testID}>
             <View style={styles.header}>
               <Text style={styles.title} numberOfLines={1}>{title}</Text>
               <Pressable onPress={onClose} hitSlop={12} testID="bottom-sheet-close">
@@ -29,7 +29,7 @@ export function BottomSheet({ visible, onClose, title, children, testID }: Props
             </View>
             <ScrollView
               ref={scrollRef}
-              style={styles.body}
+              style={[styles.body, compact && styles.bodyCompact]}
               contentContainerStyle={styles.bodyContent}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="interactive"
@@ -49,8 +49,10 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(10,9,6,0.72)', justifyContent: 'flex-end' },
   avoider: { flex: 1, justifyContent: 'flex-end', minHeight: 0 },
   sheet: { backgroundColor: COLORS.surfaceRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '88%', maxHeight: '88%', minHeight: 0, overflow: 'hidden' },
+  sheetCompact: { height: 'auto' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   title: { color: COLORS.bone, fontSize: 18, fontFamily: Platform.select({ default: undefined }), fontWeight: '500', flex: 1 },
   body: { flex: 1, minHeight: 0 },
+  bodyCompact: { flex: 0 },
   bodyContent: { padding: SPACING.lg, paddingBottom: 64 },
 });

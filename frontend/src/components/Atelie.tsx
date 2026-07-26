@@ -195,6 +195,7 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
 
 function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
   const [f, setF] = useState<any>(initial || { cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [] });
+  const pedidoRecebido = Boolean(initial?.id);
   const [searchingIdx, setSearchingIdx] = useState<number | null>(null);
   const [q, setQ] = useState('');
   const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
@@ -223,12 +224,17 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
         return (
           <View key={i} style={{ padding: SPACING.md, backgroundColor: COLORS.ink, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.sm }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <Pressable onPress={() => { setSearchingIdx(editando ? null : i); setQ(''); }} style={{ flex: 1 }} testID={`item-select-${i}`}>
+              <Pressable
+                onPress={() => { if (!pedidoRecebido) { setSearchingIdx(editando ? null : i); setQ(''); } }}
+                disabled={pedidoRecebido}
+                style={{ flex: 1 }}
+                testID={`item-select-${i}`}
+              >
                 <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p?.seq || 0)}</Text>
                 <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '500' }} numberOfLines={1}>{p?.nome || 'Selecionar perfume'}</Text>
-                <Text style={{ color: COLORS.muted, fontSize: 11 }}>{editando ? 'toque para fechar' : 'toque para trocar'}</Text>
+                {!pedidoRecebido && <Text style={{ color: COLORS.muted, fontSize: 11 }}>{editando ? 'toque para fechar' : 'toque para trocar'}</Text>}
               </Pressable>
-              <Pressable onPress={() => rmItem(i)} hitSlop={8}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>
+              {!pedidoRecebido && <Pressable onPress={() => rmItem(i)} hitSlop={8}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>}
             </View>
             {editando && (
               <View style={{ marginTop: SPACING.sm }}>
@@ -260,18 +266,33 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
                 </ScrollView>
               </View>
             )}
-            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: SPACING.sm }}>
-              {(p?.precos || []).map((pr: any) => (
-                <Pressable key={pr.ml} onPress={() => setItem(i, 'ml', pr.ml)} style={[styles.miniChip, Number(it.ml) === pr.ml && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                  <Text style={{ color: Number(it.ml) === pr.ml ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{pr.ml}ml · {brl(pr.preco)}</Text>
-                </Pressable>
-              ))}
-              <TInput style={{ width: 60 }} keyboardType="numeric" value={String(it.quantidade)} onChangeText={(v) => setItem(i, 'quantidade', Number(v) || 1)} />
-            </View>
+            {pedidoRecebido ? (
+              <View style={styles.orderChoiceRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.orderChoiceLabel}>TAMANHO ESCOLHIDO</Text>
+                  <Text style={styles.orderChoiceValue}>
+                    {it.ml}ml · {brl((p?.precos || []).find((pr: any) => pr.ml === Number(it.ml))?.preco || 0)}
+                  </Text>
+                </View>
+                <View style={styles.orderQuantity}>
+                  <Text style={styles.orderChoiceLabel}>QUANTIDADE</Text>
+                  <Text style={styles.orderQuantityValue}>{it.quantidade}</Text>
+                </View>
+              </View>
+            ) : (
+              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: SPACING.sm }}>
+                {(p?.precos || []).map((pr: any) => (
+                  <Pressable key={pr.ml} onPress={() => setItem(i, 'ml', pr.ml)} style={[styles.miniChip, Number(it.ml) === pr.ml && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
+                    <Text style={{ color: Number(it.ml) === pr.ml ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{pr.ml}ml · {brl(pr.preco)}</Text>
+                  </Pressable>
+                ))}
+                <TInput style={{ width: 60 }} keyboardType="numeric" value={String(it.quantidade)} onChangeText={(v) => setItem(i, 'quantidade', Number(v) || 1)} />
+              </View>
+            )}
           </View>
         );
       })}
-      <Pressable onPress={addItem} testID="pedido-add-item"><Text style={{ color: COLORS.gold, fontSize: 12, marginBottom: SPACING.md }}>+ adicionar item</Text></Pressable>
+      {!pedidoRecebido && <Pressable onPress={addItem} testID="pedido-add-item"><Text style={{ color: COLORS.gold, fontSize: 12, marginBottom: SPACING.md }}>+ adicionar item</Text></Pressable>}
       <Field label="Status">
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           {STATUS.map((s) => (
@@ -759,6 +780,11 @@ const styles = StyleSheet.create({
   imagePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginTop: -6, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
   imagePreviewPhoto: { width: 64, height: 64, borderRadius: 8, backgroundColor: COLORS.surface },
   imagePreviewText: { color: COLORS.muted, fontSize: 12 },
+  orderChoiceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: SPACING.md, paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border },
+  orderChoiceLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.8, marginBottom: 3 },
+  orderChoiceValue: { color: COLORS.gold, fontSize: 15, fontWeight: '600' },
+  orderQuantity: { minWidth: 76, alignItems: 'center', paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: COLORS.border },
+  orderQuantityValue: { color: COLORS.bone, fontSize: 17, fontWeight: '600' },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.ink },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },
