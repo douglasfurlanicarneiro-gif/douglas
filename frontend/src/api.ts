@@ -9,7 +9,11 @@ import type {
   Sugestao,
 } from './types';
 
-const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const previewHostname = typeof window !== 'undefined' ? window.location.hostname : '';
+const isLocalWebPreview = previewHostname === 'localhost'
+  || previewHostname === '127.0.0.1'
+  || previewHostname.endsWith('.exp.direct');
+const BASE = isLocalWebPreview ? '' : (process.env.EXPO_PUBLIC_BACKEND_URL || '');
 export const API = `${BASE}/api`;
 
 const TOKEN_KEY = 'atelie-token-v1';

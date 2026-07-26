@@ -1,5 +1,6 @@
 // metro.config.js
 const { getDefaultConfig } = require("expo/metro-config");
+const http = require('http');
 const path = require('path');
 const { FileStore } = require('metro-cache');
 
@@ -21,5 +22,45 @@ config.cacheStores = [
 
 // Reduce the number of workers to decrease resource usage
 config.maxWorkers = 2;
+
+// Durante a prévia via `npx expo start --tunnel`, mantém frontend e API no
+// mesmo endereço público. O Metro recebe /api/* e encaminha ao FastAPI local.
+const defaultEnhanceMiddleware = config.server?.enhanceMiddleware;
+config.server = {
+  ...config.server,
+  enhanceMiddleware: (middleware, metroServer) => {
+    const metroMiddleware = defaultEnhanceMiddleware
+      ? defaultEnhanceMiddleware(middleware, metroServer)
+      : middleware;
+
+    return (req, res, next) => {
+      if (!req.url?.startsWith('/api/')) {
+        return metroMiddleware(req, res, next);
+      }
+
+      const proxyRequest = http.request(
+        {
+          hostname: '127.0.0.1',
+          port: 8000,
+          path: req.url,
+          method: req.method,
+          headers: { ...req.headers, host: '127.0.0.1:8000' },
+        },
+        (proxyResponse) => {
+          res.writeHead(proxyResponse.statusCode || 502, proxyResponse.headers);
+          proxyResponse.pipe(res);
+        },
+      );
+
+      proxyRequest.on('error', () => {
+        if (!res.headersSent) {
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+        }
+        res.end(JSON.stringify({ detail: 'Backend local indisponível.' }));
+      });
+      req.pipe(proxyRequest);
+    };
+  },
+};
 
 module.exports = config;
