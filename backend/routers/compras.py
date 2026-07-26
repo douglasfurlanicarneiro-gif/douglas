@@ -54,7 +54,6 @@ class CompraIn(BaseModel):
         if self.itens:
             obrigatorios = (
                 self.nomeCompleto,
-                self.telefone,
                 self.whatsapp,
                 self.email,
                 self.endereco,
@@ -143,14 +142,14 @@ async def criar_compra(payload: CompraIn):
     # Salva/atualiza o cadastro do cliente por telefone/whatsapp, pra próxima
     # compra vir com os campos pré-preenchidos (o app consulta isso por
     # GET /api/clientes/por-contato/{contato} antes de abrir o formulário).
-    identificador = payload.whatsapp or payload.telefone or payload.contato
+    identificador = payload.whatsapp or payload.contato
     if payload.nomeCompleto and identificador:
         await db.clientes.update_one(
             {"contato": identificador},
             {"$set": {
                 "contato": identificador,
                 "nomeCompleto": payload.nomeCompleto,
-                "telefone": payload.telefone,
+                "telefone": payload.telefone or payload.whatsapp,
                 "whatsapp": payload.whatsapp,
                 "email": payload.email,
                 "endereco": payload.endereco.model_dump() if payload.endereco else None,

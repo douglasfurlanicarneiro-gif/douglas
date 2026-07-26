@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
 from database import get_db
-from routers import auth, clientes, compras, movimentos, opinioes, pedidos, perfumes, sugestoes, vitrine
+from routers import auth, cep, clientes, compras, movimentos, opinioes, pedidos, perfumes, sugestoes, vitrine
 from security import hash_password
 
 logging.basicConfig(level=logging.INFO)
@@ -59,6 +59,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(cep.router)
 app.include_router(perfumes.router)
 app.include_router(movimentos.router)
 app.include_router(pedidos.router)

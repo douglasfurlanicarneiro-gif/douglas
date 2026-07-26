@@ -110,7 +110,6 @@ export type CheckoutPayload = {
   cliente: string;
   contato: string;
   nomeCompleto: string;
-  telefone: string;
   whatsapp: string;
   email: string;
   endereco: {

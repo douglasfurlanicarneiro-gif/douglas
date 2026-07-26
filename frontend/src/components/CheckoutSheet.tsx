@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { ApiError, createCompra } from '../api';
+import { ApiError, buscarCep, createCompra } from '../api';
 import { storage } from '../utils/storage';
 import type { CheckoutPayload, Perfume, PriceOption } from '../types';
 import { brl, COLORS, SPACING } from '../theme';
@@ -22,7 +22,6 @@ type CustomerForm = Omit<CheckoutPayload, 'itens' | 'cliente' | 'contato' | 'obs
 
 const EMPTY_FORM: CustomerForm = {
   nomeCompleto: '',
-  telefone: '',
   whatsapp: '',
   email: '',
   endereco: {
@@ -58,6 +57,8 @@ export function CheckoutSheet({
   const [form, setForm] = useState<CustomerForm>(EMPTY_FORM);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepError, setCepError] = useState('');
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.option.preco * item.quantidade, 0),
     [items],
@@ -67,7 +68,13 @@ export function CheckoutSheet({
     storage.getItem(CUSTOMER_KEY, '').then((saved) => {
       if (!saved) return;
       try {
-        setForm({ ...EMPTY_FORM, ...(JSON.parse(saved) as CustomerForm) });
+        const parsed = JSON.parse(saved) as CustomerForm & { telefone?: string };
+        setForm({
+          ...EMPTY_FORM,
+          ...parsed,
+          whatsapp: parsed.whatsapp || parsed.telefone || '',
+          endereco: { ...EMPTY_FORM.endereco, ...(parsed.endereco || {}) },
+        });
       } catch {
         storage.removeItem(CUSTOMER_KEY);
       }
@@ -81,10 +88,39 @@ export function CheckoutSheet({
     }));
   };
 
+  const handleCep = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 8);
+    const formatted = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits;
+    setAddress('cep', formatted);
+    setCepError('');
+    if (digits.length !== 8) return;
+
+    setCepLoading(true);
+    buscarCep(digits)
+      .then((result) => {
+        setForm((current) => {
+          if (current.endereco.cep.replace(/\D/g, '') !== digits) return current;
+          return {
+            ...current,
+            endereco: {
+              ...current.endereco,
+              endereco: result.endereco,
+              bairro: result.bairro,
+              cidade: result.cidade,
+              estado: result.estado,
+            },
+          };
+        });
+      })
+      .catch((cause) => {
+        setCepError(cause instanceof ApiError ? cause.message : 'Não foi possível consultar o CEP.');
+      })
+      .finally(() => setCepLoading(false));
+  };
+
   const complete = Boolean(
     items.length &&
     form.nomeCompleto.trim().length >= 2 &&
-    form.telefone.trim().length >= 8 &&
     form.whatsapp.trim().length >= 8 &&
     form.email.includes('@') &&
     form.endereco.cep.replace(/\D/g, '').length === 8 &&
@@ -169,12 +205,15 @@ export function CheckoutSheet({
 
         <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1, marginBottom: SPACING.md }}>DADOS DO CLIENTE</Text>
         <Field label="Nome completo"><TInput value={form.nomeCompleto} onChangeText={(nomeCompleto) => setForm({ ...form, nomeCompleto })} /></Field>
-        <Field label="Telefone"><TInput keyboardType="phone-pad" value={form.telefone} onChangeText={(telefone) => setForm({ ...form, telefone })} /></Field>
-        <Field label="WhatsApp"><TInput keyboardType="phone-pad" value={form.whatsapp} onChangeText={(whatsapp) => setForm({ ...form, whatsapp })} /></Field>
+        <Field label="Celular / WhatsApp"><TInput keyboardType="phone-pad" autoComplete="tel" value={form.whatsapp} onChangeText={(whatsapp) => setForm({ ...form, whatsapp })} /></Field>
         <Field label="E-mail"><TInput keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={(email) => setForm({ ...form, email })} /></Field>
 
         <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1, marginVertical: SPACING.md }}>ENDEREÇO</Text>
-        <Field label="CEP"><TInput keyboardType="numeric" maxLength={9} value={form.endereco.cep} onChangeText={(value) => setAddress('cep', value)} /></Field>
+        <Field label="CEP">
+          <TInput keyboardType="numeric" autoComplete="postal-code" maxLength={9} value={form.endereco.cep} onChangeText={handleCep} />
+          {cepLoading && <Text style={{ color: COLORS.gold, fontSize: 11, marginTop: 5 }}>Buscando endereço…</Text>}
+          {!!cepError && <Text style={{ color: COLORS.rust, fontSize: 11, marginTop: 5 }}>{cepError}</Text>}
+        </Field>
         <Field label="Endereço"><TInput value={form.endereco.endereco} onChangeText={(value) => setAddress('endereco', value)} /></Field>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 1 }}><Field label="Número"><TInput value={form.endereco.numero} onChangeText={(value) => setAddress('numero', value)} /></Field></View>
