@@ -79,6 +79,14 @@ export const padronizarTamanhos = () => request<{ atualizados: number }>('/perfu
 // Estoque
 export const listMovimentos = () => request<Movimento[]>('/movimentos', {}, true);
 export const createMovimento = (data: Omit<Movimento, 'id' | 'origem' | 'data'>) => request<Movimento>('/movimentos', { method: 'POST', body: JSON.stringify(data) }, true);
+export const completarEstoque = (quantidadeMl = 1000) => request<{
+  perfumesConsiderados: number;
+  perfumesAtualizados: number;
+  estoqueAlvoMl: number;
+}>('/movimentos/completar-estoque', {
+  method: 'POST',
+  body: JSON.stringify({ quantidadeMl, somentePublicaveis: true }),
+}, true);
 export const getEstoqueMap = () => request<Record<string, number>>('/estoque');
 
 // Pedidos

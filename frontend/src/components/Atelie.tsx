@@ -8,7 +8,7 @@ import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
   listPerfumes, createPerfume, updatePerfume, deletePerfume, bulkImport, padronizarTamanhos,
-  listMovimentos, createMovimento, getEstoqueMap,
+  listMovimentos, createMovimento, completarEstoque, getEstoqueMap,
   listPedidos, createPedido, updatePedido, deletePedido,
   listOpinioes, deleteOpiniao,
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
@@ -382,6 +382,14 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     load();
   };
   const doMov = async (data: any) => { await createMovimento(data); setSheet(null); load(); };
+  const doCompletarEstoque = async () => {
+    const r = await completarEstoque(1000);
+    setSheet({
+      type: 'info',
+      label: `${r.perfumesAtualizados} perfume(s) atualizados. Todos os ${r.perfumesConsiderados} itens da vitrine agora possuem pelo menos ${r.estoqueAlvoMl}ml.`,
+    });
+    load();
+  };
   const doSavePedido = async (data: any) => {
     if (data.id) await updatePedido(data.id, data);
     else await createPedido(data);
@@ -527,6 +535,18 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     if (tab === 'estoque') {
       return (
         <View style={{ padding: SPACING.lg }}>
+          <Pressable
+            onPress={() => setSheet({
+              type: 'confirm',
+              label: 'Completar o estoque de todos os perfumes da vitrine para 1.000ml? Itens que já possuem 1.000ml ou mais não serão alterados.',
+              onConfirm: doCompletarEstoque,
+              confirmLabel: 'Completar estoque',
+            })}
+            style={styles.actionBtn}
+            testID="completar-estoque-btn"
+          >
+            <Text style={{ color: COLORS.gold, fontSize: 12 }}>Completar todos para 1.000ml</Text>
+          </Pressable>
           {perfumes.length === 0 && <EmptyState text="Cadastre um contratipo antes." />}
           {perfumes.map((p) => {
             const atual = estoqueDe(p.id);
