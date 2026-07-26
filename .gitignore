@@ -29,6 +29,7 @@ next-env.d.ts
 /build
 dist/
 dist
+dist-audit/
 
 # Environment files (comprehensive coverage)
 
@@ -86,3 +87,4 @@ android-sdk/
 credentials.json
 *.key
 .credentials
+!**/.env.example

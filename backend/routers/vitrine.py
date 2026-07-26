@@ -33,18 +33,16 @@ async def obter_vitrine():
     if not snapshot:
         return {"atualizadoEm": None, "itens": []}
 
-    # 'disponivel' é recalculado a cada leitura a partir do estoque atual —
-    # NUNCA usar o valor congelado de quando a vitrine foi publicada, senão um
-    # perfume que ficou sem estoque depois da publicação continua aparecendo
-    # como disponível até o dono publicar de novo (bug já corrigido antes,
-    # coberto por tests/test_vitrine_disponivel_dynamic.py).
     estoque_map: dict[str, int] = {}
     async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
         estoque_map[linha["_id"]] = linha["total"]
 
-    itens = snapshot.get("itens", [])
+    itens = [dict(item) for item in snapshot.get("itens", [])]
     for item in itens:
-        item["disponivel"] = estoque_map.get(item.get("id"), 0) > 0
+        qtd = estoque_map.get(item.get("id"), 0)
+        item["disponivel"] = qtd > 0
+        item["estoqueAtualMl"] = max(qtd, 0)
+        item["statusEstoque"] = "envio_imediato" if qtd > 0 else "indisponivel"
 
     return {"atualizadoEm": snapshot.get("atualizadoEm"), "itens": itens}
 
@@ -53,8 +51,6 @@ async def obter_vitrine():
 async def publicar_vitrine(_: str = Depends(require_atelie_auth)):
     db = get_db()
 
-    # Só publica quem o Ateliê marcou explicitamente como publicável
-    # (ver auditoria A6 sobre itens importados em massa).
     perfumes = await db.perfumes.find({"publicavel": True}).sort("seq", 1).to_list(2000)
 
     estoque_map: dict[str, int] = {}
@@ -64,7 +60,10 @@ async def publicar_vitrine(_: str = Depends(require_atelie_auth)):
     itens = []
     for p in perfumes:
         item = serialize(p)
-        item["disponivel"] = estoque_map.get(item["id"], 0) > 0
+        qtd = estoque_map.get(item["id"], 0)
+        item["disponivel"] = qtd > 0
+        item["estoqueAtualMl"] = max(qtd, 0)
+        item["statusEstoque"] = "envio_imediato" if qtd > 0 else "indisponivel"
         itens.append(item)
 
     atualizado_em = datetime.now(timezone.utc).isoformat()

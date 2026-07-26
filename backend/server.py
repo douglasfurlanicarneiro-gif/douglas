@@ -49,7 +49,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="Contratipos Ateliê API", lifespan=lifespan)
+app = FastAPI(title="L’Essence Furlani API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -71,4 +71,4 @@ app.include_router(clientes.router)
 
 @app.get("/")
 async def raiz():
-    return {"status": "ok", "servico": "Contratipos Ateliê API"}
+    return {"status": "ok", "servico": "L’Essence Furlani API"}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { COLORS, RADIUS, SPACING } from '../theme';
+import { COLORS, SPACING } from '../theme';
 
 type Props = { visible: boolean; onClose: () => void; title: string; children: React.ReactNode; testID?: string };
 

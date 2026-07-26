@@ -5,6 +5,11 @@ configure essas variáveis no Render (ou no .env local, nunca versionado).
 """
 import os
 
+from dotenv import load_dotenv
+from pathlib import Path
+
+load_dotenv(Path(__file__).parent / ".env")
+
 # --- Banco de dados ---
 MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = os.getenv("DB_NAME", "atelier_perfumes")

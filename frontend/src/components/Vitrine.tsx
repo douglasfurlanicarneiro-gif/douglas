@@ -2,79 +2,88 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { COLORS, SPACING, RADIUS, brl, padSeq } from '../theme';
-import { PyramidBar } from './PyramidBar';
 import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Chip, Stars } from './atoms';
-import { createCompra, createOpiniao, createSugestao, getVitrine } from '../api';
+import { createOpiniao, createSugestao, getVitrine } from '../api';
+import { CartItem, CheckoutSheet } from './CheckoutSheet';
+import type { Perfume } from '../types';
 
-type VitrineItem = {
-  id: string; seq: number; nome: string; inspiracao: string; familia: string; concentracao: string;
-  notasSaida: string; notasCoracao: string; notasFundo: string;
-  precos: { ml: number; preco: number }[]; disponivel: boolean;
-};
+type VitrineItem = Perfume;
 
 function VitrineCard({ item, onBuy, onReview }: { item: VitrineItem; onBuy: (ml: number, preco: number) => void; onReview: () => void }) {
-  const [expandido, setExpandido] = useState(false);
   const temNotas = item.notasSaida || item.notasCoracao || item.notasFundo;
+  const climaOcasiao = item.ocasioes?.length ? item.ocasioes.join(' · ') : 'Versátil · Todas as ocasiões';
   return (
     <View style={styles.card} testID={`vitrine-card-${item.id}`}>
-      <PyramidBar />
-      <View style={{ flex: 1, padding: SPACING.lg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.seq}>Nº {padSeq(item.seq)}</Text>
-            <Text style={styles.cardTitle}>{item.nome}</Text>
-            <Text style={styles.cardSub}>inspirado em {item.inspiracao || '—'}</Text>
-          </View>
-          <View style={[styles.pill, { borderColor: item.disponivel ? COLORS.sage : COLORS.rust }]}>
-            <Text style={{ color: item.disponivel ? COLORS.sage : COLORS.rust, fontSize: 11 }}>
+      <View style={styles.productTop}>
+        <View style={styles.imageFrame}>
+          {item.imagemUrl ? (
+            <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="cover" transition={180} />
+          ) : (
+            <View style={styles.imagePlaceholder}>
+              <Feather name="image" size={25} color={COLORS.muted} />
+              <Text style={styles.imagePlaceholderText}>Adicionar foto</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.productInfo}>
+          <Text style={styles.cardTitle}>{item.nome}</Text>
+          <Text style={styles.occasionLabel}>CLIMA & OCASIÃO</Text>
+          <Text style={styles.cardSub}>{climaOcasiao}</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.metaText}>{item.familia}</Text>
+            <View style={styles.metaDot} />
+            <Text style={styles.metaText}>{item.concentracao}</Text>
+            <View style={[styles.availabilityDot, { backgroundColor: item.disponivel ? COLORS.sage : COLORS.rust }]} />
+            <Text style={[styles.metaText, { color: item.disponivel ? COLORS.sage : COLORS.rust }]}>
               {item.disponivel ? 'disponível' : 'em falta'}
             </Text>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: SPACING.sm }}>
-          <View style={styles.tag}><Text style={{ color: COLORS.gold, fontSize: 11 }}>{item.familia}</Text></View>
-          <View style={styles.tag}><Text style={{ color: COLORS.muted, fontSize: 11 }}>{item.concentracao}</Text></View>
-        </View>
-        <View style={{ flexDirection: 'row', gap: 16, marginTop: SPACING.sm }}>
-          {temNotas ? (
-            <Pressable onPress={() => setExpandido((v) => !v)} testID={`toggle-notas-${item.id}`}>
-              <Text style={{ color: COLORS.gold, fontSize: 12 }}>{expandido ? 'ocultar notas' : 'ver pirâmide olfativa'}</Text>
-            </Pressable>
-          ) : null}
-          <Pressable onPress={onReview} testID={`review-trigger-${item.id}`}>
-            <Text style={{ color: COLORS.muted, fontSize: 12 }}>avaliar</Text>
-          </Pressable>
-        </View>
-        {expandido ? (
-          <View style={{ marginTop: SPACING.sm }}>
-            {!!item.notasSaida && <Text style={{ color: COLORS.topNote, fontSize: 12 }}>Saída: {item.notasSaida}</Text>}
-            {!!item.notasCoracao && <Text style={{ color: COLORS.heartNote, fontSize: 12 }}>Coração: {item.notasCoracao}</Text>}
-            {!!item.notasFundo && <Text style={{ color: COLORS.baseNote, fontSize: 12 }}>Fundo: {item.notasFundo}</Text>}
-          </View>
-        ) : null}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: SPACING.md }}>
+      </View>
+
+      <View style={styles.sizeRow}>
           {item.precos.map((pr, i) => (
             <Pressable
               key={i}
               disabled={!item.disponivel}
               onPress={() => onBuy(pr.ml, pr.preco)}
               testID={`buy-${item.id}-${pr.ml}`}
-              style={{
-                paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
-                backgroundColor: item.disponivel ? COLORS.gold : COLORS.ink,
-                borderWidth: 1, borderColor: item.disponivel ? COLORS.gold : COLORS.border,
-                opacity: item.disponivel ? 1 : 0.7,
-              }}
+              style={[styles.sizeButton, !item.disponivel && styles.sizeButtonDisabled]}
             >
-              <Text style={{ color: item.disponivel ? COLORS.ink : COLORS.bone, fontSize: 12, fontWeight: item.disponivel ? '600' : '400' }}>
-                {pr.ml}ml · {brl(pr.preco)}
-              </Text>
+              <Text style={[styles.sizeButtonText, !item.disponivel && { color: COLORS.muted }]}>+ {pr.ml}ml</Text>
+              <Text style={[styles.sizePrice, !item.disponivel && { color: COLORS.muted }]}>{brl(pr.preco)}</Text>
             </Pressable>
           ))}
-        </View>
       </View>
+
+      {temNotas ? (
+        <View style={styles.notes}>
+          {!!item.notasSaida && <NoteRow label="TOPO" value={item.notasSaida} />}
+          {!!item.notasCoracao && <NoteRow label="CORAÇÃO" value={item.notasCoracao} />}
+          {!!item.notasFundo && <NoteRow label="BASE" value={item.notasFundo} />}
+        </View>
+      ) : (
+        <View style={styles.notesEmpty}>
+          <Text style={styles.notesEmptyText}>Notas olfativas em atualização</Text>
+        </View>
+      )}
+
+      <Pressable onPress={onReview} style={styles.reviewButton} testID={`review-trigger-${item.id}`}>
+        <Feather name="star" size={13} color={COLORS.gold} />
+        <Text style={styles.reviewText}>Avaliar fragrância</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function NoteRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.noteRow}>
+      <Text style={styles.noteLabel}>{label}</Text>
+      <Text style={styles.noteValue}>{value}</Text>
     </View>
   );
 }
@@ -85,12 +94,12 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [snapshot, setSnapshot] = useState<{ atualizadoEm: string | null; itens: VitrineItem[] } | null>(null);
   const [search, setSearch] = useState('');
   const [familiaAtiva, setFamiliaAtiva] = useState('Todas');
-  const [buyItem, setBuyItem] = useState<{ item: VitrineItem; ml: number; preco: number } | null>(null);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
   const [sugestaoOpen, setSugestaoOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState<VitrineItem | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  const [buyForm, setBuyForm] = useState({ cliente: '', contato: '', observacoes: '' });
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
   const [enviando, setEnviando] = useState(false);
@@ -99,35 +108,41 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     try {
       const r = await getVitrine();
       setSnapshot(r);
-    } catch (e) {
+    } catch {
       setSnapshot({ atualizadoEm: null, itens: [] });
     } finally { setLoading(false); setRefreshing(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  const itens = snapshot?.itens || [];
+  const itens = useMemo(() => snapshot?.itens || [], [snapshot?.itens]);
   const familias = useMemo(() => ['Todas', ...Array.from(new Set(itens.map((i) => i.familia)))], [itens]);
   const filtrados = useMemo(() => itens.filter((i) => {
-    const okBusca = (i.nome + ' ' + (i.inspiracao || '')).toLowerCase().includes(search.toLowerCase());
+    const searchable = [
+      i.nome,
+      i.familia,
+      ...(i.ocasioes || []),
+      i.notasSaida,
+      i.notasCoracao,
+      i.notasFundo,
+    ].filter(Boolean).join(' ').toLowerCase();
+    const okBusca = searchable.includes(search.trim().toLowerCase());
     const okFam = familiaAtiva === 'Todas' || i.familia === familiaAtiva;
     return okBusca && okFam;
   }), [itens, search, familiaAtiva]);
 
-  const submitCompra = async () => {
-    if (!buyItem || !buyForm.cliente.trim() || !buyForm.contato.trim()) return;
-    setEnviando(true);
-    try {
-      await createCompra({
-        perfumeId: buyItem.item.id, perfumeNome: buyItem.item.nome,
-        ml: buyItem.ml, preco: buyItem.preco,
-        cliente: buyForm.cliente, contato: buyForm.contato, observacoes: buyForm.observacoes,
-      });
-      setBuyItem(null); setBuyForm({ cliente: '', contato: '', observacoes: '' });
-      setInfo('Pedido de compra enviado! Vamos entrar em contato em breve.');
-    } catch (e) { setInfo('Não foi possível enviar. Tente novamente.'); }
-    finally { setEnviando(false); }
+  const addToCart = (item: VitrineItem, ml: number, preco: number) => {
+    setCart((current) => {
+      const index = current.findIndex((line) => line.perfume.id === item.id && line.option.ml === ml);
+      if (index < 0) return [...current, { perfume: item, option: { ml, preco }, quantidade: 1 }];
+      return current.map((line, lineIndex) => lineIndex === index
+        ? { ...line, quantidade: Math.min(line.quantidade + 1, 20) }
+        : line);
+    });
+    setCartOpen(true);
   };
+
+  const cartCount = cart.reduce((total, item) => total + item.quantidade, 0);
 
   const submitSugestao = async () => {
     if (!sugForm.mensagem.trim()) return;
@@ -136,7 +151,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
       await createSugestao({ cliente: sugForm.cliente, contato: sugForm.contato, mensagem: sugForm.mensagem });
       setSugestaoOpen(false); setSugForm({ cliente: '', contato: '', mensagem: '' });
       setInfo('Sugestão enviada! Obrigado por compartilhar.');
-    } catch (e) { setInfo('Não foi possível enviar. Tente novamente.'); }
+    } catch { setInfo('Não foi possível enviar. Tente novamente.'); }
     finally { setEnviando(false); }
   };
 
@@ -152,7 +167,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
       });
       setReviewItem(null); setReviewForm({ cliente: '', nota: 5, comentario: '' });
       setInfo('Avaliação enviada! Obrigado.');
-    } catch (e) { setInfo('Não foi possível enviar. Tente novamente.'); }
+    } catch { setInfo('Não foi possível enviar. Tente novamente.'); }
     finally { setEnviando(false); }
   };
 
@@ -185,15 +200,15 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         data={filtrados}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
-          <VitrineCard item={item} onBuy={(ml, preco) => setBuyItem({ item, ml, preco })} onReview={() => setReviewItem(item)} />
+          <VitrineCard item={item} onBuy={(ml, preco) => addToCart(item, ml, preco)} onReview={() => setReviewItem(item)} />
         )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={COLORS.gold} />}
         ListHeaderComponent={
           <View>
-            <View style={{ paddingHorizontal: SPACING.lg, paddingTop: SPACING.xl, paddingBottom: SPACING.md }}>
-              <Text style={styles.eyebrow}>VITRINE</Text>
-              <Text style={styles.h1}>Coleção de Contratipos</Text>
-              <Text style={styles.subtitle}>Inspirados nos grandes nomes da perfumaria de luxo e nicho.</Text>
+            <View style={styles.brandHeader}>
+              <Text style={styles.eyebrow}>L’ESSENCE</Text>
+              <Text style={styles.h1}>FURLANI</Text>
+              <Text style={styles.subtitle}>PERFUMARIA AUTORAL</Text>
             </View>
             {!showEmpty && (
               <View style={{ paddingHorizontal: SPACING.lg }}>
@@ -202,7 +217,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
                   <TextInput
                     value={search}
                     onChangeText={setSearch}
-                    placeholder="Buscar por nome ou inspiração"
+                    placeholder="Buscar fragrância, nota ou ocasião…"
                     placeholderTextColor={COLORS.muted + 'BB'}
                     style={styles.searchInput}
                     testID="vitrine-search"
@@ -227,7 +242,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
             <View style={{ paddingHorizontal: SPACING.lg }}><EmptyState text="Nenhum contratipo encontrado." /></View>
           )
         }
-        contentContainerStyle={{ paddingHorizontal: SPACING.lg, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingHorizontal: SPACING.lg, paddingBottom: 160 }}
       />
 
       {/* Floating suggestion button */}
@@ -239,26 +254,41 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         <Feather name="message-circle" size={22} color={COLORS.ink} />
       </Pressable>
 
-      {/* Compra sheet */}
-      <BottomSheet visible={!!buyItem} onClose={() => setBuyItem(null)} title="Confirmar pedido de compra" testID="buy-sheet">
-        {buyItem && (
+      <View style={styles.bottomNav}>
+        <View style={styles.navItem}>
+          <Feather name="home" size={22} color={COLORS.gold} />
+          <Text style={styles.navTextActive}>Vitrine</Text>
+        </View>
+        <Pressable
+          onPress={() => cartCount ? setCartOpen(true) : setInfo('Seu carrinho está vazio. Escolha um tamanho para começar.')}
+          style={styles.navItem}
+          testID="cart-button"
+        >
           <View>
-            <View style={{ padding: SPACING.md, borderRadius: 12, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
-              <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(buyItem.item.seq)}</Text>
-              <Text style={{ color: COLORS.bone, fontSize: 16, fontWeight: '500' }}>{buyItem.item.nome}</Text>
-              <Text style={{ color: COLORS.muted, fontSize: 12 }}>inspirado em {buyItem.item.inspiracao || '—'}</Text>
-              <Text style={{ color: COLORS.bone, fontSize: 14, marginTop: 6 }}>{buyItem.ml}ml · {brl(buyItem.preco)}</Text>
-            </View>
-            <Field label="Seu nome"><TInput value={buyForm.cliente} onChangeText={(v) => setBuyForm({ ...buyForm, cliente: v })} placeholder="Nome completo" testID="buy-cliente" /></Field>
-            <Field label="WhatsApp ou e-mail"><TInput value={buyForm.contato} onChangeText={(v) => setBuyForm({ ...buyForm, contato: v })} placeholder="(00) 00000-0000" testID="buy-contato" /></Field>
-            <Field label="Observações (opcional)"><TInput value={buyForm.observacoes} onChangeText={(v) => setBuyForm({ ...buyForm, observacoes: v })} multiline style={{ minHeight: 80, textAlignVertical: 'top' }} /></Field>
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
-              <SecondaryButton label="Cancelar" onPress={() => setBuyItem(null)} />
-              <PrimaryButton label={enviando ? 'Enviando…' : 'Enviar pedido'} onPress={submitCompra} disabled={enviando || !buyForm.cliente.trim() || !buyForm.contato.trim()} testID="buy-submit" />
-            </View>
+            <Feather name="shopping-cart" size={23} color={COLORS.muted} />
+            {cartCount > 0 && <View style={styles.cartBadge}><Text style={styles.cartBadgeText}>{cartCount}</Text></View>}
           </View>
-        )}
-      </BottomSheet>
+          <Text style={styles.navText}>Carrinho</Text>
+        </Pressable>
+      </View>
+
+      <CheckoutSheet
+        visible={cartOpen}
+        items={cart}
+        onClose={() => setCartOpen(false)}
+        onChangeQuantity={(index, quantity) => setCart((current) => (
+          quantity <= 0
+            ? current.filter((_, lineIndex) => lineIndex !== index)
+            : current.map((line, lineIndex) => lineIndex === index ? { ...line, quantidade: Math.min(quantity, 20) } : line)
+        ))}
+        onRemove={(index) => setCart((current) => current.filter((_, lineIndex) => lineIndex !== index))}
+        onSuccess={(message) => {
+          setCart([]);
+          setCartOpen(false);
+          setInfo(message);
+          load();
+        }}
+      />
 
       {/* Sugestão sheet */}
       <BottomSheet visible={sugestaoOpen} onClose={() => setSugestaoOpen(false)} title="Enviar sugestão" testID="sugestao-sheet">
@@ -304,17 +334,45 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.ink },
-  eyebrow: { color: COLORS.gold, fontSize: 11, letterSpacing: 2, fontWeight: '500' },
-  h1: { color: COLORS.bone, fontSize: 28, fontWeight: '500', marginTop: 6 },
-  subtitle: { color: COLORS.muted, fontSize: 13, marginTop: 6 },
-  atelieAccess: { position: 'absolute', top: 58, right: SPACING.lg, zIndex: 40, width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, marginBottom: SPACING.sm },
-  searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 10, fontSize: 14 },
-  card: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.md, overflow: 'hidden' },
-  seq: { color: COLORS.gold, fontSize: 11, letterSpacing: 1 },
-  cardTitle: { color: COLORS.bone, fontSize: 17, fontWeight: '500', marginTop: 2 },
-  cardSub: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
-  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.ink, flexShrink: 0 },
-  tag: { paddingHorizontal: 10, paddingVertical: 3, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
-  fabSuggestion: { position: 'absolute', right: 20, bottom: 30, width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  brandHeader: { alignItems: 'center', paddingHorizontal: 56, paddingTop: SPACING.xl, paddingBottom: SPACING.lg },
+  eyebrow: { color: COLORS.gold, fontSize: 11, letterSpacing: 5, fontWeight: '500' },
+  h1: { color: COLORS.bone, fontSize: 26, lineHeight: 30, letterSpacing: 1.5, fontWeight: '700', marginTop: 2 },
+  subtitle: { color: COLORS.muted, fontSize: 9, letterSpacing: 2.2, marginTop: 5 },
+  atelieAccess: { position: 'absolute', top: 48, right: SPACING.lg, zIndex: 40, width: 38, height: 38, borderRadius: 19, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 16, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, marginBottom: SPACING.sm },
+  searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 12, fontSize: 14 },
+  card: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.lg, padding: SPACING.md, overflow: 'hidden' },
+  productTop: { flexDirection: 'row', gap: SPACING.md },
+  imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
+  productImage: { width: '100%', height: '100%' },
+  imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  imagePlaceholderText: { color: COLORS.muted, fontSize: 9 },
+  productInfo: { flex: 1, minWidth: 0, paddingTop: 2 },
+  cardTitle: { color: COLORS.bone, fontSize: 17, lineHeight: 21, fontWeight: '700' },
+  occasionLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, marginTop: 9 },
+  cardSub: { color: COLORS.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 9 },
+  metaText: { color: COLORS.muted, fontSize: 9 },
+  metaDot: { width: 2, height: 2, borderRadius: 1, backgroundColor: COLORS.muted },
+  availabilityDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
+  sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: SPACING.md },
+  sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', backgroundColor: COLORS.ink },
+  sizeButtonDisabled: { borderColor: COLORS.border, opacity: 0.65 },
+  sizeButtonText: { color: COLORS.gold, fontSize: 12, lineHeight: 15, fontWeight: '700' },
+  sizePrice: { color: COLORS.bone, fontSize: 9, lineHeight: 12, marginTop: 1 },
+  notes: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: SPACING.md, paddingTop: 10, gap: 6 },
+  noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  noteLabel: { width: 58, color: COLORS.muted, fontSize: 9, lineHeight: 15, letterSpacing: 0.8 },
+  noteValue: { flex: 1, color: COLORS.bone, fontSize: 11, lineHeight: 15, fontStyle: 'italic' },
+  notesEmpty: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
+  notesEmptyText: { color: COLORS.muted, fontSize: 10, fontStyle: 'italic' },
+  reviewButton: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10, paddingVertical: 3 },
+  reviewText: { color: COLORS.gold, fontSize: 10 },
+  fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
+  navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
+  navTextActive: { color: COLORS.gold, fontSize: 11, marginTop: 3 },
+  navText: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  cartBadge: { position: 'absolute', top: -7, right: -10, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
+  cartBadgeText: { color: COLORS.ink, fontSize: 9, fontWeight: '700' },
 });

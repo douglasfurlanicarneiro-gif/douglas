@@ -10,8 +10,9 @@ App mobile Expo/React Native para atelier de perfumes contratipos (dupes inspira
 - Backend: FastAPI + MongoDB (motor async)
 - Persistência do token do Ateliê: AsyncStorage
 
-## Credenciais fixas (Ateliê)
-Ver `/app/memory/test_credentials.md`. Usuário `douglasfurlani` / Senha `Dfc160201`.
+## Credenciais do Ateliê
+Defina `ATELIE_ADMIN_USER`, `ATELIE_ADMIN_PASSWORD` e `JWT_SECRET` nas
+variáveis de ambiente. Credenciais reais não devem ser versionadas.
 
 ## Acesso ao Ateliê
 Long-press (~0.8s) no ícone de cadeado discreto no canto superior direito da Vitrine → abre bottom sheet com login.

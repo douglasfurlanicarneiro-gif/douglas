@@ -28,6 +28,17 @@ export const STATUS = [
 
 export const FAMILIAS = ['Amadeirado', 'Floral', 'Oriental', 'Cítrico', 'Aromático', 'Chipre', 'Gourmand', 'Aquático'];
 export const CONCENTRACOES = ['Extrait', 'EDP', 'EDT', 'EDC'];
+export const OCASIOES = [
+  'Verão',
+  'Inverno',
+  'Meia-estação',
+  'Dia',
+  'Noite',
+  'Uso diário',
+  'Trabalho',
+  'Encontros',
+  'Ocasiões especiais',
+];
 
 export const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 export const fmtDate = (iso?: string | null) => { if (!iso) return ''; try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return ''; } };

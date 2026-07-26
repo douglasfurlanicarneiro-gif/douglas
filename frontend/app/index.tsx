@@ -17,22 +17,29 @@ function LoginForm({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () 
     setLoading(true); setErro('');
     try {
       const r = await login(usuario.trim(), senha);
-      if (r.ok && r.token) { await saveToken(r.token); onUnlock(); }
-      else setErro('Usuário ou senha incorretos.');
-    } catch (e) { setErro('Erro ao conectar. Tente novamente.'); }
+      if (r.ok && r.token) {
+        await saveToken(r.token);
+        onUnlock();
+      } else {
+        setErro('Usuário ou senha incorretos.');
+      }
+    } catch { setErro('Erro ao conectar. Tente novamente.'); }
     finally { setLoading(false); }
   };
   return (
     <View>
+      <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1.5, marginBottom: SPACING.sm }}>
+        ACESSO RESTRITO
+      </Text>
       <Text style={{ color: COLORS.muted, fontSize: 13, marginBottom: SPACING.md }}>
-        Entre com o usuário e a senha do Ateliê.
+        Entre com suas credenciais de administrador.
       </Text>
       <Field label="Usuário"><TInput value={usuario} onChangeText={setUsuario} autoCapitalize="none" autoCorrect={false} testID="login-usuario" /></Field>
       <Field label="Senha"><TInput value={senha} onChangeText={setSenha} secureTextEntry testID="login-senha" /></Field>
       {!!erro && <Text style={{ color: COLORS.rust, fontSize: 12, marginBottom: 8 }} testID="login-erro">{erro}</Text>}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <PrimaryButton label={loading ? 'Entrando…' : 'Entrar'} onPress={entrar} disabled={loading} testID="login-submit" />
+        <PrimaryButton label={loading ? 'Entrando…' : 'Entrar'} onPress={entrar} disabled={loading || !usuario.trim() || !senha} testID="login-submit" />
       </View>
     </View>
   );
@@ -65,7 +72,7 @@ export default function Index() {
       ) : (
         <Vitrine onAtelieClick={() => setPedindoSenha(true)} />
       )}
-      <BottomSheet visible={pedindoSenha} onClose={() => setPedindoSenha(false)} title="Acesso do Ateliê" testID="login-sheet">
+      <BottomSheet visible={pedindoSenha} onClose={() => setPedindoSenha(false)} title="Painel de Controle" testID="login-sheet">
         <LoginForm
           onUnlock={() => { setPedindoSenha(false); setModo('atelie'); }}
           onCancel={() => setPedindoSenha(false)}

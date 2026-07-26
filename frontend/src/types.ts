@@ -1,0 +1,127 @@
+export type PriceOption = {
+  ml: number;
+  preco: number;
+};
+
+export type Perfume = {
+  id: string;
+  seq: number;
+  nome: string;
+  inspiracao: string;
+  imagemUrl: string;
+  ocasioes: string[];
+  familia: string;
+  concentracao: string;
+  notasSaida: string;
+  notasCoracao: string;
+  notasFundo: string;
+  precos: PriceOption[];
+  estoqueMinimoMl: number;
+  publicavel: boolean;
+  disponivel?: boolean;
+  estoqueAtualMl?: number;
+};
+
+export type Movimento = {
+  id: string;
+  perfumeId: string;
+  tipo: 'entrada' | 'saida';
+  quantidadeMl: number;
+  motivo: string;
+  origem: string;
+  data: string;
+};
+
+export type OrderStatus = 'pendente' | 'preparando' | 'enviado' | 'entregue' | 'cancelado';
+
+export type PedidoItem = {
+  perfumeId: string;
+  ml: number;
+  quantidade: number;
+};
+
+export type Pedido = {
+  id: string;
+  seq: number;
+  cliente: string;
+  contato: string;
+  status: OrderStatus;
+  observacoes: string;
+  itens: PedidoItem[];
+  total: number;
+  criadoEm: string;
+};
+
+export type Opiniao = {
+  id: string;
+  perfumeId: string;
+  cliente: string;
+  nota: number;
+  comentario: string;
+  data: string;
+};
+
+export type Sugestao = {
+  id: string;
+  cliente: string;
+  contato: string;
+  mensagem: string;
+  data: string;
+  lida: boolean;
+};
+
+export type CompraItem = {
+  perfumeId: string;
+  perfumeNome: string;
+  ml: number;
+  quantidade: number;
+  precoUnitario: number;
+  subtotal: number;
+};
+
+export type Compra = {
+  id: string;
+  seq?: number;
+  cliente: string;
+  contato: string;
+  itens?: CompraItem[];
+  perfumeId?: string;
+  perfumeNome?: string;
+  ml?: number;
+  preco?: number;
+  subtotal?: number;
+  frete?: number;
+  total?: number;
+  status: string;
+  observacoes: string;
+  formaPagamento?: 'pix' | 'cartao';
+  pagamento?: {
+    metodo: string;
+    status: string;
+    referencia: string;
+    cobrancaId?: string;
+  };
+  data: string;
+  criadoEm?: string;
+};
+
+export type CheckoutPayload = {
+  itens: { perfumeId: string; ml: number; quantidade: number }[];
+  cliente: string;
+  contato: string;
+  nomeCompleto: string;
+  telefone: string;
+  whatsapp: string;
+  email: string;
+  endereco: {
+    cep: string;
+    endereco: string;
+    numero: string;
+    complemento: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+  };
+  formaPagamento: 'pix' | 'cartao';
+  observacoes: string;
+};

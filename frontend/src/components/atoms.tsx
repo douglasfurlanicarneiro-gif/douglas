@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, TextInputProps } from 'react-native';
+import { View, Text, TextInput, Pressable, TextInputProps, TextStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { COLORS, RADIUS, SPACING } from '../theme';
 
-export const inputStyle = {
+export const inputStyle: TextStyle = {
   width: '100%',
   backgroundColor: COLORS.ink,
   borderWidth: 1,
@@ -13,7 +14,7 @@ export const inputStyle = {
   paddingVertical: 10,
   color: COLORS.bone,
   fontSize: 14,
-} as const;
+};
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -25,13 +26,13 @@ export function Field({ label, children }: { label: string; children: React.Reac
 }
 
 export function TInput(props: TextInputProps) {
-  return <TextInput {...props} placeholderTextColor={COLORS.muted + 'BB'} style={[inputStyle as any, props.style]} />;
+  return <TextInput {...props} placeholderTextColor={COLORS.muted + 'BB'} style={[inputStyle, props.style]} />;
 }
 
 export function PrimaryButton({ label, onPress, disabled, testID }: { label: string; onPress: () => void; disabled?: boolean; testID?: string }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       disabled={disabled}
       testID={testID}
       style={({ pressed }) => [
@@ -46,7 +47,7 @@ export function PrimaryButton({ label, onPress, disabled, testID }: { label: str
 export function SecondaryButton({ label, onPress, testID }: { label: string; onPress: () => void; testID?: string }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => { void Haptics.selectionAsync(); onPress(); }}
       testID={testID}
       style={({ pressed }) => [
         { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, opacity: pressed ? 0.85 : 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center', flex: 1 },
@@ -80,7 +81,7 @@ export function Stars({ value, onChange, size = 16 }: { value: number; onChange?
 export function Chip({ label, active, onPress, testID }: { label: string; active?: boolean; onPress: () => void; testID?: string }) {
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => { void Haptics.selectionAsync(); onPress(); }}
       testID={testID}
       style={{
         height: 36,

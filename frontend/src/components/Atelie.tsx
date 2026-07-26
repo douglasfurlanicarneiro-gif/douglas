@@ -1,24 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, STATUS, FAMILIAS, CONCENTRACOES, brl, fmtDate, padSeq } from '../theme';
-import { PyramidBar } from './PyramidBar';
+import { Image } from 'expo-image';
+import { COLORS, SPACING, RADIUS, STATUS, FAMILIAS, CONCENTRACOES, OCASIOES, brl, fmtDate, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
   listPerfumes, createPerfume, updatePerfume, deletePerfume, bulkImport, padronizarTamanhos,
   listMovimentos, createMovimento, getEstoqueMap,
   listPedidos, createPedido, updatePedido, deletePedido,
-  listOpinioes, createOpiniao, deleteOpiniao,
+  listOpinioes, deleteOpiniao,
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
+import type { Compra, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 
-type Perfume = any; type Movimento = any; type Pedido = any; type Opiniao = any; type Sugestao = any; type Compra = any;
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean }
   | { type: 'info'; label: string };
+
+type PedidoPainel = Pedido & {
+  fonte: 'pedidos' | 'compras-legadas';
+  compraLegada?: Compra;
+};
 
 const TABS = [
   { id: 'dashboard', label: 'Início', icon: 'home' as const },
@@ -41,18 +46,52 @@ function StatCard({ label, value, icon, alert }: { label: string; value: string 
 
 function PerfumeForm({ initial, onSave, onCancel }: any) {
   const [f, setF] = useState<any>(initial || {
-    nome: '', inspiracao: '', familia: FAMILIAS[0], concentracao: 'EDP',
+    nome: '', inspiracao: '', imagemUrl: '', ocasioes: [], familia: FAMILIAS[0], concentracao: 'EDP',
     notasSaida: '', notasCoracao: '', notasFundo: '',
-    precos: [{ ml: 30, preco: 0 }], estoqueMinimoMl: 100, publicavel: true,
+    precos: [{ ml: 30, preco: 0 }], estoqueMinimoMl: 100, publicavel: false,
   });
   const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
+  const toggleOcasiao = (value: string) => setF((s: any) => {
+    const atuais = Array.isArray(s.ocasioes) ? s.ocasioes : [];
+    return { ...s, ocasioes: atuais.includes(value) ? atuais.filter((item: string) => item !== value) : [...atuais, value] };
+  });
   const setPreco = (i: number, k: string, v: any) => setF((s: any) => ({ ...s, precos: s.precos.map((p: any, idx: number) => idx === i ? { ...p, [k]: v } : p) }));
   const addPreco = () => setF((s: any) => ({ ...s, precos: [...s.precos, { ml: 10, preco: 0 }] }));
   const rmPreco = (i: number) => setF((s: any) => ({ ...s, precos: s.precos.filter((_: any, idx: number) => idx !== i) }));
   return (
     <View>
       <Field label="Nome do contratipo"><TInput value={f.nome} onChangeText={(v) => set('nome', v)} placeholder="Ex: Âmbar Noturno" testID="perfume-nome" /></Field>
-      <Field label="Inspirado em"><TInput value={f.inspiracao} onChangeText={(v) => set('inspiracao', v)} placeholder="Ex: Baccarat Rouge 540 - MFK" /></Field>
+      <Field label="Foto do perfume (link da imagem)">
+        <TInput
+          value={f.imagemUrl || ''}
+          onChangeText={(v) => set('imagemUrl', v)}
+          placeholder="https://.../foto-do-perfume.jpg"
+          autoCapitalize="none"
+          keyboardType="url"
+          testID="perfume-imagem"
+        />
+      </Field>
+      {!!f.imagemUrl && (
+        <View style={styles.imagePreview}>
+          <Image source={{ uri: f.imagemUrl }} style={styles.imagePreviewPhoto} contentFit="contain" transition={180} />
+          <Text style={styles.imagePreviewText}>Prévia da foto</Text>
+        </View>
+      )}
+      <Field label="Clima & ocasião">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {OCASIOES.map((item) => {
+            const selected = (f.ocasioes || []).includes(item);
+            return (
+              <Pressable key={item} onPress={() => toggleOcasiao(item)} style={[styles.miniChip, selected && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
+                <Text style={{ color: selected ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{item}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Field>
+      <Field label="Referência olfativa (opcional, uso interno)">
+        <TInput value={f.inspiracao || ''} onChangeText={(v) => set('inspiracao', v)} placeholder="Não aparece na vitrine" />
+      </Field>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <View style={{ flex: 1 }}>
           <Field label="Família">
@@ -111,7 +150,12 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
       </Pressable>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <PrimaryButton label="Salvar" onPress={() => f.nome.trim() && onSave(f)} disabled={!f.nome.trim()} testID="perfume-save" />
+        <PrimaryButton
+          label="Salvar"
+          onPress={() => f.nome.trim() && onSave(f)}
+          disabled={!f.nome.trim() || (f.publicavel && !f.precos.some((price: { preco: number }) => price.preco > 0))}
+          testID="perfume-save"
+        />
       </View>
     </View>
   );
@@ -250,8 +294,6 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
   );
 }
 
-function OpiniaoForm() { return null; } // desativado — clientes deixam opinião pela Vitrine
-
 export function Atelie({ onSair }: { onSair: () => void }) {
   const [tab, setTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
@@ -279,9 +321,41 @@ export function Atelie({ onSair }: { onSair: () => void }) {
 
   useEffect(() => { load(); }, [load]);
 
+  const pedidosUnificados = useMemo<PedidoPainel[]>(() => {
+    const statusValido = (status: string): OrderStatus =>
+      STATUS.some((item) => item.id === status) ? status as OrderStatus : 'pendente';
+
+    const atuais: PedidoPainel[] = pedidos.map((pedido) => ({
+      ...pedido,
+      fonte: 'pedidos',
+    }));
+    const legados: PedidoPainel[] = compras.map((compra) => ({
+      id: `compra-${compra.id}`,
+      seq: compra.seq || 0,
+      cliente: compra.cliente,
+      contato: compra.contato || '',
+      status: statusValido(compra.status),
+      observacoes: compra.observacoes || '',
+      itens: compra.itens?.map((item) => ({
+        perfumeId: item.perfumeId,
+        ml: item.ml,
+        quantidade: item.quantidade,
+      })) || (compra.perfumeId && compra.ml ? [{
+        perfumeId: compra.perfumeId,
+        ml: compra.ml,
+        quantidade: 1,
+      }] : []),
+      total: compra.total ?? compra.preco ?? 0,
+      criadoEm: compra.criadoEm || compra.data,
+      fonte: 'compras-legadas',
+      compraLegada: compra,
+    }));
+    return [...atuais, ...legados];
+  }, [compras, pedidos]);
+
   const estoqueDe = (id: string) => estoqueMap[id] || 0;
   const estoqueBaixo = perfumes.filter((p) => estoqueDe(p.id) <= (p.estoqueMinimoMl || 0)).length;
-  const pendentes = pedidos.filter((p) => p.status === 'pendente').length;
+  const pendentes = pedidosUnificados.filter((p) => p.status === 'pendente').length;
   const notaMedia = opinioes.length ? (opinioes.reduce((s, o) => s + o.nota, 0) / opinioes.length).toFixed(1) : '–';
 
   const doSavePerfume = async (data: any) => {
@@ -307,16 +381,25 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     setSheet(null); load();
   };
   const doDelPedido = async (id: string) => { await deletePedido(id); setSheet(null); load(); };
-  const doSaveOpiniao = async (data: any) => { await createOpiniao(data); setSheet(null); load(); };
   const doDelOpiniao = async (id: string) => { await deleteOpiniao(id); setSheet(null); load(); };
   const doPublish = async () => {
     setPublicando(true);
     try { await publishVitrine(); setSheet({ type: 'info', label: 'Vitrine publicada! Quem abrir o app vê a nova versão.' }); }
-    catch (e) { setSheet({ type: 'info', label: 'Erro ao publicar. Tente de novo.' }); }
+    catch { setSheet({ type: 'info', label: 'Erro ao publicar. Tente de novo.' }); }
     finally { setPublicando(false); }
   };
   const doDelSugestao = async (id: string) => { await deleteSugestao(id); load(); };
-  const doDelCompra = async (id: string) => { await deleteCompra(id); load(); };
+  const doDelCompra = async (id: string) => { await deleteCompra(id); setSheet(null); load(); };
+  const abrirPedido = (pedido: PedidoPainel) => {
+    if (pedido.fonte === 'pedidos') {
+      setSheet({ type: 'pedido', data: pedido });
+      return;
+    }
+    setSheet({
+      type: 'info',
+      label: `Pedido recebido pela vitrine de ${pedido.cliente}. Contato: ${pedido.contato || 'não informado'}. ${pedido.observacoes || ''}`.trim(),
+    });
+  };
 
   const perfumesFiltrados = perfumes.filter((p) => (p.nome + (p.inspiracao || '')).toLowerCase().includes(search.toLowerCase()));
 
@@ -331,7 +414,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     if (perfumes.length === 0) { setSheet({ type: 'info', label: 'Cadastre um contratipo no Catálogo antes.' }); return; }
     if (tab === 'estoque') setSheet({ type: 'movimento' });
     else if (tab === 'pedidos') setSheet({ type: 'pedido' });
-    else if (tab === 'opinioes') setSheet({ type: 'opiniao' });
   };
 
   const renderContent = () => {
@@ -347,11 +429,11 @@ export function Atelie({ onSair }: { onSair: () => void }) {
             <View style={{ width: '48%' }}><StatCard label="Nota média" value={notaMedia} icon="star" /></View>
           </View>
           <Text style={styles.sectionLabel}>ÚLTIMOS PEDIDOS</Text>
-          {pedidos.length === 0 && <EmptyState text="Nenhum pedido lançado ainda." />}
-          {[...pedidos].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).slice(0, 5).map((p) => {
+          {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
+          {[...pedidosUnificados].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).slice(0, 5).map((p) => {
             const st = STATUS.find((s) => s.id === p.status) || STATUS[0];
             return (
-              <Pressable key={p.id} onPress={() => setSheet({ type: 'pedido', data: p })} style={styles.rowCard}>
+              <Pressable key={`${p.fonte}-${p.id}`} onPress={() => abrirPedido(p)} style={styles.rowCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <View>
                     <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text>
@@ -360,7 +442,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
                   <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: 11 }}>{st.label}</Text></View>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                  <Text style={{ color: COLORS.muted, fontSize: 12 }}>{p.itens.length} item(ns) · {fmtDate(p.criadoEm)}</Text>
+                  <Text style={{ color: COLORS.muted, fontSize: 12 }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
                   <Text style={{ color: COLORS.bone, fontSize: 13 }}>{brl(p.total)}</Text>
                 </View>
               </Pressable>
@@ -384,18 +466,30 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           >
             <Text style={{ color: COLORS.gold, fontSize: 12 }}>Importar lista do fornecedor ({PRESET_FORNECEDOR.length})</Text>
           </Pressable>
+          <Pressable
+            onPress={() => setSheet({ type: 'confirm', label: 'Adicionar opções de 30/50/100ml aos itens sem tamanho?', onConfirm: doPadronizar })}
+            style={styles.actionBtn}
+          >
+            <Text style={{ color: COLORS.gold, fontSize: 12 }}>Padronizar tamanhos ausentes</Text>
+          </Pressable>
           {perfumesFiltrados.length === 0 && <EmptyState text="Nenhum contratipo. Toque em + para começar." />}
           {perfumesFiltrados.map((p) => {
             const baixo = estoqueDe(p.id) <= (p.estoqueMinimoMl || 0);
             return (
               <View key={p.id} style={styles.perfumeCard} testID={`perfume-card-${p.id}`}>
-                <PyramidBar />
+                {p.imagemUrl ? (
+                  <Image source={{ uri: p.imagemUrl }} style={styles.catalogThumb} contentFit="cover" transition={150} />
+                ) : (
+                  <View style={styles.catalogThumbPlaceholder}><Feather name="image" size={20} color={COLORS.muted} /></View>
+                )}
                 <View style={{ flex: 1, padding: SPACING.md }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text>
                       <Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p.nome}</Text>
-                      <Text style={{ color: COLORS.muted, fontSize: 11 }}>inspirado em {p.inspiracao || '—'}</Text>
+                      <Text style={{ color: COLORS.muted, fontSize: 11 }}>
+                        {(p.ocasioes || []).length ? (p.ocasioes || []).join(' · ') : 'Clima & ocasião não informados'}
+                      </Text>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 12 }}>
                       <Pressable onPress={() => setSheet({ type: 'perfume', data: p })} hitSlop={8} testID={`edit-${p.id}`}><Feather name="edit-2" size={16} color={COLORS.muted} /></Pressable>
@@ -467,11 +561,11 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     if (tab === 'pedidos') {
       return (
         <View style={{ padding: SPACING.lg }}>
-          {pedidos.length === 0 && <EmptyState text="Nenhum pedido lançado ainda." />}
-          {[...pedidos].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).map((p) => {
+          {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
+          {[...pedidosUnificados].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).map((p) => {
             const st = STATUS.find((s) => s.id === p.status) || STATUS[0];
             return (
-              <Pressable key={p.id} onPress={() => setSheet({ type: 'pedido', data: p })} style={styles.rowCard} testID={`pedido-${p.id}`}>
+              <Pressable key={`${p.fonte}-${p.id}`} onPress={() => abrirPedido(p)} style={styles.rowCard} testID={`pedido-${p.id}`}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <View><Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text><Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p.cliente}</Text></View>
                   <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: 11 }}>{st.label}</Text></View>
@@ -480,7 +574,15 @@ export function Atelie({ onSair }: { onSair: () => void }) {
                   <Text style={{ color: COLORS.muted, fontSize: 12 }}>{p.itens.length} item(ns) · {fmtDate(p.criadoEm)}</Text>
                   <Text style={{ color: COLORS.bone, fontSize: 13 }}>{brl(p.total)}</Text>
                 </View>
-                <Pressable onPress={() => setSheet({ type: 'confirm', label: `Excluir pedido de ${p.cliente}?`, onConfirm: () => doDelPedido(p.id), danger: true })} hitSlop={4}>
+                <Pressable
+                  onPress={() => setSheet({
+                    type: 'confirm',
+                    label: `Excluir pedido de ${p.cliente}?`,
+                    onConfirm: () => p.compraLegada ? doDelCompra(p.compraLegada.id) : doDelPedido(p.id),
+                    danger: true,
+                  })}
+                  hitSlop={4}
+                >
                   <Text style={{ color: COLORS.rust, fontSize: 11, marginTop: 4 }}>excluir</Text>
                 </Pressable>
               </Pressable>
@@ -510,28 +612,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
               </View>
             );
           })}
-        </View>
-      );
-    }
-
-    if (tab === 'mensagens') {
-      return (
-        <View style={{ padding: SPACING.lg }}>
-          <Text style={styles.sectionLabel}>PEDIDOS DE COMPRA (VITRINE)</Text>
-          {compras.length === 0 && <EmptyState text="Nenhum pedido de compra recebido." />}
-          {[...compras].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()).map((c) => (
-            <View key={c.id} style={styles.rowCard} testID={`compra-${c.id}`}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{c.cliente}</Text>
-                <Pressable onPress={() => doDelCompra(c.id)} hitSlop={8}><Feather name="trash-2" size={14} color={COLORS.muted} /></Pressable>
-              </View>
-              <Text style={{ color: COLORS.gold, fontSize: 12, marginTop: 2 }}>{c.perfumeNome} · {c.ml}ml · {brl(c.preco)}</Text>
-              <Text style={{ color: COLORS.muted, fontSize: 12, marginTop: 2 }}>Contato: {c.contato}</Text>
-              {!!c.observacoes && <Text style={{ color: COLORS.bone, fontSize: 12, marginTop: 4 }}>{c.observacoes}</Text>}
-              <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 4 }}>{fmtDate(c.data)}</Text>
-            </View>
-          ))}
-          <Text style={[styles.sectionLabel, { marginTop: SPACING.lg }]}>SUGESTÕES</Text>
+          <Text style={[styles.sectionLabel, { marginTop: SPACING.lg }]}>SUGESTÕES RECEBIDAS</Text>
           {sugestoes.length === 0 && <EmptyState text="Nenhuma sugestão recebida." />}
           {[...sugestoes].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()).map((s) => (
             <View key={s.id} style={styles.rowCard}>
@@ -547,6 +628,15 @@ export function Atelie({ onSair }: { onSair: () => void }) {
         </View>
       );
     }
+
+    if (tab === 'mensagens') {
+      return (
+        <View style={{ padding: SPACING.lg }}>
+          <Text style={styles.sectionLabel}>MENSAGENS DE CLIENTES</Text>
+          <EmptyState text="Nenhuma mensagem recebida." />
+        </View>
+      );
+    }
     return null;
   };
 
@@ -554,8 +644,8 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.topbar}>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 2 }}>ATELIÊ</Text>
-          <Text style={{ color: COLORS.bone, fontSize: 22, fontWeight: '500' }}>Painel</Text>
+          <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 2 }}>PAINEL DE CONTROLE</Text>
+          <Text style={{ color: COLORS.bone, fontSize: 22, fontWeight: '500' }}>Administração</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable
@@ -637,6 +727,11 @@ const styles = StyleSheet.create({
   sectionLabel: { color: COLORS.muted, fontSize: 11, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
+  catalogThumb: { width: 84, minHeight: 126, backgroundColor: COLORS.ink },
+  catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
+  imagePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginTop: -6, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  imagePreviewPhoto: { width: 64, height: 64, borderRadius: 8, backgroundColor: COLORS.surface },
+  imagePreviewText: { color: COLORS.muted, fontSize: 12 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.ink },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },

@@ -3,10 +3,16 @@ import os
 import pytest
 import requests
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://contratipo-app.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
 API = f"{BASE_URL}/api"
-GOOD_TOKEN = "atelie-token-douglas-furlani-fixed"
+GOOD_TOKEN = os.environ.get("ATELIE_TEST_TOKEN", "")
+ADMIN_USER = os.environ.get("ATELIE_TEST_USER", "")
+ADMIN_PASSWORD = os.environ.get("ATELIE_TEST_PASSWORD", "")
 AUTH = {"x-atelie-token": GOOD_TOKEN}
+pytestmark = pytest.mark.skipif(
+    not BASE_URL or not GOOD_TOKEN,
+    reason="Configure EXPO_PUBLIC_BACKEND_URL e ATELIE_TEST_TOKEN para testes de integração.",
+)
 
 
 @pytest.fixture(scope="module")
@@ -77,7 +83,9 @@ class TestRegression:
     """Make sure other endpoints still behave the same."""
 
     def test_auth_login_ok(self, s):
-        r = s.post(f"{API}/auth/login", json={"usuario": "douglasfurlani", "senha": "Dfc160201"})
+        if not ADMIN_USER or not ADMIN_PASSWORD:
+            pytest.skip("Credenciais de teste não configuradas.")
+        r = s.post(f"{API}/auth/login", json={"usuario": ADMIN_USER, "senha": ADMIN_PASSWORD})
         assert r.status_code == 200
         assert r.json()["ok"] is True
 

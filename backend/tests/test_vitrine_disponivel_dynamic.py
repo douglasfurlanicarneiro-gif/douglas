@@ -9,10 +9,13 @@ import pytest
 import requests
 
 BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "").rstrip("/")
-assert BASE_URL, "EXPO_PUBLIC_BACKEND_URL not set"
 API = f"{BASE_URL}/api"
-TOKEN = "atelie-token-douglas-furlani-fixed"
+TOKEN = os.environ.get("ATELIE_TEST_TOKEN", "")
 AUTH = {"x-atelie-token": TOKEN, "Content-Type": "application/json"}
+pytestmark = pytest.mark.skipif(
+    not BASE_URL or not TOKEN,
+    reason="Configure EXPO_PUBLIC_BACKEND_URL e ATELIE_TEST_TOKEN para testes de integração.",
+)
 
 
 @pytest.fixture(scope="module")

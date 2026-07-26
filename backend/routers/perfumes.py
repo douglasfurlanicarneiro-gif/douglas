@@ -3,7 +3,7 @@ from typing import List
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, model_validator
 
 from database import get_db
 from security import require_atelie_auth
@@ -13,21 +13,29 @@ router = APIRouter(prefix="/api/perfumes", tags=["perfumes"])
 
 
 class Preco(BaseModel):
-    ml: int
-    preco: float
+    ml: int = Field(gt=0, le=1000)
+    preco: float = Field(ge=0, le=1_000_000)
 
 
 class PerfumeIn(BaseModel):
-    nome: str
-    inspiracao: str = ""
-    familia: str
-    concentracao: str
-    notasSaida: str = ""
-    notasCoracao: str = ""
-    notasFundo: str = ""
-    precos: List[Preco] = []
-    estoqueMinimoMl: int = 0
-    publicavel: bool = True
+    nome: str = Field(min_length=2, max_length=160)
+    inspiracao: str = Field(default="", max_length=160)
+    imagemUrl: str = Field(default="", max_length=2000)
+    ocasioes: List[str] = Field(default_factory=list, max_length=12)
+    familia: str = Field(min_length=2, max_length=80)
+    concentracao: str = Field(min_length=2, max_length=40)
+    notasSaida: str = Field(default="", max_length=500)
+    notasCoracao: str = Field(default="", max_length=500)
+    notasFundo: str = Field(default="", max_length=500)
+    precos: List[Preco] = Field(default_factory=list, max_length=30)
+    estoqueMinimoMl: int = Field(default=0, ge=0, le=1_000_000)
+    publicavel: bool = False
+
+    @model_validator(mode="after")
+    def validar_publicacao(self):
+        if self.publicavel and not any(preco.preco > 0 for preco in self.precos):
+            raise ValueError("Informe ao menos um preço válido antes de publicar.")
+        return self
 
 
 def _oid(perfume_id: str) -> ObjectId:
@@ -92,6 +100,8 @@ async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_ateli
         await db.perfumes.insert_one({
             "nome": nome,
             "inspiracao": "",
+            "imagemUrl": "",
+            "ocasioes": [],
             "familia": "Amadeirado",
             "concentracao": "EDP",
             "notasSaida": "",
