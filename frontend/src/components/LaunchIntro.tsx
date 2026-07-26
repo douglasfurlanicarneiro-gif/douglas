@@ -1,11 +1,12 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS } from '../theme';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
+  const [logoReady, setLogoReady] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.94)).current;
@@ -18,26 +19,46 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
     outputRange: [-320, 520],
   });
 
+  const hideHtmlPreloader = () => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const preloader = document.getElementById('brand-preloader');
+    if (!preloader) return;
+    preloader.style.opacity = '0';
+    setTimeout(() => preloader.remove(), 180);
+  };
+
+  const handleLogoLoad = () => {
+    setLogoReady(true);
+    hideHtmlPreloader();
+  };
+
+  const handleLogoError = () => {
+    hideHtmlPreloader();
+    onFinish();
+  };
+
   useEffect(() => {
+    if (!logoReady) return;
+
     const animation = Animated.sequence([
       Animated.parallel([
         Animated.timing(logoOpacity, {
           toValue: 1,
-          duration: 700,
+          duration: 450,
           easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
-        Animated.spring(logoScale, {
+        Animated.timing(logoScale, {
           toValue: 1,
-          speed: 7,
-          bounciness: 0,
+          duration: 450,
+          easing: Easing.out(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.sequence([
-          Animated.delay(300),
+          Animated.delay(150),
           Animated.timing(captionOpacity, {
             toValue: 1,
-            duration: 550,
+            duration: 350,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
           }),
@@ -46,37 +67,37 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
       Animated.parallel([
         Animated.timing(shineProgress, {
           toValue: 1,
-          duration: 1050,
+          duration: 650,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.sequence([
           Animated.timing(shineOpacity, {
             toValue: 0.42,
-            duration: 260,
+            duration: 180,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
-          Animated.delay(470),
+          Animated.delay(260),
           Animated.timing(shineOpacity, {
             toValue: 0,
-            duration: 320,
+            duration: 210,
             easing: Easing.in(Easing.quad),
             useNativeDriver: true,
           }),
         ]),
       ]),
-      Animated.delay(180),
+      Animated.delay(60),
       Animated.parallel([
         Animated.timing(overlayOpacity, {
           toValue: 0,
-          duration: 580,
+          duration: 350,
           easing: Easing.inOut(Easing.cubic),
           useNativeDriver: true,
         }),
         Animated.timing(logoScale, {
           toValue: 1.025,
-          duration: 580,
+          duration: 350,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
@@ -88,7 +109,7 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
     });
 
     return () => animation.stop();
-  }, [captionOpacity, logoOpacity, logoScale, onFinish, overlayOpacity, shineOpacity, shineProgress]);
+  }, [captionOpacity, logoOpacity, logoReady, logoScale, onFinish, overlayOpacity, shineOpacity, shineProgress]);
 
   return (
     <Animated.View
@@ -98,8 +119,10 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
     >
       <View style={styles.stage}>
         <Animated.Image
-          source={require('../../assets/images/icon.png')}
+          source={require('../../assets/images/launch-logo.jpg')}
           resizeMode="contain"
+          onLoad={handleLogoLoad}
+          onError={handleLogoError}
           style={[
             styles.logo,
             {

@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
+    "backgroundColor": "#080706",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -22,8 +23,17 @@
     },
     "web": {
       "bundler": "metro",
-      "output": "single",
-      "favicon": "./assets/images/favicon.png"
+      "output": "static",
+      "favicon": "./assets/images/favicon.png",
+      "backgroundColor": "#080706",
+      "themeColor": "#080706",
+      "display": "standalone",
+      "barStyle": "black-translucent",
+      "splash": {
+        "backgroundColor": "#080706",
+        "resizeMode": "contain",
+        "image": "./assets/images/splash-image.png"
+      }
     },
     "plugins": [
       "expo-router",
