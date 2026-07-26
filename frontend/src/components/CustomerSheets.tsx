@@ -207,7 +207,7 @@ export function OrdersSheet({
             </View>
           </View>
           <Text style={styles.emptyEyebrow}>SUA JORNADA L’ESSENCE</Text>
-          <Text style={styles.emptyTitle}>Seu próximo perfume está aqui ✨!</Text>
+          <Text style={styles.emptyTitle}>Seu próximo perfume está aqui! ✨</Text>
           <View style={styles.privacyNote}>
             <Feather name="shield" size={16} color={COLORS.gold} />
             <Text style={styles.privacyText}>
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   timelineText: { color: COLORS.bone, fontSize: 12, flex: 1 },
   timelineDate: { color: COLORS.muted, fontSize: 10 },
   emptyOrdersContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACING.lg },
-  emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg },
+  emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg, transform: [{ translateY: -30 }] },
   emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
   emptyOrdersIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.gold, shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
   emptyEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.8, textAlign: 'center' },
