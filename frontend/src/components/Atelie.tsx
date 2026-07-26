@@ -399,7 +399,11 @@ export function Atelie({ onSair }: { onSair: () => void }) {
   };
   const doPadronizar = async () => {
     const r = await padronizarTamanhos();
-    setSheet({ type: 'info', label: `Tamanhos 30/50/100ml aplicados a ${r.atualizados} contratipo(s).` });
+    await publishVitrine();
+    setSheet({
+      type: 'info',
+      label: `Preços padrão aplicados a ${r.atualizados} perfume(s) e vitrine republicada: 30ml por R$ 50, 50ml por R$ 80 e 100ml por R$ 120.`,
+    });
     load();
   };
   const doMov = async (data: any) => { await createMovimento(data); setSheet(null); load(); };
@@ -503,10 +507,15 @@ export function Atelie({ onSair }: { onSair: () => void }) {
             <Text style={{ color: COLORS.gold, fontSize: 12 }}>Importar lista do fornecedor ({PRESET_FORNECEDOR.length})</Text>
           </Pressable>
           <Pressable
-            onPress={() => setSheet({ type: 'confirm', label: 'Adicionar opções de 30/50/100ml aos itens sem tamanho?', onConfirm: doPadronizar })}
+            onPress={() => setSheet({
+              type: 'confirm',
+              label: 'Aplicar os preços padrão aos tamanhos sem preço? 30ml = R$ 50, 50ml = R$ 80 e 100ml = R$ 120. Valores personalizados não serão alterados.',
+              onConfirm: doPadronizar,
+              confirmLabel: 'Aplicar preços',
+            })}
             style={styles.actionBtn}
           >
-            <Text style={{ color: COLORS.gold, fontSize: 12 }}>Padronizar tamanhos ausentes</Text>
+            <Text style={{ color: COLORS.gold, fontSize: 12 }}>Aplicar preços padrão 30/50/100ml</Text>
           </Pressable>
           {perfumesFiltrados.length === 0 && <EmptyState text="Nenhum contratipo. Toque em + para começar." />}
           {perfumesFiltrados.map((p) => {

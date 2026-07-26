@@ -122,10 +122,35 @@ async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_ateli
 @router.post("/padronizar-tamanhos")
 async def padronizar_tamanhos(_: str = Depends(require_atelie_auth)):
     db = get_db()
-    default_precos = [{"ml": 30, "preco": 0}, {"ml": 50, "preco": 0}, {"ml": 100, "preco": 0}]
+    precos_padrao = {30: 50.0, 50: 80.0, 100: 120.0}
     atualizados = 0
-    cursor = db.perfumes.find({"$or": [{"precos": {"$size": 0}}, {"precos": {"$exists": False}}]})
+    cursor = db.perfumes.find({"publicavel": True})
     async for p in cursor:
-        await db.perfumes.update_one({"_id": p["_id"]}, {"$set": {"precos": default_precos}})
+        atuais = {
+            int(item.get("ml", 0)): float(item.get("preco", 0))
+            for item in p.get("precos", [])
+            if item.get("ml")
+        }
+        novos = []
+        mudou = False
+        for ml, preco_padrao in precos_padrao.items():
+            preco_atual = atuais.get(ml, 0)
+            preco_final = preco_atual if preco_atual > 0 else preco_padrao
+            novos.append({"ml": ml, "preco": preco_final})
+            if preco_atual != preco_final:
+                mudou = True
+
+        # Mantém tamanhos personalizados que não fazem parte de 30/50/100ml.
+        novos.extend(
+            {"ml": ml, "preco": preco}
+            for ml, preco in atuais.items()
+            if ml not in precos_padrao
+        )
+        if not mudou:
+            continue
+        await db.perfumes.update_one({"_id": p["_id"]}, {"$set": {"precos": novos}})
         atualizados += 1
-    return {"atualizados": atualizados}
+    return {
+        "atualizados": atualizados,
+        "precosPadrao": [{"ml": ml, "preco": preco} for ml, preco in precos_padrao.items()],
+    }

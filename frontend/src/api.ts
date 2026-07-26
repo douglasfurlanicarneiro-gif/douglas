@@ -74,7 +74,10 @@ export const createPerfume = (data: Omit<Perfume, 'id' | 'seq'>) => request<Perf
 export const updatePerfume = (id: string, data: Partial<Perfume>) => request<Perfume>(`/perfumes/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
 export const deletePerfume = (id: string) => request<{ status: string }>(`/perfumes/${id}`, { method: 'DELETE' }, true);
 export const bulkImport = (nomes: string[]) => request<{ adicionados: number }>('/perfumes/bulk-import', { method: 'POST', body: JSON.stringify({ nomes }) }, true);
-export const padronizarTamanhos = () => request<{ atualizados: number }>('/perfumes/padronizar-tamanhos', { method: 'POST' }, true);
+export const padronizarTamanhos = () => request<{
+  atualizados: number;
+  precosPadrao: { ml: number; preco: number }[];
+}>('/perfumes/padronizar-tamanhos', { method: 'POST' }, true);
 
 // Estoque
 export const listMovimentos = () => request<Movimento[]>('/movimentos', {}, true);
