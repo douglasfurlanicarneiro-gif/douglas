@@ -36,8 +36,16 @@ export type OrderStatus = 'pendente' | 'preparando' | 'enviado' | 'entregue' | '
 
 export type PedidoItem = {
   perfumeId: string;
+  perfumeNome?: string;
   ml: number;
   quantidade: number;
+  precoUnitario?: number;
+  subtotal?: number;
+};
+
+export type StatusHistoryItem = {
+  status: OrderStatus;
+  data: string;
 };
 
 export type Pedido = {
@@ -50,6 +58,8 @@ export type Pedido = {
   itens: PedidoItem[];
   total: number;
   criadoEm: string;
+  codigoAcompanhamento?: string;
+  historicoStatus?: StatusHistoryItem[];
 };
 
 export type Opiniao = {
@@ -103,6 +113,37 @@ export type Compra = {
   };
   data: string;
   criadoEm?: string;
+  codigoAcompanhamento?: string;
+  historicoStatus?: StatusHistoryItem[];
+};
+
+export type Acompanhamento = {
+  id: string;
+  seq?: number;
+  codigoAcompanhamento: string;
+  status: OrderStatus;
+  itens: CompraItem[];
+  subtotal: number;
+  frete: number;
+  total: number;
+  formaPagamento?: 'pix' | 'cartao';
+  pagamento?: Compra['pagamento'];
+  criadoEm: string;
+  historicoStatus: StatusHistoryItem[];
+};
+
+export type Metricas = {
+  pedidosTotal: number;
+  pedidosValidos: number;
+  pedidosPorStatus: Record<string, number>;
+  faturamento: number;
+  ticketMedio: number;
+  maisVendidos: {
+    perfumeId?: string;
+    nome: string;
+    quantidade: number;
+    faturamento: number;
+  }[];
 };
 
 export type CheckoutPayload = {

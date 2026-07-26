@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from database import get_db
+from locks import stock_lock
 from security import require_atelie_auth
 from utils import next_seq, serialize
 
@@ -94,39 +95,55 @@ async def listar_pedidos(_: str = Depends(require_atelie_auth)):
 
 @router.post("")
 async def criar_pedido(payload: PedidoIn, _: str = Depends(require_atelie_auth)):
-    db = get_db()
-    if payload.status != "cancelado":
-        await _validar_estoque(db, payload.itens)
-    doc = payload.model_dump()
-    doc["seq"] = await next_seq(db, "pedidos")
-    doc["criadoEm"] = datetime.now(timezone.utc).isoformat()
-    resultado = await db.pedidos.insert_one(doc)
-    pedido_id = str(resultado.inserted_id)
-    await _aplicar_saida_estoque(db, pedido_id, payload.itens, payload.status)
-    novo = await db.pedidos.find_one({"_id": resultado.inserted_id})
-    return serialize(novo)
+    async with stock_lock:
+        db = get_db()
+        if payload.status != "cancelado":
+            await _validar_estoque(db, payload.itens)
+        doc = payload.model_dump()
+        doc["seq"] = await next_seq(db, "pedidos")
+        agora = datetime.now(timezone.utc).isoformat()
+        doc["criadoEm"] = agora
+        doc["historicoStatus"] = [{"status": payload.status, "data": agora}]
+        resultado = await db.pedidos.insert_one(doc)
+        pedido_id = str(resultado.inserted_id)
+        await _aplicar_saida_estoque(db, pedido_id, payload.itens, payload.status)
+        novo = await db.pedidos.find_one({"_id": resultado.inserted_id})
+        return serialize(novo)
 
 
 @router.put("/{pedido_id}")
 async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(require_atelie_auth)):
-    db = get_db()
-    existente = await db.pedidos.find_one({"_id": _oid(pedido_id)})
-    if not existente:
-        raise HTTPException(status_code=404, detail="Pedido não encontrado.")
-    if payload.status != "cancelado":
-        await _validar_estoque(db, payload.itens, ignorar_pedido_id=pedido_id)
-    await _reverter_movimentos_do_pedido(db, pedido_id)
-    await _aplicar_saida_estoque(db, pedido_id, payload.itens, payload.status)
-    await db.pedidos.update_one({"_id": _oid(pedido_id)}, {"$set": payload.model_dump()})
-    atualizado = await db.pedidos.find_one({"_id": _oid(pedido_id)})
-    return serialize(atualizado)
+    async with stock_lock:
+        db = get_db()
+        existente = await db.pedidos.find_one({"_id": _oid(pedido_id)})
+        if not existente:
+            raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+        if payload.status != "cancelado":
+            await _validar_estoque(db, payload.itens, ignorar_pedido_id=pedido_id)
+        await _reverter_movimentos_do_pedido(db, pedido_id)
+        await _aplicar_saida_estoque(db, pedido_id, payload.itens, payload.status)
+        atualizacao = payload.model_dump()
+        if payload.status != existente.get("status"):
+            historico = existente.get("historicoStatus", [])
+            historico.append({
+                "status": payload.status,
+                "data": datetime.now(timezone.utc).isoformat(),
+            })
+            atualizacao["historicoStatus"] = historico
+        await db.pedidos.update_one(
+            {"_id": _oid(pedido_id)},
+            {"$set": atualizacao},
+        )
+        atualizado = await db.pedidos.find_one({"_id": _oid(pedido_id)})
+        return serialize(atualizado)
 
 
 @router.delete("/{pedido_id}")
 async def apagar_pedido(pedido_id: str, _: str = Depends(require_atelie_auth)):
-    db = get_db()
-    await _reverter_movimentos_do_pedido(db, pedido_id)
-    resultado = await db.pedidos.delete_one({"_id": _oid(pedido_id)})
-    if resultado.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Pedido não encontrado.")
-    return {"status": "Pedido apagado."}
+    async with stock_lock:
+        db = get_db()
+        await _reverter_movimentos_do_pedido(db, pedido_id)
+        resultado = await db.pedidos.delete_one({"_id": _oid(pedido_id)})
+        if resultado.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+        return {"status": "Pedido apagado."}

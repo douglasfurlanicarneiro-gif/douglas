@@ -12,9 +12,10 @@ import {
   listPedidos, createPedido, updatePedido, deletePedido,
   listOpinioes, deleteOpiniao,
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
+  downloadBackup, getMetricas,
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
-import type { Compra, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
+import type { Compra, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean }
@@ -329,13 +330,16 @@ export function Atelie({ onSair }: { onSair: () => void }) {
   const [sheet, setSheet] = useState<SheetType>(null);
   const [search, setSearch] = useState('');
   const [publicando, setPublicando] = useState(false);
+  const [metricas, setMetricas] = useState<Metricas | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [p, m, pe, o, s, c, e] = await Promise.all([
+      const [p, m, pe, o, s, c, e, metrics] = await Promise.all([
         listPerfumes(), listMovimentos(), listPedidos(), listOpinioes(), listSugestoes(), listCompras(), getEstoqueMap(),
+        getMetricas().catch(() => null),
       ]);
       setPerfumes(p); setMovimentos(m); setPedidos(pe); setOpinioes(o); setSugestoes(s); setCompras(c); setEstoqueMap(e);
+      setMetricas(metrics);
     } catch (err) { console.error(err); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
@@ -440,6 +444,14 @@ export function Atelie({ onSair }: { onSair: () => void }) {
       label: `Pedido recebido pela vitrine de ${pedido.cliente}. Contato: ${pedido.contato || 'não informado'}. ${pedido.observacoes || ''}`.trim(),
     });
   };
+  const doBackup = async () => {
+    try {
+      await downloadBackup();
+      setSheet({ type: 'info', label: 'Backup gerado e baixado com sucesso. Guarde o arquivo em um local seguro.' });
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível baixar o backup. Abra o painel no navegador e tente novamente.' });
+    }
+  };
 
   const perfumesFiltrados = perfumes.filter((p) => (p.nome + (p.inspiracao || '')).toLowerCase().includes(search.toLowerCase()));
 
@@ -468,6 +480,33 @@ export function Atelie({ onSair }: { onSair: () => void }) {
             <View style={{ width: '48%' }}><StatCard label="Pedidos pendentes" value={pendentes} icon="clipboard" /></View>
             <View style={{ width: '48%' }}><StatCard label="Nota média" value={notaMedia} icon="star" /></View>
           </View>
+          {metricas && (
+            <View style={styles.metricsPanel}>
+              <Text style={styles.sectionLabel}>VISÃO DO NEGÓCIO</Text>
+              <View style={styles.metricsRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.metricLabel}>Faturamento em pedidos</Text>
+                  <Text style={styles.metricValue}>{brl(metricas.faturamento)}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.metricLabel}>Ticket médio</Text>
+                  <Text style={styles.metricValue}>{brl(metricas.ticketMedio)}</Text>
+                </View>
+              </View>
+              {metricas.maisVendidos.length > 0 && (
+                <>
+                  <Text style={[styles.metricLabel, { marginTop: SPACING.md }]}>MAIS VENDIDOS</Text>
+                  {metricas.maisVendidos.slice(0, 5).map((item, index) => (
+                    <View key={`${item.perfumeId}-${index}`} style={styles.rankingRow}>
+                      <Text style={styles.rankingNumber}>{index + 1}</Text>
+                      <Text style={styles.rankingName} numberOfLines={1}>{item.nome}</Text>
+                      <Text style={styles.rankingQty}>{item.quantidade} un.</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+            </View>
+          )}
           <Text style={styles.sectionLabel}>ÚLTIMOS PEDIDOS</Text>
           {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
           {[...pedidosUnificados].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).slice(0, 5).map((p) => {
@@ -705,6 +744,9 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           <Text style={{ color: COLORS.bone, fontSize: 22, fontWeight: '500' }}>Administração</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
+          <Pressable onPress={doBackup} style={styles.topBtn} testID="backup-btn">
+            <Feather name="download" size={13} color={COLORS.gold} />
+          </Pressable>
           <Pressable
             onPress={() => setSheet({ type: 'confirm', label: `Publicar ${perfumes.filter((p) => p.publicavel !== false).length} contratipo(s) na vitrine?`, onConfirm: doPublish, confirmLabel: publicando ? 'Publicando…' : 'Publicar' })}
             style={styles.topBtn}
@@ -781,6 +823,14 @@ const styles = StyleSheet.create({
   statCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg },
   statValue: { color: COLORS.bone, fontSize: 24, fontWeight: '500', marginTop: 6 },
   statLabel: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  metricsPanel: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
+  metricsRow: { flexDirection: 'row', gap: 12 },
+  metricLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.6 },
+  metricValue: { color: COLORS.bone, fontSize: 18, fontWeight: '600', marginTop: 3 },
+  rankingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  rankingNumber: { color: COLORS.gold, width: 22, fontSize: 12, fontWeight: '700' },
+  rankingName: { color: COLORS.bone, flex: 1, fontSize: 12 },
+  rankingQty: { color: COLORS.muted, fontSize: 11 },
   sectionLabel: { color: COLORS.muted, fontSize: 11, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },

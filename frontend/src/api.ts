@@ -2,6 +2,8 @@ import { storage } from './utils/storage';
 import type {
   CheckoutPayload,
   Compra,
+  Acompanhamento,
+  Metricas,
   Movimento,
   Opiniao,
   Pedido,
@@ -123,3 +125,30 @@ export const deleteSugestao = (id: string) => request<{ status: string }>(`/suge
 export const createCompra = (data: CheckoutPayload) => request<Compra>('/compras', { method: 'POST', body: JSON.stringify(data) });
 export const listCompras = () => request<Compra[]>('/compras', {}, true);
 export const deleteCompra = (id: string) => request<{ status: string }>(`/compras/${id}`, { method: 'DELETE' }, true);
+
+// Experiência e operação
+export const acompanharPedido = (codigo: string) =>
+  request<Acompanhamento>(`/acompanhamento/${encodeURIComponent(codigo)}`);
+export const getMetricas = () => request<Metricas>('/admin/metricas', {}, true);
+
+export async function downloadBackup(): Promise<void> {
+  const token = await getToken();
+  if (!token) throw new ApiError('Sua sessão expirou. Entre novamente.', 401);
+  const response = await fetch(`${API}/admin/backup`, {
+    headers: { 'x-atelie-token': token },
+  });
+  if (!response.ok) throw new ApiError('Não foi possível gerar o backup.', response.status);
+  const blob = await response.blob();
+  if (typeof document === 'undefined') {
+    throw new ApiError('Abra o painel no navegador para baixar o arquivo.', 400);
+  }
+  const disposition = response.headers.get('content-disposition') || '';
+  const match = disposition.match(/filename="([^"]+)"/);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = match?.[1] || 'lessence-furlani-backup.json';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+}

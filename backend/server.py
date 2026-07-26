@@ -15,7 +15,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
 from database import get_db
-from routers import auth, cep, clientes, compras, movimentos, opinioes, pedidos, perfumes, sugestoes, vitrine
+from routers import (
+    acompanhamento,
+    admin,
+    auth,
+    cep,
+    clientes,
+    compras,
+    movimentos,
+    opinioes,
+    pedidos,
+    perfumes,
+    sugestoes,
+    vitrine,
+)
 from security import hash_password
 
 logging.basicConfig(level=logging.INFO)
@@ -43,9 +56,25 @@ async def _seed_admin():
     logger.info("Usuário administrador do Ateliê criado.")
 
 
+async def _criar_indices():
+    """Índices de integridade e desempenho das rotas mais acessadas."""
+    db = get_db()
+    await db.admins.create_index("usuario", unique=True)
+    await db.pedidos.create_index("seq")
+    await db.pedidos.create_index("status")
+    await db.pedidos.create_index(
+        "codigoAcompanhamento",
+        unique=True,
+        sparse=True,
+    )
+    await db.movimentos.create_index("perfumeId")
+    await db.movimentos.create_index("origem")
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await _seed_admin()
+    await _criar_indices()
     yield
 
 
@@ -68,6 +97,8 @@ app.include_router(sugestoes.router)
 app.include_router(compras.router)
 app.include_router(vitrine.router)
 app.include_router(clientes.router)
+app.include_router(acompanhamento.router)
+app.include_router(admin.router)
 
 
 @app.get("/")

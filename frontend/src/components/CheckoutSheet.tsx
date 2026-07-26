@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ApiError, buscarCep, createCompra } from '../api';
 import { storage } from '../utils/storage';
-import type { CheckoutPayload, Perfume, PriceOption } from '../types';
+import type { CheckoutPayload, Compra, Perfume, PriceOption } from '../types';
 import { brl, COLORS, SPACING } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';
@@ -43,7 +43,7 @@ type Props = {
   onClose: () => void;
   onChangeQuantity: (index: number, quantity: number) => void;
   onRemove: (index: number) => void;
-  onSuccess: (message: string) => void;
+  onSuccess: (order: Compra, message: string) => void;
 };
 
 export function CheckoutSheet({
@@ -156,7 +156,7 @@ export function CheckoutSheet({
       const paymentMessage = order.pagamento?.status === 'gateway_nao_configurado'
         ? 'Nossa equipe entrará em contato pelo WhatsApp para combinar o pagamento e os próximos passos.'
         : 'Em breve você receberá pelo WhatsApp a confirmação do pedido e os próximos passos.';
-      onSuccess(paymentMessage);
+      onSuccess(order, paymentMessage);
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Não foi possível finalizar o pedido.');
     } finally {

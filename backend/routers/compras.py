@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import secrets
 from typing import Literal, Optional
 
 from bson import ObjectId
@@ -7,7 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from database import get_db
+from locks import stock_lock
 from payments.service import iniciar_pagamento
+from routers.pedidos import (
+    ItemPedido,
+    _aplicar_saida_estoque,
+    _reverter_movimentos_do_pedido,
+    _validar_estoque,
+)
 from security import require_atelie_auth
 from utils import next_seq, serialize
 
@@ -73,6 +81,13 @@ async def listar_compras(_: str = Depends(require_atelie_auth)):
 
 @router.post("")
 async def criar_compra(payload: CompraIn):
+    # Saldo e saídas são tratados como uma única operação no processo atual.
+    # Assim dois checkouts simultâneos não consomem o mesmo mililitro.
+    async with stock_lock:
+        return await _criar_compra(payload)
+
+
+async def _criar_compra(payload: CompraIn):
     db = get_db()
     itens_entrada = payload.itens or [
         ItemCompraIn(perfumeId=payload.perfumeId or "", ml=payload.ml or 0, quantidade=1)
@@ -138,6 +153,8 @@ async def criar_compra(payload: CompraIn):
     doc["status"] = "pendente"
     doc["origem"] = "vitrine"
     doc["seq"] = await next_seq(db, "pedidos")
+    doc["codigoAcompanhamento"] = secrets.token_urlsafe(12)
+    doc["historicoStatus"] = [{"status": "pendente", "data": agora}]
 
     # Salva/atualiza o cadastro do cliente por telefone/whatsapp, pra próxima
     # compra vir com os campos pré-preenchidos (o app consulta isso por
@@ -184,28 +201,55 @@ async def criar_compra(payload: CompraIn):
 
 
 class CompraStatusIn(BaseModel):
-    status: str
+    status: Literal["pendente", "preparando", "enviado", "entregue", "cancelado"]
 
 
 @router.patch("/{compra_id}")
 async def atualizar_status_compra(compra_id: str, payload: CompraStatusIn, _: str = Depends(require_atelie_auth)):
-    db = get_db()
-    try:
-        oid = ObjectId(compra_id)
-    except InvalidId:
-        raise HTTPException(status_code=400, detail="Id de compra inválido.")
-    resultado = await db.compras.update_one({"_id": oid}, {"$set": {"status": payload.status}})
-    if resultado.matched_count == 0:
-        resultado = await db.pedidos.update_one(
-            {"_id": oid, "origem": "vitrine"},
-            {"$set": {"status": payload.status}},
-        )
-    if resultado.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Pedido de compra não encontrado.")
-    atualizada = await db.compras.find_one({"_id": oid})
-    if not atualizada:
-        atualizada = await db.pedidos.find_one({"_id": oid, "origem": "vitrine"})
-    return serialize(atualizada)
+    async with stock_lock:
+        db = get_db()
+        try:
+            oid = ObjectId(compra_id)
+        except InvalidId:
+            raise HTTPException(status_code=400, detail="Id de compra inválido.")
+
+        legado = await db.compras.find_one({"_id": oid})
+        if legado:
+            await db.compras.update_one(
+                {"_id": oid},
+                {"$set": {"status": payload.status}},
+            )
+            return serialize(await db.compras.find_one({"_id": oid}))
+
+        pedido = await db.pedidos.find_one({"_id": oid, "origem": "vitrine"})
+        if not pedido:
+            raise HTTPException(
+                status_code=404,
+                detail="Pedido de compra não encontrado.",
+            )
+        itens = [
+            ItemPedido(
+                perfumeId=item["perfumeId"],
+                ml=item["ml"],
+                quantidade=item.get("quantidade", 1),
+            )
+            for item in pedido.get("itens", [])
+        ]
+        if payload.status != "cancelado":
+            await _validar_estoque(db, itens, ignorar_pedido_id=compra_id)
+        await _reverter_movimentos_do_pedido(db, compra_id)
+        await _aplicar_saida_estoque(db, compra_id, itens, payload.status)
+
+        atualizacao = {"status": payload.status}
+        if payload.status != pedido.get("status"):
+            historico = pedido.get("historicoStatus", [])
+            historico.append({
+                "status": payload.status,
+                "data": datetime.now(timezone.utc).isoformat(),
+            })
+            atualizacao["historicoStatus"] = historico
+        await db.pedidos.update_one({"_id": oid}, {"$set": atualizacao})
+        return serialize(await db.pedidos.find_one({"_id": oid}))
 
 
 @router.delete("/{compra_id}")
