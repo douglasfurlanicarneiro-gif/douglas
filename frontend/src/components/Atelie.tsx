@@ -145,6 +145,55 @@ function SwipeablePedidoCard({
   );
 }
 
+function ConfirmSheetContent({
+  sheet,
+  onCancel,
+}: {
+  sheet: Extract<NonNullable<SheetType>, { type: 'confirm' }>;
+  onCancel: () => void;
+}) {
+  const [ready, setReady] = useState(!sheet.danger);
+
+  useEffect(() => {
+    if (!sheet.danger) {
+      setReady(true);
+      return;
+    }
+    setReady(false);
+    const timer = setTimeout(() => setReady(true), 700);
+    return () => clearTimeout(timer);
+  }, [sheet]);
+
+  return (
+    <View>
+      <Text style={{ color: COLORS.bone, marginBottom: SPACING.lg }}>{sheet.label}</Text>
+      {sheet.danger && (
+        <View style={styles.deleteSafetyNotice}>
+          <Feather name="shield" size={15} color={COLORS.gold} />
+          <Text style={styles.deleteSafetyText}>Esta ação é permanente. Confirme somente se deseja realmente excluir.</Text>
+        </View>
+      )}
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <SecondaryButton label="Cancelar" onPress={onCancel} />
+        <Pressable
+          onPress={sheet.onConfirm}
+          disabled={!ready}
+          testID="confirm-ok"
+          style={[
+            styles.confirmAction,
+            { backgroundColor: sheet.danger ? COLORS.rust : COLORS.gold },
+            !ready && styles.confirmActionDisabled,
+          ]}
+        >
+          <Text style={{ color: sheet.danger ? COLORS.bone : COLORS.ink, fontWeight: '600' }}>
+            {!ready ? 'Aguarde…' : (sheet.confirmLabel || (sheet.danger ? 'Sim, excluir' : 'Confirmar'))}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function PerfumeForm({ initial, onSave, onCancel }: any) {
   const [f, setF] = useState<any>(initial || {
     nome: '', inspiracao: '', imagemUrl: '', ocasioes: [], familia: FAMILIAS[0], concentracao: 'EDP',
@@ -559,7 +608,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     sheet.type === 'perfume' ? (sheet.data ? 'Editar contratipo' : 'Novo contratipo') :
     sheet.type === 'movimento' ? 'Lançar estoque' :
     sheet.type === 'pedido' ? (sheet.data ? 'Editar pedido' : 'Novo pedido') :
-    sheet.type === 'confirm' ? 'Confirmar' : 'Aviso';
+    sheet.type === 'confirm' ? (sheet.danger ? 'Confirmar exclusão' : 'Confirmar') : 'Aviso';
 
   const openCreate = () => {
     if (tab === 'catalogo') { setSheet({ type: 'perfume' }); return; }
@@ -888,19 +937,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
         {sheet?.type === 'movimento' && <MovimentoForm perfumes={perfumes} onSave={doMov} onCancel={() => setSheet(null)} />}
         {sheet?.type === 'pedido' && <PedidoForm perfumes={perfumes} initial={sheet.data} onSave={doSavePedido} onCancel={() => setSheet(null)} />}
         {sheet?.type === 'confirm' && (
-          <View>
-            <Text style={{ color: COLORS.bone, marginBottom: SPACING.lg }}>{sheet.label}</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <SecondaryButton label="Cancelar" onPress={() => setSheet(null)} />
-              <Pressable
-                onPress={sheet.onConfirm}
-                testID="confirm-ok"
-                style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: sheet.danger ? COLORS.rust : COLORS.gold }}
-              >
-                <Text style={{ color: sheet.danger ? COLORS.bone : COLORS.ink, fontWeight: '600' }}>{sheet.confirmLabel || (sheet.danger ? 'Excluir' : 'Confirmar')}</Text>
-              </Pressable>
-            </View>
-          </View>
+          <ConfirmSheetContent sheet={sheet} onCancel={() => setSheet(null)} />
         )}
         {sheet?.type === 'info' && (
           <View>
@@ -942,6 +979,10 @@ const styles = StyleSheet.create({
   swipeOrderDeleteText: { color: COLORS.bone, fontSize: 11, fontWeight: '700' },
   swipeOrderFront: { backgroundColor: COLORS.surface },
   swipeOrderCard: { padding: SPACING.md, minHeight: 88, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, justifyContent: 'center' },
+  deleteSafetyNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  deleteSafetyText: { color: COLORS.muted, fontSize: 11, lineHeight: 16, flex: 1 },
+  confirmAction: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  confirmActionDisabled: { opacity: 0.45 },
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
   catalogThumb: { width: 84, minHeight: 126, backgroundColor: COLORS.ink },
   catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
