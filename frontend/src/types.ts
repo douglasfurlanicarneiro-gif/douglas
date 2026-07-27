@@ -11,6 +11,7 @@ export type Perfume = {
   imagemUrl: string;
   ocasioes: string[];
   familia: string;
+  familias?: string[];
   concentracao: string;
   notasSaida: string;
   notasCoracao: string;
