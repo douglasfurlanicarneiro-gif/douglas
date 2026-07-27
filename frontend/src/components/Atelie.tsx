@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -40,6 +40,107 @@ function StatCard({ label, value, icon, alert }: { label: string; value: string 
       <Feather name={icon} size={16} color={alert ? COLORS.rust : COLORS.gold} />
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+const ORDER_ACTIONS_WIDTH = 156;
+
+function SwipeablePedidoCard({
+  children,
+  onEdit,
+  onDelete,
+  testID,
+}: {
+  children: React.ReactNode;
+  onEdit: () => void;
+  onDelete: () => void;
+  testID: string;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const openRef = useRef(false);
+  const dragStartRef = useRef(0);
+
+  const animateTo = useCallback((open: boolean) => {
+    openRef.current = open;
+    Animated.spring(translateX, {
+      toValue: open ? -ORDER_ACTIONS_WIDTH : 0,
+      useNativeDriver: false,
+      damping: 22,
+      stiffness: 240,
+      mass: 0.8,
+    }).start();
+  }, [translateX]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      Math.abs(gesture.dx) > 8
+      && Math.abs(gesture.dx) > Math.abs(gesture.dy)
+    ),
+    onPanResponderGrant: () => {
+      dragStartRef.current = openRef.current ? -ORDER_ACTIONS_WIDTH : 0;
+    },
+    onPanResponderMove: (_, gesture) => {
+      const nextPosition = Math.max(
+        -ORDER_ACTIONS_WIDTH,
+        Math.min(0, dragStartRef.current + gesture.dx),
+      );
+      translateX.setValue(nextPosition);
+    },
+    onPanResponderRelease: (_, gesture) => {
+      const finalPosition = dragStartRef.current + gesture.dx;
+      animateTo(finalPosition < -(ORDER_ACTIONS_WIDTH / 2) || gesture.vx < -0.35);
+    },
+    onPanResponderTerminate: () => animateTo(openRef.current),
+  }), [animateTo, translateX]);
+
+  const edit = () => {
+    animateTo(false);
+    onEdit();
+  };
+
+  const remove = () => {
+    animateTo(false);
+    onDelete();
+  };
+
+  return (
+    <View style={styles.swipeOrderWrap} testID={testID}>
+      <View style={styles.swipeOrderActions}>
+        <Pressable
+          onPress={edit}
+          style={({ pressed }) => [styles.swipeOrderAction, styles.swipeOrderEdit, pressed && styles.swipeOrderActionPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Editar pedido"
+          testID={`${testID}-editar`}
+        >
+          <Feather name="edit-2" size={18} color={COLORS.ink} />
+          <Text style={styles.swipeOrderEditText}>Editar</Text>
+        </Pressable>
+        <Pressable
+          onPress={remove}
+          style={({ pressed }) => [styles.swipeOrderAction, styles.swipeOrderDelete, pressed && styles.swipeOrderActionPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Excluir pedido"
+          testID={`${testID}-excluir`}
+        >
+          <Feather name="trash-2" size={18} color={COLORS.bone} />
+          <Text style={styles.swipeOrderDeleteText}>Excluir</Text>
+        </Pressable>
+      </View>
+      <Animated.View
+        style={[styles.swipeOrderFront, { transform: [{ translateX }] }]}
+        {...panResponder.panHandlers}
+      >
+        <Pressable
+          onPress={() => openRef.current ? animateTo(false) : onEdit()}
+          style={({ pressed }) => [styles.swipeOrderCard, pressed && { opacity: 0.94 }]}
+          accessibilityRole="button"
+          accessibilityHint="Deslize para a esquerda para editar ou excluir"
+        >
+          {children}
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
@@ -657,10 +758,26 @@ export function Atelie({ onSair }: { onSair: () => void }) {
       return (
         <View style={{ padding: SPACING.lg }}>
           {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
+          {pedidosUnificados.length > 0 && (
+            <View style={styles.swipeOrderHint}>
+              <Feather name="chevrons-left" size={15} color={COLORS.gold} />
+              <Text style={styles.swipeOrderHintText}>Deslize um pedido para a esquerda para editar ou excluir.</Text>
+            </View>
+          )}
           {[...pedidosUnificados].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).map((p) => {
             const st = STATUS.find((s) => s.id === p.status) || STATUS[0];
             return (
-              <Pressable key={`${p.fonte}-${p.id}`} onPress={() => abrirPedido(p)} style={styles.rowCard} testID={`pedido-${p.id}`}>
+              <SwipeablePedidoCard
+                key={`${p.fonte}-${p.id}`}
+                onEdit={() => abrirPedido(p)}
+                onDelete={() => setSheet({
+                  type: 'confirm',
+                  label: `Excluir pedido de ${p.cliente}?`,
+                  onConfirm: () => p.compraLegada ? doDelCompra(p.compraLegada.id) : doDelPedido(p.id),
+                  danger: true,
+                })}
+                testID={`pedido-${p.id}`}
+              >
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <View><Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text><Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p.cliente}</Text></View>
                   <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: 11 }}>{st.label}</Text></View>
@@ -669,18 +786,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
                   <Text style={{ color: COLORS.muted, fontSize: 12 }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
                   <Text style={{ color: COLORS.bone, fontSize: 13 }}>{brl(p.total)}</Text>
                 </View>
-                <Pressable
-                  onPress={() => setSheet({
-                    type: 'confirm',
-                    label: `Excluir pedido de ${p.cliente}?`,
-                    onConfirm: () => p.compraLegada ? doDelCompra(p.compraLegada.id) : doDelPedido(p.id),
-                    danger: true,
-                  })}
-                  hitSlop={4}
-                >
-                  <Text style={{ color: COLORS.rust, fontSize: 11, marginTop: 4 }}>excluir</Text>
-                </Pressable>
-              </Pressable>
+              </SwipeablePedidoCard>
             );
           })}
         </View>
@@ -824,6 +930,18 @@ const styles = StyleSheet.create({
   rankingQty: { color: COLORS.muted, fontSize: 11 },
   sectionLabel: { color: COLORS.muted, fontSize: 11, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
+  swipeOrderHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm, paddingHorizontal: 2 },
+  swipeOrderHintText: { color: COLORS.muted, fontSize: 11, flex: 1 },
+  swipeOrderWrap: { position: 'relative', marginBottom: SPACING.sm, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: COLORS.surfaceRaised },
+  swipeOrderActions: { position: 'absolute', top: 0, right: 0, bottom: 0, width: ORDER_ACTIONS_WIDTH, flexDirection: 'row' },
+  swipeOrderAction: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5 },
+  swipeOrderEdit: { backgroundColor: COLORS.gold },
+  swipeOrderDelete: { backgroundColor: COLORS.rust },
+  swipeOrderActionPressed: { opacity: 0.82 },
+  swipeOrderEditText: { color: COLORS.ink, fontSize: 11, fontWeight: '700' },
+  swipeOrderDeleteText: { color: COLORS.bone, fontSize: 11, fontWeight: '700' },
+  swipeOrderFront: { backgroundColor: COLORS.surface },
+  swipeOrderCard: { padding: SPACING.md, minHeight: 88, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, justifyContent: 'center' },
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
   catalogThumb: { width: 84, minHeight: 126, backgroundColor: COLORS.ink },
   catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
