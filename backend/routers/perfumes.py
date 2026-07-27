@@ -36,6 +36,8 @@ ORDEM_OCASIOES = [
     "Viagem",
 ]
 
+VERSAO_METADADOS = 2
+
 
 def _valores_unicos(valores) -> list[str]:
     return list(dict.fromkeys(
@@ -63,6 +65,48 @@ def _metadados_normalizados(documento: dict) -> dict:
         "familias": familias,
         "ocasioes": ocasioes,
         "concentracao": CONCENTRACOES_LEGADAS.get(concentracao_atual, concentracao_atual),
+    }
+
+
+async def _garantir_metadados_padronizados(db) -> dict:
+    controle = await db.configuracoes.find_one({"_id": "metadados_perfumes"})
+    if controle and controle.get("versao", 0) >= VERSAO_METADADOS:
+        return {
+            "atualizados": 0,
+            "itensVitrineAtualizados": 0,
+            "jaEstavaAtualizado": True,
+        }
+
+    atualizados = 0
+    async for perfume in db.perfumes.find():
+        metadados = _metadados_normalizados(perfume)
+        await db.perfumes.update_one(
+            {"_id": perfume["_id"]},
+            {"$set": metadados},
+        )
+        atualizados += 1
+
+    snapshot = await db.vitrine.find_one({"_id": "snapshot"})
+    itens_snapshot = []
+    if snapshot:
+        for item in snapshot.get("itens", []):
+            atualizado = dict(item)
+            atualizado.update(_metadados_normalizados(atualizado))
+            itens_snapshot.append(atualizado)
+        await db.vitrine.update_one(
+            {"_id": "snapshot"},
+            {"$set": {"itens": itens_snapshot}},
+        )
+
+    await db.configuracoes.update_one(
+        {"_id": "metadados_perfumes"},
+        {"$set": {"versao": VERSAO_METADADOS}},
+        upsert=True,
+    )
+    return {
+        "atualizados": atualizados,
+        "itensVitrineAtualizados": len(itens_snapshot),
+        "jaEstavaAtualizado": False,
     }
 
 
@@ -109,6 +153,7 @@ def _oid(perfume_id: str) -> ObjectId:
 @router.get("")
 async def listar_perfumes():
     db = get_db()
+    await _garantir_metadados_padronizados(db)
     perfumes = await db.perfumes.find().sort("seq", 1).to_list(2000)
     return [serialize(p) for p in perfumes]
 
@@ -221,30 +266,8 @@ async def padronizar_tamanhos(_: str = Depends(require_atelie_auth)):
 @router.post("/padronizar-metadados")
 async def padronizar_metadados(_: str = Depends(require_atelie_auth)):
     db = get_db()
-    atualizados = 0
-
-    async for perfume in db.perfumes.find():
-        metadados = _metadados_normalizados(perfume)
-        await db.perfumes.update_one(
-            {"_id": perfume["_id"]},
-            {"$set": metadados},
-        )
-        atualizados += 1
-
-    snapshot = await db.vitrine.find_one({"_id": "snapshot"})
-    itens_snapshot = []
-    if snapshot:
-        for item in snapshot.get("itens", []):
-            atualizado = dict(item)
-            atualizado.update(_metadados_normalizados(atualizado))
-            itens_snapshot.append(atualizado)
-        await db.vitrine.update_one(
-            {"_id": "snapshot"},
-            {"$set": {"itens": itens_snapshot}},
-        )
-
+    resultado = await _garantir_metadados_padronizados(db)
     return {
-        "atualizados": atualizados,
-        "itensVitrineAtualizados": len(itens_snapshot),
+        **resultado,
         "concentracoes": ["Eau De Parfum", "Eau De Toilette", "Elixir"],
     }
