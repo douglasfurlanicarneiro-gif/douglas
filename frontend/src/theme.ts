@@ -26,19 +26,54 @@ export const STATUS = [
   { id: 'cancelado', label: 'Cancelado', color: '#C1552F' },
 ];
 
-export const FAMILIAS = ['Amadeirado', 'Floral', 'Oriental', 'Cítrico', 'Aromático', 'Chipre', 'Gourmand', 'Aquático'];
-export const CONCENTRACOES = ['Extrait', 'EDP', 'EDT', 'EDC'];
+export const FAMILIAS = [
+  'Almiscarado',
+  'Amadeirado',
+  'Ambarado',
+  'Animálico',
+  'Aquático',
+  'Aromático',
+  'Balsâmico',
+  'Cítrico',
+  'Couro',
+  'Especiado Quente',
+  'Floral',
+  'Frutado',
+  'Oriental',
+  'Verde',
+];
+
+export const CONCENTRACOES = ['Eau De Parfum', 'Eau De Toilette', 'Elixir'];
+
 export const OCASIOES = [
-  'Verão',
+  'Academia',
+  'Casual',
+  'Dia',
+  'Encontros',
+  'Festa',
   'Inverno',
   'Meia-estação',
-  'Dia',
   'Noite',
-  'Uso diário',
-  'Trabalho',
-  'Encontros',
   'Ocasiões especiais',
+  'Outono',
+  'Primavera',
+  'Trabalho',
+  'Uso diário',
+  'Verão',
+  'Viagem',
 ];
+
+export const familiasDoPerfume = (perfume: { familia?: string; familias?: string[] }) => {
+  const familias = Array.isArray(perfume.familias) ? perfume.familias.filter(Boolean) : [];
+  return familias.length ? familias : (perfume.familia ? [perfume.familia] : []);
+};
+
+export const nomeConcentracao = (concentracao?: string) => ({
+  EDP: 'Eau De Parfum',
+  EDT: 'Eau De Toilette',
+  EDC: 'Eau De Toilette',
+  Extrait: 'Elixir',
+}[concentracao || ''] || concentracao || '');
 
 export const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 export const fmtDate = (iso?: string | null) => { if (!iso) return ''; try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return ''; } };
