@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -22,6 +22,14 @@ const normalize = (value: string) => value
   .replace(/[\u0300-\u036f]/g, '')
   .toLowerCase();
 
+const resumirCategorias = (valores: string[], limite: number, singular: string, plural: string) => {
+  if (!valores.length) return '';
+  const visiveis = valores.slice(0, limite);
+  const restantes = valores.length - visiveis.length;
+  if (restantes <= 0) return visiveis.join(' · ');
+  return `${visiveis.join(' · ')} · +${restantes} ${restantes === 1 ? singular : plural}`;
+};
+
 function VitrineCard({
   item,
   favorite,
@@ -38,7 +46,10 @@ function VitrineCard({
   onToggleFavorite: () => void;
 }) {
   const temNotas = item.notasSaida || item.notasCoracao || item.notasFundo;
-  const climaOcasiao = item.ocasioes?.length ? item.ocasioes.join(' · ') : 'Versátil · Todas as ocasiões';
+  const ocasioes = item.ocasioes || [];
+  const familias = familiasDoPerfume(item);
+  const climaOcasiao = ocasioes.length ? resumirCategorias(ocasioes, 2, 'ocasião', 'ocasiões') : 'Versátil · Todas as ocasiões';
+  const familiasResumo = resumirCategorias(familias, 2, 'família', 'famílias');
   return (
     <View style={styles.card} testID={`vitrine-card-${item.id}`}>
       <Pressable onPress={onToggleFavorite} style={styles.cardFavorite} hitSlop={8}>
@@ -57,17 +68,16 @@ function VitrineCard({
         </Pressable>
         <View style={styles.productInfo}>
           <Pressable onPress={onDetails}>
-            <Text style={styles.cardTitle}>{item.nome}</Text>
+            <Text style={styles.cardTitle} numberOfLines={2}>{item.nome}</Text>
           </Pressable>
           <Text style={styles.occasionLabel}>CLIMA & OCASIÃO</Text>
-          <Text style={styles.cardSub}>{climaOcasiao}</Text>
+          <Text style={styles.cardSub} numberOfLines={2}>{climaOcasiao}</Text>
+          {!!familiasResumo && <Text style={styles.familySummary} numberOfLines={2}>{familiasResumo}</Text>}
           <View style={styles.metaRow}>
-            <Text style={styles.metaText}>{familiasDoPerfume(item).join(' · ')}</Text>
-            <View style={styles.metaDot} />
             <Text style={styles.metaText}>{nomeConcentracao(item.concentracao)}</Text>
             <View style={[styles.availabilityDot, { backgroundColor: item.disponivel ? COLORS.sage : COLORS.rust }]} />
             <Text style={[styles.metaText, { color: item.disponivel ? COLORS.sage : COLORS.rust }]}>
-              {item.disponivel ? 'disponível' : 'em falta'}
+              {item.disponivel ? 'Disponível' : 'Em falta'}
             </Text>
           </View>
         </View>
@@ -92,7 +102,7 @@ function VitrineCard({
         <View style={styles.notes}>
           {!!item.notasSaida && <NoteRow label="TOPO" value={item.notasSaida} />}
           {!!item.notasCoracao && <NoteRow label="CORAÇÃO" value={item.notasCoracao} />}
-          {!!item.notasFundo && <NoteRow label="BASE" value={item.notasFundo} />}
+          {!!item.notasFundo && <NoteRow label="FUNDO" value={item.notasFundo} />}
         </View>
       ) : (
         <View style={styles.notesEmpty}>
@@ -100,14 +110,16 @@ function VitrineCard({
         </View>
       )}
 
-      <Pressable onPress={onReview} style={styles.reviewButton} testID={`review-trigger-${item.id}`}>
-        <Feather name="star" size={13} color={COLORS.gold} />
-        <Text style={styles.reviewText}>Avaliar fragrância</Text>
-      </Pressable>
-      <Pressable onPress={onDetails} style={styles.detailsButton}>
-        <Text style={styles.detailsText}>Conhecer a fragrância</Text>
-        <Feather name="arrow-right" size={13} color={COLORS.gold} />
-      </Pressable>
+      <View style={styles.cardActions}>
+        <Pressable onPress={onReview} style={styles.reviewButton} testID={`review-trigger-${item.id}`}>
+          <Feather name="star" size={13} color={COLORS.gold} />
+          <Text style={styles.reviewText}>Avaliar</Text>
+        </Pressable>
+        <Pressable onPress={onDetails} style={styles.detailsButton}>
+          <Text style={styles.detailsText}>Conhecer a fragrância</Text>
+          <Feather name="arrow-right" size={13} color={COLORS.gold} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -138,6 +150,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [detailItem, setDetailItem] = useState<VitrineItem | null>(null);
   const [quizOpen, setQuizOpen] = useState(false);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [orderCodes, setOrderCodes] = useState<string[]>([]);
   const [successOrder, setSuccessOrder] = useState<Compra | null>(null);
@@ -214,7 +227,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     [itens],
   );
   const ocasioes = useMemo(
-    () => ['Todas', ...Array.from(new Set(itens.flatMap((i) => i.ocasioes || [])))],
+    () => ['Todas', ...Array.from(new Set(itens.flatMap((i) => i.ocasioes || []))).sort((a, b) => a.localeCompare(b, 'pt-BR'))],
     [itens],
   );
   const filtrados = useMemo(() => itens.filter((i) => {
@@ -255,6 +268,8 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   };
 
   const cartCount = cart.reduce((total, item) => total + item.quantidade, 0);
+  const filtrosAtivos = (familiaAtiva !== 'Todas' && familiaAtiva !== 'Favoritos' ? 1 : 0)
+    + (ocasiaoAtiva !== 'Todas' ? 1 : 0);
 
   const saveOrderCode = (order: Compra) => {
     if (!order.codigoAcompanhamento) return;
@@ -340,7 +355,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         testID="atelie-access-button"
         hitSlop={12}
       >
-        <Feather name="lock" size={13} color={COLORS.gold} />
+        <Feather name="user" size={14} color={COLORS.muted} />
       </Pressable>
 
       <FlatList
@@ -372,14 +387,14 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
                     value={search}
                     onChangeText={setSearch}
                     placeholder="Buscar fragrância, nota ou ocasião…"
-                    placeholderTextColor={COLORS.muted + 'BB'}
+                    placeholderTextColor={COLORS.muted}
                     style={styles.searchInput}
                     testID="vitrine-search"
                   />
                 </View>
                 <Pressable onPress={() => setQuizOpen(true)} style={styles.quizBanner} testID="quiz-open">
                   <View style={styles.quizIcon}>
-                    <Feather name="compass" size={20} color={COLORS.ink} />
+                    <Feather name="compass" size={19} color={COLORS.gold} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.quizTitle}>Encontre sua essência</Text>
@@ -387,22 +402,37 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
                   </View>
                   <Feather name="chevron-right" size={18} color={COLORS.gold} />
                 </Pressable>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 6, paddingHorizontal: 2 }} style={{ height: 56, marginBottom: SPACING.sm }}>
-                  {familias.map((f) => (
-                    <Chip key={f} label={f} active={familiaAtiva === f} onPress={() => setFamiliaAtiva(f)} testID={`chip-familia-${f}`} />
-                  ))}
-                </ScrollView>
-                <Text style={styles.filterLabel}>OCASIÃO</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 6, paddingHorizontal: 2 }} style={{ height: 52, marginBottom: SPACING.sm }}>
-                  {ocasioes.map((item) => (
-                    <Chip
-                      key={item}
-                      label={item === 'Todas' ? 'Todas as ocasiões' : item}
-                      active={ocasiaoAtiva === item}
-                      onPress={() => setOcasiaoAtiva(item)}
-                    />
-                  ))}
-                </ScrollView>
+                <View style={styles.quickFilters}>
+                  <Pressable
+                    onPress={() => { setFamiliaAtiva('Todas'); setOcasiaoAtiva('Todas'); }}
+                    style={[styles.quickFilterButton, familiaAtiva === 'Todas' && ocasiaoAtiva === 'Todas' && styles.quickFilterButtonActive]}
+                    testID="filter-all"
+                  >
+                    <Text style={[styles.quickFilterText, familiaAtiva === 'Todas' && ocasiaoAtiva === 'Todas' && styles.quickFilterTextActive]}>Todas</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => { setFamiliaAtiva('Favoritos'); setOcasiaoAtiva('Todas'); }}
+                    style={[styles.quickFilterButton, styles.quickFilterGrow, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
+                    testID="filter-favorites"
+                  >
+                    <Feather name="heart" size={14} color={familiaAtiva === 'Favoritos' ? COLORS.ink : COLORS.gold} />
+                    <Text style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]}>Favoritos</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      if (familiaAtiva === 'Favoritos') setFamiliaAtiva('Todas');
+                      setFiltersOpen(true);
+                    }}
+                    style={[styles.quickFilterButton, styles.quickFilterGrow, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
+                    testID="filter-open"
+                  >
+                    <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />
+                    <Text style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]}>Filtros</Text>
+                    {filtrosAtivos > 0 && (
+                      <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{filtrosAtivos}</Text></View>
+                    )}
+                  </Pressable>
+                </View>
               </View>
             )}
           </View>
@@ -508,6 +538,40 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         onAddCode={addOrderCode}
       />
 
+      <BottomSheet visible={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrar fragrâncias" compact testID="filters-sheet">
+        <View>
+          <Text style={styles.filterSheetLabel}>FAMÍLIA OLFATIVA</Text>
+          <View style={styles.filterSheetChips}>
+            {familias.filter((item) => item !== 'Favoritos').map((item) => (
+              <Chip
+                key={item}
+                label={item === 'Todas' ? 'Todas as famílias' : item}
+                active={familiaAtiva === item}
+                onPress={() => setFamiliaAtiva(item)}
+              />
+            ))}
+          </View>
+          <Text style={styles.filterSheetLabel}>OCASIÃO</Text>
+          <View style={styles.filterSheetChips}>
+            {ocasioes.map((item) => (
+              <Chip
+                key={item}
+                label={item === 'Todas' ? 'Todas as ocasiões' : item}
+                active={ocasiaoAtiva === item}
+                onPress={() => setOcasiaoAtiva(item)}
+              />
+            ))}
+          </View>
+          <View style={styles.filterSheetActions}>
+            <SecondaryButton
+              label="Limpar"
+              onPress={() => { setFamiliaAtiva('Todas'); setOcasiaoAtiva('Todas'); }}
+            />
+            <PrimaryButton label="Aplicar filtros" onPress={() => setFiltersOpen(false)} />
+          </View>
+        </View>
+      </BottomSheet>
+
       {/* Sugestão sheet */}
       <BottomSheet visible={sugestaoOpen} onClose={() => setSugestaoOpen(false)} title="Enviar sugestão" testID="sugestao-sheet">
         <View>
@@ -612,19 +676,29 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.ink },
-  brandHeader: { alignItems: 'center', paddingHorizontal: 56, paddingTop: SPACING.xl, paddingBottom: SPACING.lg },
+  brandHeader: { alignItems: 'center', paddingHorizontal: 56, paddingTop: 26, paddingBottom: 20 },
   eyebrow: { color: COLORS.gold, fontSize: 11, letterSpacing: 5, fontWeight: '500' },
-  h1: { color: COLORS.bone, fontSize: 26, lineHeight: 30, letterSpacing: 1.5, fontWeight: '700', marginTop: 2 },
+  h1: { color: COLORS.bone, fontSize: 26, lineHeight: 30, letterSpacing: 1.5, fontWeight: '700', marginTop: 7 },
   subtitle: { color: COLORS.muted, fontSize: 9, letterSpacing: 2.2, marginTop: 5 },
-  atelieAccess: { position: 'absolute', top: 48, right: SPACING.lg, zIndex: 40, width: 38, height: 38, borderRadius: 19, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 52, paddingHorizontal: 16, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, marginBottom: SPACING.sm },
-  searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 12, fontSize: 14 },
+  atelieAccess: { position: 'absolute', top: 51, right: SPACING.lg, zIndex: 40, width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.surface + '99', borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 56, paddingHorizontal: 18, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, marginBottom: 12 },
+  searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 15, fontSize: 14 },
   quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.gold + '70', marginBottom: SPACING.sm },
-  quizIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
+  quizIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   quizTitle: { color: COLORS.bone, fontSize: 14, fontWeight: '700' },
   quizSubtitle: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
-  filterLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.2, marginTop: 2 },
-  card: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.lg, padding: SPACING.md, overflow: 'hidden' },
+  quickFilters: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, marginBottom: SPACING.sm },
+  quickFilterButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  quickFilterGrow: { flex: 1 },
+  quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
+  quickFilterText: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
+  quickFilterTextActive: { color: COLORS.ink },
+  filterBadge: { minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
+  filterBadgeText: { color: COLORS.gold, fontSize: 8, fontWeight: '700' },
+  filterSheetLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.2, marginBottom: 9 },
+  filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg },
+  filterSheetActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
+  card: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: 12, padding: SPACING.md, overflow: 'hidden' },
   cardFavorite: { position: 'absolute', right: 10, top: 9, zIndex: 4, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.ink + 'DD' },
   productTop: { flexDirection: 'row', gap: SPACING.md },
   imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
@@ -635,9 +709,9 @@ const styles = StyleSheet.create({
   cardTitle: { color: COLORS.bone, fontSize: 17, lineHeight: 21, fontWeight: '700' },
   occasionLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, marginTop: 9 },
   cardSub: { color: COLORS.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 9 },
+  familySummary: { color: COLORS.bone, fontSize: 10, lineHeight: 14, marginTop: 6 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 5 },
   metaText: { color: COLORS.muted, fontSize: 9 },
-  metaDot: { width: 2, height: 2, borderRadius: 1, backgroundColor: COLORS.muted },
   availabilityDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: SPACING.md },
   sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', backgroundColor: COLORS.ink },
@@ -650,9 +724,10 @@ const styles = StyleSheet.create({
   noteValue: { flex: 1, color: COLORS.bone, fontSize: 11, lineHeight: 15, fontStyle: 'italic' },
   notesEmpty: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
   notesEmptyText: { color: COLORS.muted, fontSize: 10, fontStyle: 'italic' },
-  reviewButton: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10, paddingVertical: 3 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
+  reviewButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
   reviewText: { color: COLORS.gold, fontSize: 10 },
-  detailsButton: { alignSelf: 'flex-end', flexDirection: 'row', alignItems: 'center', gap: 5, paddingTop: 5 },
+  detailsButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
   detailsText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
   fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
