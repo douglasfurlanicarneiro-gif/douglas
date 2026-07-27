@@ -11,6 +11,60 @@ from utils import next_seq, serialize
 
 router = APIRouter(prefix="/api/perfumes", tags=["perfumes"])
 
+CONCENTRACOES_LEGADAS = {
+    "EDP": "Eau De Parfum",
+    "EDT": "Eau De Toilette",
+    "EDC": "Eau De Toilette",
+    "Extrait": "Elixir",
+}
+
+ORDEM_OCASIOES = [
+    "Academia",
+    "Casual",
+    "Dia",
+    "Encontros",
+    "Festa",
+    "Inverno",
+    "Meia-estação",
+    "Noite",
+    "Ocasiões especiais",
+    "Outono",
+    "Primavera",
+    "Trabalho",
+    "Uso diário",
+    "Verão",
+    "Viagem",
+]
+
+
+def _valores_unicos(valores) -> list[str]:
+    return list(dict.fromkeys(
+        str(valor).strip()
+        for valor in (valores or [])
+        if str(valor).strip()
+    ))
+
+
+def _metadados_normalizados(documento: dict) -> dict:
+    familias = _valores_unicos(documento.get("familias"))
+    if not familias and documento.get("familia"):
+        familias = [str(documento["familia"]).strip()]
+    if not familias:
+        familias = ["Amadeirado"]
+
+    ocasioes = _valores_unicos(documento.get("ocasioes"))
+    ordem = {nome: indice for indice, nome in enumerate(ORDEM_OCASIOES)}
+    ocasioes.sort(key=lambda nome: (ordem.get(nome, len(ordem)), nome.casefold()))
+
+    concentracao_atual = str(documento.get("concentracao") or "Eau De Parfum").strip()
+    return {
+        "inspiracao": "",
+        "familia": familias[0],
+        "familias": familias,
+        "ocasioes": ocasioes,
+        "concentracao": CONCENTRACOES_LEGADAS.get(concentracao_atual, concentracao_atual),
+    }
+
 
 class Preco(BaseModel):
     ml: int = Field(gt=0, le=1000)
@@ -21,8 +75,9 @@ class PerfumeIn(BaseModel):
     nome: str = Field(min_length=2, max_length=160)
     inspiracao: str = Field(default="", max_length=160)
     imagemUrl: str = Field(default="", max_length=2000)
-    ocasioes: List[str] = Field(default_factory=list, max_length=12)
+    ocasioes: List[str] = Field(default_factory=list, max_length=15)
     familia: str = Field(min_length=2, max_length=80)
+    familias: List[str] = Field(default_factory=list, max_length=14)
     concentracao: str = Field(min_length=2, max_length=40)
     notasSaida: str = Field(default="", max_length=500)
     notasCoracao: str = Field(default="", max_length=500)
@@ -33,6 +88,12 @@ class PerfumeIn(BaseModel):
 
     @model_validator(mode="after")
     def validar_publicacao(self):
+        metadados = _metadados_normalizados(self.model_dump())
+        self.inspiracao = ""
+        self.familia = metadados["familia"]
+        self.familias = metadados["familias"]
+        self.ocasioes = metadados["ocasioes"]
+        self.concentracao = metadados["concentracao"]
         if self.publicavel and not any(preco.preco > 0 for preco in self.precos):
             raise ValueError("Informe ao menos um preço válido antes de publicar.")
         return self
@@ -103,7 +164,8 @@ async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_ateli
             "imagemUrl": "",
             "ocasioes": [],
             "familia": "Amadeirado",
-            "concentracao": "EDP",
+            "familias": ["Amadeirado"],
+            "concentracao": "Eau De Parfum",
             "notasSaida": "",
             "notasCoracao": "",
             "notasFundo": "",
@@ -153,4 +215,36 @@ async def padronizar_tamanhos(_: str = Depends(require_atelie_auth)):
     return {
         "atualizados": atualizados,
         "precosPadrao": [{"ml": ml, "preco": preco} for ml, preco in precos_padrao.items()],
+    }
+
+
+@router.post("/padronizar-metadados")
+async def padronizar_metadados(_: str = Depends(require_atelie_auth)):
+    db = get_db()
+    atualizados = 0
+
+    async for perfume in db.perfumes.find():
+        metadados = _metadados_normalizados(perfume)
+        await db.perfumes.update_one(
+            {"_id": perfume["_id"]},
+            {"$set": metadados},
+        )
+        atualizados += 1
+
+    snapshot = await db.vitrine.find_one({"_id": "snapshot"})
+    itens_snapshot = []
+    if snapshot:
+        for item in snapshot.get("itens", []):
+            atualizado = dict(item)
+            atualizado.update(_metadados_normalizados(atualizado))
+            itens_snapshot.append(atualizado)
+        await db.vitrine.update_one(
+            {"_id": "snapshot"},
+            {"$set": {"itens": itens_snapshot}},
+        )
+
+    return {
+        "atualizados": atualizados,
+        "itensVitrineAtualizados": len(itens_snapshot),
+        "concentracoes": ["Eau De Parfum", "Eau De Toilette", "Elixir"],
     }
