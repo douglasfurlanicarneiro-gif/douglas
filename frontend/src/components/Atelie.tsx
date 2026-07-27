@@ -32,7 +32,6 @@ const TABS = [
   { id: 'estoque', label: 'Estoque', icon: 'package' as const },
   { id: 'pedidos', label: 'Pedidos', icon: 'clipboard' as const },
   { id: 'opinioes', label: 'Opiniões', icon: 'star' as const },
-  { id: 'mensagens', label: 'Mensagens', icon: 'inbox' as const },
 ];
 
 function StatCard({ label, value, icon, alert }: { label: string; value: string | number; icon: any; alert?: boolean }) {
@@ -725,14 +724,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
       );
     }
 
-    if (tab === 'mensagens') {
-      return (
-        <View style={{ padding: SPACING.lg }}>
-          <Text style={styles.sectionLabel}>MENSAGENS DE CLIENTES</Text>
-          <EmptyState text="Nenhuma mensagem recebida." />
-        </View>
-      );
-    }
     return null;
   };
 
@@ -768,7 +759,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
         {renderContent()}
       </ScrollView>
 
-      {tab !== 'dashboard' && tab !== 'mensagens' && tab !== 'opinioes' && (
+      {tab !== 'dashboard' && tab !== 'opinioes' && (
         <Pressable onPress={openCreate} style={styles.fab} testID="fab-add">
           <Feather name="plus" size={24} color={COLORS.ink} />
         </Pressable>
