@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TextInput, Pressable, FlatList, Act
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { COLORS, SPACING, RADIUS, brl, padSeq } from '../theme';
+import { COLORS, SPACING, RADIUS, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Chip, Stars } from './atoms';
 import { createOpiniao, createSugestao, getVitrine } from '../api';
@@ -62,9 +62,9 @@ function VitrineCard({
           <Text style={styles.occasionLabel}>CLIMA & OCASIÃO</Text>
           <Text style={styles.cardSub}>{climaOcasiao}</Text>
           <View style={styles.metaRow}>
-            <Text style={styles.metaText}>{item.familia}</Text>
+            <Text style={styles.metaText}>{familiasDoPerfume(item).join(' · ')}</Text>
             <View style={styles.metaDot} />
-            <Text style={styles.metaText}>{item.concentracao}</Text>
+            <Text style={styles.metaText}>{nomeConcentracao(item.concentracao)}</Text>
             <View style={[styles.availabilityDot, { backgroundColor: item.disponivel ? COLORS.sage : COLORS.rust }]} />
             <Text style={[styles.metaText, { color: item.disponivel ? COLORS.sage : COLORS.rust }]}>
               {item.disponivel ? 'disponível' : 'em falta'}
@@ -209,7 +209,10 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     storage.setItem(CART_KEY, JSON.stringify(lines));
   }, [cart]);
 
-  const familias = useMemo(() => ['Todas', 'Favoritos', ...Array.from(new Set(itens.map((i) => i.familia)))], [itens]);
+  const familias = useMemo(
+    () => ['Todas', 'Favoritos', ...Array.from(new Set(itens.flatMap(familiasDoPerfume))).sort((a, b) => a.localeCompare(b, 'pt-BR'))],
+    [itens],
+  );
   const ocasioes = useMemo(
     () => ['Todas', ...Array.from(new Set(itens.flatMap((i) => i.ocasioes || [])))],
     [itens],
@@ -217,7 +220,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const filtrados = useMemo(() => itens.filter((i) => {
     const searchable = [
       i.nome,
-      i.familia,
+      ...familiasDoPerfume(i),
       ...(i.ocasioes || []),
       i.notasSaida,
       i.notasCoracao,
@@ -225,7 +228,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     ].filter(Boolean).join(' ');
     const okBusca = normalize(searchable).includes(normalize(search.trim()));
     const okFam = familiaAtiva === 'Todas'
-      || (familiaAtiva === 'Favoritos' ? favorites.has(i.id) : i.familia === familiaAtiva);
+      || (familiaAtiva === 'Favoritos' ? favorites.has(i.id) : familiasDoPerfume(i).includes(familiaAtiva));
     const okOcasiao = ocasiaoAtiva === 'Todas' || i.ocasioes?.includes(ocasiaoAtiva);
     return okBusca && okFam && okOcasiao;
   }), [itens, search, familiaAtiva, ocasiaoAtiva, favorites]);
