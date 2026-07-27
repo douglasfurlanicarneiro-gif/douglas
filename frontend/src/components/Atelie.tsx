@@ -3,7 +3,10 @@ import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { COLORS, SPACING, RADIUS, STATUS, FAMILIAS, CONCENTRACOES, OCASIOES, brl, fmtDate, padSeq } from '../theme';
+import {
+  COLORS, SPACING, RADIUS, STATUS, FAMILIAS, CONCENTRACOES, OCASIOES,
+  brl, familiasDoPerfume, fmtDate, nomeConcentracao, padSeq,
+} from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
@@ -195,8 +198,12 @@ function ConfirmSheetContent({
 }
 
 function PerfumeForm({ initial, onSave, onCancel }: any) {
-  const [f, setF] = useState<any>(initial || {
-    nome: '', inspiracao: '', imagemUrl: '', ocasioes: [], familia: FAMILIAS[0], concentracao: 'EDP',
+  const [f, setF] = useState<any>(initial ? {
+    ...initial,
+    familias: familiasDoPerfume(initial),
+    concentracao: nomeConcentracao(initial.concentracao),
+  } : {
+    nome: '', imagemUrl: '', ocasioes: [], familia: FAMILIAS[0], familias: [FAMILIAS[0]], concentracao: CONCENTRACOES[0],
     notasSaida: '', notasCoracao: '', notasFundo: '',
     precos: [{ ml: 30, preco: 0 }], estoqueMinimoMl: 100, publicavel: false,
   });
@@ -204,6 +211,11 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
   const toggleOcasiao = (value: string) => setF((s: any) => {
     const atuais = Array.isArray(s.ocasioes) ? s.ocasioes : [];
     return { ...s, ocasioes: atuais.includes(value) ? atuais.filter((item: string) => item !== value) : [...atuais, value] };
+  });
+  const toggleFamilia = (value: string) => setF((s: any) => {
+    const atuais = familiasDoPerfume(s);
+    const familias = atuais.includes(value) ? atuais.filter((item: string) => item !== value) : [...atuais, value];
+    return { ...s, familias, familia: familias[0] || '' };
   });
   const setPreco = (i: number, k: string, v: any) => setF((s: any) => ({ ...s, precos: s.precos.map((p: any, idx: number) => idx === i ? { ...p, [k]: v } : p) }));
   const addPreco = () => setF((s: any) => ({ ...s, precos: [...s.precos, { ml: 10, preco: 0 }] }));
@@ -227,7 +239,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
           <Text style={styles.imagePreviewText}>Prévia da foto</Text>
         </View>
       )}
-      <Field label="Clima & ocasião">
+      <Field label="Clima & Ocasião">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {OCASIOES.map((item) => {
             const selected = (f.ocasioes || []).includes(item);
@@ -239,22 +251,18 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
           })}
         </View>
       </Field>
-      <Field label="Referência olfativa (opcional, uso interno)">
-        <TInput value={f.inspiracao || ''} onChangeText={(v) => set('inspiracao', v)} placeholder="Não aparece na vitrine" />
-      </Field>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <Field label="Família">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-              {FAMILIAS.map((fam) => (
-                <Pressable key={fam} onPress={() => set('familia', fam)} style={[styles.miniChip, f.familia === fam && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                  <Text style={{ color: f.familia === fam ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{fam}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </Field>
+      <Field label="Família Olfativa">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {FAMILIAS.map((fam) => {
+            const selected = familiasDoPerfume(f).includes(fam);
+            return (
+              <Pressable key={fam} onPress={() => toggleFamilia(fam)} style={[styles.miniChip, selected && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
+                <Text style={{ color: selected ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{fam}</Text>
+              </Pressable>
+            );
+          })}
         </View>
-      </View>
+      </Field>
       <Field label="Concentração">
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           {CONCENTRACOES.map((c) => (
@@ -302,8 +310,13 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
         <SecondaryButton label="Cancelar" onPress={onCancel} />
         <PrimaryButton
           label="Salvar"
-          onPress={() => f.nome.trim() && onSave(f)}
-          disabled={!f.nome.trim() || (f.publicavel && !f.precos.some((price: { preco: number }) => price.preco > 0))}
+          onPress={() => f.nome.trim() && familiasDoPerfume(f).length && onSave({
+            ...f,
+            inspiracao: '',
+            familia: familiasDoPerfume(f)[0],
+            familias: familiasDoPerfume(f),
+          })}
+          disabled={!f.nome.trim() || !familiasDoPerfume(f).length || (f.publicavel && !f.precos.some((price: { preco: number }) => price.preco > 0))}
           testID="perfume-save"
         />
       </View>
@@ -362,7 +375,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
     return p?.precos.find((pr: any) => pr.ml === Number(it.ml))?.preco || 0;
   };
   const total = f.itens.reduce((s: number, it: any) => s + precoDo(it) * it.quantidade, 0);
-  const filtrados = perfumes.filter((p: any) => (p.nome + (p.inspiracao || '')).toLowerCase().includes(q.toLowerCase())).slice(0, 40);
+  const filtrados = perfumes.filter((p: any) => p.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
   return (
     <View>
       <Field label="Cliente"><TInput value={f.cliente} onChangeText={(v) => set('cliente', v)} testID="pedido-cliente" /></Field>
@@ -602,7 +615,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     }
   };
 
-  const perfumesFiltrados = perfumes.filter((p) => (p.nome + (p.inspiracao || '')).toLowerCase().includes(search.toLowerCase()));
+  const perfumesFiltrados = perfumes.filter((p) => p.nome.toLowerCase().includes(search.toLowerCase()));
 
   const sheetTitle = !sheet ? '' :
     sheet.type === 'perfume' ? (sheet.data ? 'Editar contratipo' : 'Novo contratipo') :
@@ -730,8 +743,8 @@ export function Atelie({ onSair }: { onSair: () => void }) {
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                    <View style={styles.tag}><Text style={{ color: COLORS.gold, fontSize: 10 }}>{p.familia}</Text></View>
-                    <View style={styles.tag}><Text style={{ color: COLORS.muted, fontSize: 10 }}>{p.concentracao}</Text></View>
+                    <View style={styles.tag}><Text style={{ color: COLORS.gold, fontSize: 10 }}>{familiasDoPerfume(p).join(' · ')}</Text></View>
+                    <View style={styles.tag}><Text style={{ color: COLORS.muted, fontSize: 10 }}>{nomeConcentracao(p.concentracao)}</Text></View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                     {p.precos.map((pr: any, i: number) => (
