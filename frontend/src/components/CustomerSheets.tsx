@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { acompanharPedido } from '../api';
-import { brl, COLORS, fmtDate, OCASIOES, RADIUS, SPACING, STATUS } from '../theme';
+import { brl, COLORS, familiasDoPerfume, fmtDate, nomeConcentracao, OCASIOES, RADIUS, SPACING, STATUS } from '../theme';
 import type { Acompanhamento, Perfume } from '../types';
 import { BottomSheet } from './BottomSheet';
 import { Chip, PrimaryButton, SecondaryButton, TInput } from './atoms';
+
+const SUPPORT_WHATSAPP = (process.env.EXPO_PUBLIC_WHATSAPP_NUMBER || '').replace(/\D/g, '');
 
 export function PerfumeDetailSheet({
   perfume,
@@ -39,7 +41,7 @@ export function PerfumeDetailSheet({
           </View>
           <Text style={styles.eyebrow}>FRAGRÂNCIA Nº {String(perfume.seq || 0).padStart(3, '0')}</Text>
           <Text style={styles.detailTitle}>{perfume.nome}</Text>
-          <Text style={styles.detailMeta}>{perfume.familia} · {perfume.concentracao}</Text>
+          <Text style={styles.detailMeta}>{familiasDoPerfume(perfume).join(' · ')} · {nomeConcentracao(perfume.concentracao)}</Text>
 
           <View style={styles.occasionBox}>
             <Text style={styles.sectionLabel}>CLIMA & OCASIÃO</Text>
@@ -94,14 +96,14 @@ export function QuizSheet({
   onDetails: (perfume: Perfume) => void;
 }) {
   const familias = useMemo(
-    () => Array.from(new Set(perfumes.map((item) => item.familia).filter(Boolean))),
+    () => Array.from(new Set(perfumes.flatMap(familiasDoPerfume))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
     [perfumes],
   );
   const ocasioes = useMemo(
     () => Array.from(new Set([
       ...perfumes.flatMap((item) => item.ocasioes || []),
       ...OCASIOES,
-    ])).slice(0, 12),
+    ])).sort((a, b) => a.localeCompare(b, 'pt-BR')),
     [perfumes],
   );
   const [familia, setFamilia] = useState('');
@@ -112,7 +114,7 @@ export function QuizSheet({
     .map((perfume) => ({
       perfume,
       pontos:
-        (familia && perfume.familia === familia ? 4 : 0)
+        (familia && familiasDoPerfume(perfume).includes(familia) ? 4 : 0)
         + (ocasiao && perfume.ocasioes?.includes(ocasiao) ? 3 : 0)
         + (perfume.disponivel ? 1 : 0),
     }))
@@ -154,7 +156,7 @@ export function QuizSheet({
                 <View style={styles.resultNumber}><Text style={styles.resultNumberText}>{index + 1}</Text></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.resultName}>{perfume.nome}</Text>
-                  <Text style={styles.resultMeta}>{perfume.familia} · {(perfume.ocasioes || []).join(' · ')}</Text>
+                  <Text style={styles.resultMeta}>{familiasDoPerfume(perfume).join(' · ')} · {(perfume.ocasioes || []).join(' · ')}</Text>
                 </View>
                 <Feather name="chevron-right" size={18} color={COLORS.gold} />
               </Pressable>
@@ -269,6 +271,15 @@ export function OrdersSheet({
     </View>
   );
 
+  const talkAboutOrder = (order: Acompanhamento) => {
+    const orderNumber = String(order.seq || 0).padStart(3, '0');
+    const message = [
+      `Olá! Gostaria de saber o andamento do pedido nº ${orderNumber} da L’Essence Furlani.`,
+      `Código de acompanhamento: ${order.codigoAcompanhamento}.`,
+    ].join('\n');
+    Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(message)}`).catch(() => undefined);
+  };
+
   return (
     <BottomSheet
       visible={visible}
@@ -333,6 +344,16 @@ export function OrdersSheet({
                 </View>
               );
             })}
+            {!!SUPPORT_WHATSAPP && (
+              <Pressable
+                onPress={() => talkAboutOrder(order)}
+                style={styles.whatsappButton}
+                testID={`order-whatsapp-${order.codigoAcompanhamento}`}
+              >
+                <Feather name="message-circle" size={17} color={COLORS.ink} />
+                <Text style={styles.whatsappButtonText}>Falar sobre este pedido</Text>
+              </Pressable>
+            )}
             <SecondaryButton label="Comprar novamente" onPress={() => onRebuy(order)} />
           </View>
         );
@@ -380,6 +401,8 @@ const styles = StyleSheet.create({
   timelineDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   timelineText: { color: COLORS.bone, fontSize: 12, flex: 1 },
   timelineDate: { color: COLORS.muted, fontSize: 10 },
+  whatsappButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: SPACING.md, marginTop: SPACING.md, marginBottom: 8, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
+  whatsappButtonText: { color: COLORS.ink, fontSize: 13, fontWeight: '700' },
   emptyOrdersContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACING.lg },
   emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg, transform: [{ translateY: -30 }] },
   emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
