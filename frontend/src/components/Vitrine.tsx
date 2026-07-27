@@ -14,7 +14,8 @@ import type { Acompanhamento, Compra, Perfume } from '../types';
 
 type VitrineItem = Perfume;
 const FAVORITES_KEY = 'favorite-perfumes-v1';
-const ORDERS_KEY = 'customer-orders-v1';
+const ORDERS_KEY = 'customer-orders-v2';
+const LEGACY_ORDERS_KEYS = ['customer-orders-v1'];
 const CART_KEY = 'customer-cart-v1';
 type SavedCartLine = { perfumeId: string; ml: number; quantidade: number };
 const normalize = (value: string) => value
@@ -171,6 +172,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
+    LEGACY_ORDERS_KEYS.forEach((key) => storage.removeItem(key));
     Promise.all([
       storage.getItem(FAVORITES_KEY, ''),
       storage.getItem(ORDERS_KEY, ''),
