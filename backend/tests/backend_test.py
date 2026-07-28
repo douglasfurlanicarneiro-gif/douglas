@@ -140,6 +140,19 @@ class TestFullFlow:
         assert resumo["reservadoMl"] >= 100
         assert resumo["disponivelMl"] == resumo["saldoAtualMl"] - resumo["reservadoMl"]
 
+        # Confirmar o pagamento mantém a reserva, sem baixa física.
+        payload["status"] = "pagamento_confirmado"
+        r_confirmado = s.put(
+            f"{API}/pedidos/{d['id']}",
+            json=payload,
+            headers=AUTH,
+        )
+        assert r_confirmado.status_code == 200, r_confirmado.text
+        est_confirmado = s.get(f"{API}/estoque").json().get(pid, 0)
+        assert est_confirmado == est_before
+        resumo_confirmado = s.get(f"{API}/estoque/resumo", headers=AUTH).json()[pid]
+        assert resumo_confirmado["reservadoMl"] >= 100
+
         # Ao iniciar o preparo, a reserva vira baixa física.
         payload["status"] = "preparando"
         r2 = s.put(

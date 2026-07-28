@@ -136,7 +136,7 @@ async def resumo_estoque(_: str = Depends(require_atelie_auth)):
 
     reservado: dict[str, int] = {}
     pedidos_pendentes = await db.pedidos.find(
-        {"status": "pendente"},
+        {"status": {"$in": ["pendente", "pagamento_confirmado"]}},
         {"itens": 1},
     ).to_list(5000)
     for pedido in pedidos_pendentes:

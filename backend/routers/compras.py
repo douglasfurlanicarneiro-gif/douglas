@@ -172,7 +172,15 @@ async def _criar_compra(payload: CompraIn):
 
 
 class CompraStatusIn(BaseModel):
-    status: Literal["pendente", "preparando", "enviado", "entregue", "cancelado"]
+    status: Literal[
+        "pendente",
+        "pagamento_confirmado",
+        "preparando",
+        "pronto",
+        "enviado",
+        "entregue",
+        "cancelado",
+    ]
 
 
 @router.patch("/{compra_id}")

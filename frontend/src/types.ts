@@ -42,7 +42,14 @@ export type EstoqueResumoItem = {
 
 export type EstoqueResumo = Record<string, EstoqueResumoItem>;
 
-export type OrderStatus = 'pendente' | 'preparando' | 'enviado' | 'entregue' | 'cancelado';
+export type OrderStatus =
+  | 'pendente'
+  | 'pagamento_confirmado'
+  | 'preparando'
+  | 'pronto'
+  | 'enviado'
+  | 'entregue'
+  | 'cancelado';
 
 export type PedidoItem = {
   perfumeId: string;

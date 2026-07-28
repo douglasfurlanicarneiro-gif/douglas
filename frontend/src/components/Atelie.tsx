@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
+import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -21,7 +21,7 @@ import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { Compra, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
-  | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean }
+  | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
   | { type: 'info'; label: string };
 
 type PedidoPainel = Pedido & {
@@ -35,6 +35,15 @@ const TABS = [
   { id: 'estoque', label: 'Estoque', icon: 'package' as const },
   { id: 'pedidos', label: 'Pedidos', icon: 'clipboard' as const },
   { id: 'opinioes', label: 'Opiniões', icon: 'star' as const },
+];
+
+const KANBAN_FLOW: OrderStatus[] = [
+  'pendente',
+  'pagamento_confirmado',
+  'preparando',
+  'pronto',
+  'enviado',
+  'entregue',
 ];
 
 function StatCard({ label, value, icon, alert }: { label: string; value: string | number; icon: any; alert?: boolean }) {
@@ -148,6 +157,99 @@ function SwipeablePedidoCard({
   );
 }
 
+function KanbanPedidoCard({
+  pedido,
+  onOpen,
+  onMove,
+  moving,
+}: {
+  pedido: PedidoPainel;
+  onOpen: () => void;
+  onMove: (status: OrderStatus) => void;
+  moving: boolean;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const statusIndex = KANBAN_FLOW.indexOf(pedido.status);
+  const podeVoltar = pedido.fonte === 'pedidos' && statusIndex > 0;
+  const podeAvancar = pedido.fonte === 'pedidos' && statusIndex >= 0 && statusIndex < KANBAN_FLOW.length - 1;
+
+  const mover = useCallback((direcao: -1 | 1) => {
+    const novoStatus = KANBAN_FLOW[statusIndex + direcao];
+    if (!novoStatus || moving || pedido.fonte !== 'pedidos') {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: false }).start();
+      return;
+    }
+    Animated.timing(translateX, {
+      toValue: direcao * 36,
+      duration: 120,
+      useNativeDriver: false,
+    }).start(() => {
+      translateX.setValue(0);
+      onMove(novoStatus);
+    });
+  }, [moving, onMove, pedido.fonte, statusIndex, translateX]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      pedido.fonte === 'pedidos'
+      && Math.abs(gesture.dx) > 10
+      && Math.abs(gesture.dx) > Math.abs(gesture.dy)
+    ),
+    onPanResponderMove: (_, gesture) => {
+      translateX.setValue(Math.max(-90, Math.min(90, gesture.dx)));
+    },
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dx > 72) mover(-1);
+      else if (gesture.dx < -72) mover(1);
+      else Animated.spring(translateX, { toValue: 0, useNativeDriver: false }).start();
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(translateX, { toValue: 0, useNativeDriver: false }).start();
+    },
+  }), [mover, pedido.fonte, translateX]);
+
+  const unidades = (pedido.itens || []).reduce((total, item) => total + (item.quantidade || 1), 0);
+  return (
+    <Animated.View
+      style={[styles.kanbanCard, moving && { opacity: 0.55 }, { transform: [{ translateX }] }]}
+      {...panResponder.panHandlers}
+      testID={`kanban-pedido-${pedido.id}`}
+    >
+      <Pressable onPress={onOpen} disabled={moving}>
+        <View style={styles.kanbanCardTop}>
+          <Text style={styles.kanbanOrderNumber}>Nº {padSeq(pedido.seq)}</Text>
+          <Text style={styles.kanbanOrderDate}>{fmtDate(pedido.criadoEm)}</Text>
+        </View>
+        <Text style={styles.kanbanCustomer} numberOfLines={1}>{pedido.cliente}</Text>
+        <Text style={styles.kanbanOrderMeta}>{unidades} unidade(s) · {brl(pedido.total)}</Text>
+        {!!pedido.contato && <Text style={styles.kanbanContact} numberOfLines={1}>{pedido.contato}</Text>}
+      </Pressable>
+      <View style={styles.kanbanCardActions}>
+        <Pressable
+          onPress={() => podeVoltar && mover(-1)}
+          disabled={!podeVoltar || moving}
+          style={[styles.kanbanMoveButton, !podeVoltar && styles.kanbanMoveDisabled]}
+          accessibilityLabel="Voltar pedido uma etapa"
+        >
+          <Feather name="arrow-left" size={13} color={podeVoltar ? COLORS.muted : COLORS.border} />
+        </Pressable>
+        <Pressable onPress={onOpen} style={styles.kanbanEditButton}>
+          <Feather name="edit-2" size={12} color={COLORS.gold} />
+          <Text style={styles.kanbanEditText}>Detalhes</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => podeAvancar && mover(1)}
+          disabled={!podeAvancar || moving}
+          style={[styles.kanbanMoveButton, !podeAvancar && styles.kanbanMoveDisabled]}
+          accessibilityLabel="Avançar pedido uma etapa"
+        >
+          <Feather name="arrow-right" size={13} color={podeAvancar ? COLORS.gold : COLORS.border} />
+        </Pressable>
+      </View>
+    </Animated.View>
+  );
+}
+
 function ConfirmSheetContent({
   sheet,
   onCancel,
@@ -173,7 +275,9 @@ function ConfirmSheetContent({
       {sheet.danger && (
         <View style={styles.deleteSafetyNotice}>
           <Feather name="shield" size={15} color={COLORS.gold} />
-          <Text style={styles.deleteSafetyText}>Esta ação é permanente. Confirme somente se deseja realmente excluir.</Text>
+          <Text style={styles.deleteSafetyText}>
+            {sheet.safetyText || 'Esta ação é permanente. Confirme somente se deseja realmente excluir.'}
+          </Text>
         </View>
       )}
       <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -506,6 +610,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
 }
 
 export function Atelie({ onSair }: { onSair: () => void }) {
+  const { width } = useWindowDimensions();
   const [tab, setTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -520,6 +625,10 @@ export function Atelie({ onSair }: { onSair: () => void }) {
   const [search, setSearch] = useState('');
   const [publicando, setPublicando] = useState(false);
   const [metricas, setMetricas] = useState<Metricas | null>(null);
+  const [orderView, setOrderView] = useState<'kanban' | 'lista'>('kanban');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [movingOrderId, setMovingOrderId] = useState<string | null>(null);
+  const kanbanColumnWidth = Math.min(310, Math.max(260, width - 56));
 
   const load = useCallback(async () => {
     try {
@@ -581,6 +690,26 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     return [...atuais, ...legados];
   }, [compras, pedidos]);
 
+  const pedidosFiltrados = useMemo(() => {
+    const termo = orderSearch.trim().toLocaleLowerCase('pt-BR');
+    const ordenados = [...pedidosUnificados].sort(
+      (a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime(),
+    );
+    if (!termo) return ordenados;
+    return ordenados.filter((pedido) => {
+      const nomesItens = (pedido.itens || [])
+        .map((item) => perfumes.find((perfume) => perfume.id === item.perfumeId)?.nome || item.perfumeNome || '')
+        .join(' ');
+      return [
+        pedido.cliente,
+        pedido.contato,
+        pedido.observacoes,
+        String(pedido.seq),
+        nomesItens,
+      ].some((valor) => valor.toLocaleLowerCase('pt-BR').includes(termo));
+    });
+  }, [orderSearch, pedidosUnificados, perfumes]);
+
   const resumoDe = (id: string) => estoqueResumo[id] || {
     saldoAtualMl: 0,
     reservadoMl: 0,
@@ -627,10 +756,38 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     });
     load();
   };
+  const pedidoPayload = (data: any) => ({
+    cliente: data.cliente,
+    contato: data.contato || '',
+    status: data.status,
+    observacoes: data.observacoes || '',
+    itens: (data.itens || []).map((item: any) => ({
+      perfumeId: item.perfumeId,
+      ml: Number(item.ml),
+      quantidade: Number(item.quantidade) || 1,
+    })),
+    total: Number(data.total) || 0,
+  });
+  const persistPedido = async (data: any) => {
+    if (data.id) await updatePedido(data.id, pedidoPayload(data));
+    else await createPedido(pedidoPayload(data) as any);
+    setSheet(null);
+    await load();
+  };
   const doSavePedido = async (data: any) => {
-    if (data.id) await updatePedido(data.id, data);
-    else await createPedido(data);
-    setSheet(null); load();
+    const anterior = data.id ? pedidos.find((pedido) => pedido.id === data.id) : null;
+    if (anterior && anterior.status !== 'cancelado' && data.status === 'cancelado') {
+      setSheet({
+        type: 'confirm',
+        label: `Cancelar o pedido Nº ${padSeq(data.seq)} de ${data.cliente}? A reserva ou a baixa automática do estoque será liberada.`,
+        onConfirm: () => persistPedido(data),
+        confirmLabel: 'Cancelar pedido',
+        danger: true,
+        safetyText: 'O pedido sairá do fluxo ativo e a reserva ou baixa automática será liberada. O histórico continuará disponível.',
+      });
+      return;
+    }
+    await persistPedido(data);
   };
   const doDelPedido = async (id: string) => { await deletePedido(id); setSheet(null); load(); };
   const doDelOpiniao = async (id: string) => { await deleteOpiniao(id); setSheet(null); load(); };
@@ -651,6 +808,18 @@ export function Atelie({ onSair }: { onSair: () => void }) {
       type: 'info',
       label: `Pedido recebido pela vitrine de ${pedido.cliente}. Contato: ${pedido.contato || 'não informado'}. ${pedido.observacoes || ''}`.trim(),
     });
+  };
+  const moverPedido = async (pedido: PedidoPainel, status: OrderStatus) => {
+    if (pedido.fonte !== 'pedidos' || pedido.status === status || movingOrderId) return;
+    setMovingOrderId(pedido.id);
+    try {
+      await updatePedido(pedido.id, pedidoPayload({ ...pedido, status }));
+      await load();
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível mover o pedido. Verifique a conexão e tente novamente.' });
+    } finally {
+      setMovingOrderId(null);
+    }
   };
   const doBackup = async () => {
     try {
@@ -848,7 +1017,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
               </View>
             </View>
             <Text style={styles.stockSummaryHint}>
-              Pedidos pendentes ficam reservados. A baixa ocorre quando o pedido entra em preparação.
+              Pedidos pendentes ou com pagamento confirmado ficam reservados. A baixa ocorre quando o pedido entra em preparação.
             </Text>
           </View>
           <Pressable
@@ -937,38 +1106,147 @@ export function Atelie({ onSair }: { onSair: () => void }) {
               <Text style={styles.resetOrdersText}>Zerar base</Text>
             </Pressable>
           </View>
-          {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
-          {pedidosUnificados.length > 0 && (
-            <View style={styles.swipeOrderHint}>
-              <Feather name="chevrons-left" size={15} color={COLORS.gold} />
-              <Text style={styles.swipeOrderHintText}>Deslize um pedido para a esquerda para editar ou excluir.</Text>
+          <View style={styles.orderToolbar}>
+            <View style={styles.orderViewToggle}>
+              {([
+                { id: 'kanban', label: 'Etapas', icon: 'columns' },
+                { id: 'lista', label: 'Lista', icon: 'list' },
+              ] as const).map((view) => {
+                const active = orderView === view.id;
+                return (
+                  <Pressable
+                    key={view.id}
+                    onPress={() => setOrderView(view.id)}
+                    style={[styles.orderViewButton, active && styles.orderViewButtonActive]}
+                    accessibilityRole="button"
+                    testID={`orders-view-${view.id}`}
+                  >
+                    <Feather name={view.icon} size={13} color={active ? COLORS.ink : COLORS.muted} />
+                    <Text style={[styles.orderViewText, active && { color: COLORS.ink }]}>{view.label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
+            <View style={styles.orderSearchBox}>
+              <Feather name="search" size={14} color={COLORS.muted} />
+              <TextInput
+                value={orderSearch}
+                onChangeText={setOrderSearch}
+                placeholder="Buscar pedido, cliente ou contato"
+                placeholderTextColor={COLORS.muted}
+                style={styles.orderSearchInput}
+                testID="orders-search"
+              />
+              {!!orderSearch && (
+                <Pressable onPress={() => setOrderSearch('')} hitSlop={8}>
+                  <Feather name="x" size={14} color={COLORS.muted} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {pedidosFiltrados.length === 0 && (
+            <EmptyState text={orderSearch ? 'Nenhum pedido encontrado para esta busca.' : 'Nenhum pedido recebido ainda.'} />
           )}
-          {[...pedidosUnificados].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).map((p) => {
-            const st = STATUS.find((s) => s.id === p.status) || STATUS[0];
-            return (
-              <SwipeablePedidoCard
-                key={`${p.fonte}-${p.id}`}
-                onEdit={() => abrirPedido(p)}
-                onDelete={() => setSheet({
-                  type: 'confirm',
-                  label: `Excluir pedido de ${p.cliente}?`,
-                  onConfirm: () => p.compraLegada ? doDelCompra(p.compraLegada.id) : doDelPedido(p.id),
-                  danger: true,
-                })}
-                testID={`pedido-${p.id}`}
+
+          {pedidosFiltrados.length > 0 && orderView === 'kanban' && (
+            <>
+              <View style={styles.kanbanHint}>
+                <Feather name="move" size={14} color={COLORS.gold} />
+                <Text style={styles.kanbanHintText}>Arraste o cartão para os lados ou use as setas para mudar a etapa.</Text>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                nestedScrollEnabled
+                contentContainerStyle={styles.kanbanBoard}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View><Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text><Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p.cliente}</Text></View>
-                  <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: 11 }}>{st.label}</Text></View>
+                {KANBAN_FLOW.map((statusId) => {
+                  const status = STATUS.find((item) => item.id === statusId) || STATUS[0];
+                  const pedidosDaEtapa = pedidosFiltrados.filter((pedido) => pedido.status === statusId);
+                  return (
+                    <View key={statusId} style={[styles.kanbanColumn, { width: kanbanColumnWidth }]}>
+                      <View style={styles.kanbanColumnHeader}>
+                        <View style={styles.kanbanColumnTitleRow}>
+                          <View style={[styles.kanbanStatusDot, { backgroundColor: status.color }]} />
+                          <Text style={styles.kanbanColumnTitle}>{status.label}</Text>
+                        </View>
+                        <View style={styles.kanbanCount}>
+                          <Text style={styles.kanbanCountText}>{pedidosDaEtapa.length}</Text>
+                        </View>
+                      </View>
+                      {pedidosDaEtapa.length === 0 ? (
+                        <View style={styles.kanbanEmpty}>
+                          <Text style={styles.kanbanEmptyText}>Nenhum pedido nesta etapa</Text>
+                        </View>
+                      ) : pedidosDaEtapa.map((pedido) => (
+                        <KanbanPedidoCard
+                          key={`${pedido.fonte}-${pedido.id}`}
+                          pedido={pedido}
+                          onOpen={() => abrirPedido(pedido)}
+                          onMove={(novoStatus) => moverPedido(pedido, novoStatus)}
+                          moving={movingOrderId === pedido.id}
+                        />
+                      ))}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+              {pedidosFiltrados.some((pedido) => pedido.status === 'cancelado') && (
+                <View style={styles.cancelledOrders}>
+                  <Text style={styles.sectionLabel}>CANCELADOS</Text>
+                  {pedidosFiltrados.filter((pedido) => pedido.status === 'cancelado').map((pedido) => (
+                    <Pressable
+                      key={`${pedido.fonte}-${pedido.id}`}
+                      onPress={() => abrirPedido(pedido)}
+                      style={styles.cancelledOrderCard}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.kanbanOrderNumber}>Nº {padSeq(pedido.seq)}</Text>
+                        <Text style={styles.cancelledOrderCustomer}>{pedido.cliente}</Text>
+                      </View>
+                      <Text style={styles.kanbanOrderDate}>{fmtDate(pedido.criadoEm)}</Text>
+                      <Feather name="chevron-right" size={15} color={COLORS.muted} />
+                    </Pressable>
+                  ))}
                 </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                  <Text style={{ color: COLORS.muted, fontSize: 12 }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
-                  <Text style={{ color: COLORS.bone, fontSize: 13 }}>{brl(p.total)}</Text>
-                </View>
-              </SwipeablePedidoCard>
-            );
-          })}
+              )}
+            </>
+          )}
+
+          {pedidosFiltrados.length > 0 && orderView === 'lista' && (
+            <>
+              <View style={styles.swipeOrderHint}>
+                <Feather name="chevrons-left" size={15} color={COLORS.gold} />
+                <Text style={styles.swipeOrderHintText}>Deslize um pedido para a esquerda para editar ou excluir.</Text>
+              </View>
+              {pedidosFiltrados.map((p) => {
+                const st = STATUS.find((s) => s.id === p.status) || STATUS[0];
+                return (
+                  <SwipeablePedidoCard
+                    key={`${p.fonte}-${p.id}`}
+                    onEdit={() => abrirPedido(p)}
+                    onDelete={() => setSheet({
+                      type: 'confirm',
+                      label: `Excluir pedido de ${p.cliente}?`,
+                      onConfirm: () => p.compraLegada ? doDelCompra(p.compraLegada.id) : doDelPedido(p.id),
+                      danger: true,
+                    })}
+                    testID={`pedido-${p.id}`}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <View><Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text><Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p.cliente}</Text></View>
+                      <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: 11 }}>{st.label}</Text></View>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                      <Text style={{ color: COLORS.muted, fontSize: 12 }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
+                      <Text style={{ color: COLORS.bone, fontSize: 13 }}>{brl(p.total)}</Text>
+                    </View>
+                  </SwipeablePedidoCard>
+                );
+              })}
+            </>
+          )}
         </View>
       );
     }
@@ -1115,6 +1393,40 @@ const styles = StyleSheet.create({
   ordersManagementText: { color: COLORS.muted, fontSize: 11, lineHeight: 15 },
   resetOrdersButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingHorizontal: 11, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.rust + '88', backgroundColor: COLORS.ink },
   resetOrdersText: { color: COLORS.rust, fontSize: 10, fontWeight: '700' },
+  orderToolbar: { marginBottom: SPACING.md, gap: SPACING.sm },
+  orderViewToggle: { flexDirection: 'row', alignSelf: 'flex-start', padding: 3, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  orderViewButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 34, paddingHorizontal: 13, borderRadius: RADIUS.pill },
+  orderViewButtonActive: { backgroundColor: COLORS.gold },
+  orderViewText: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
+  orderSearchBox: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 44, paddingHorizontal: 13, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  orderSearchInput: { flex: 1, color: COLORS.bone, fontSize: 13, paddingVertical: 11 },
+  kanbanHint: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: SPACING.sm, paddingHorizontal: 2 },
+  kanbanHintText: { flex: 1, color: COLORS.muted, fontSize: 11, lineHeight: 15 },
+  kanbanBoard: { gap: SPACING.sm, paddingBottom: SPACING.sm, paddingRight: SPACING.lg },
+  kanbanColumn: { padding: 10, alignSelf: 'flex-start', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
+  kanbanColumnHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 2 },
+  kanbanColumnTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
+  kanbanStatusDot: { width: 8, height: 8, borderRadius: 4 },
+  kanbanColumnTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
+  kanbanCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  kanbanCountText: { color: COLORS.muted, fontSize: 10, fontWeight: '700' },
+  kanbanEmpty: { minHeight: 98, alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  kanbanEmptyText: { color: COLORS.muted, fontSize: 11, textAlign: 'center' },
+  kanbanCard: { marginBottom: 8, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  kanbanCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  kanbanOrderNumber: { color: COLORS.gold, fontSize: 9, letterSpacing: 0.6, fontWeight: '700' },
+  kanbanOrderDate: { color: COLORS.muted, fontSize: 9 },
+  kanbanCustomer: { color: COLORS.bone, fontSize: 14, fontWeight: '600', marginTop: 5 },
+  kanbanOrderMeta: { color: COLORS.bone, fontSize: 11, marginTop: 4 },
+  kanbanContact: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
+  kanbanCardActions: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
+  kanbanMoveButton: { width: 34, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  kanbanMoveDisabled: { opacity: 0.45 },
+  kanbanEditButton: { flex: 1, minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.ink },
+  kanbanEditText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
+  cancelledOrders: { marginTop: SPACING.lg },
+  cancelledOrderCard: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, marginBottom: 7, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '55', backgroundColor: COLORS.surface },
+  cancelledOrderCustomer: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
   swipeOrderWrap: { position: 'relative', marginBottom: SPACING.sm, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: COLORS.surfaceRaised },
   swipeOrderActions: { position: 'absolute', top: 0, right: 0, bottom: 0, width: ORDER_ACTIONS_WIDTH, flexDirection: 'row' },
   swipeOrderAction: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5 },

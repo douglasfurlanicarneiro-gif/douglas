@@ -23,7 +23,15 @@ class ItemPedido(BaseModel):
 class PedidoIn(BaseModel):
     cliente: str = Field(min_length=2, max_length=120)
     contato: str = Field(default="", max_length=160)
-    status: Literal["pendente", "preparando", "enviado", "entregue", "cancelado"] = "pendente"
+    status: Literal[
+        "pendente",
+        "pagamento_confirmado",
+        "preparando",
+        "pronto",
+        "enviado",
+        "entregue",
+        "cancelado",
+    ] = "pendente"
     observacoes: str = Field(default="", max_length=1000)
     itens: List[ItemPedido] = Field(min_length=1, max_length=100)
     total: float = Field(default=0, ge=0)
@@ -43,7 +51,7 @@ async def _reverter_movimentos_do_pedido(db, pedido_id: str):
 async def _aplicar_saida_estoque(db, pedido_id: str, itens: List[ItemPedido], status: str):
     # Enquanto o pedido está pendente, a quantidade aparece apenas como
     # reservada no resumo. A baixa física começa quando o preparo é iniciado.
-    if status not in ("preparando", "enviado", "entregue"):
+    if status not in ("preparando", "pronto", "enviado", "entregue"):
         return
     agora = datetime.now(timezone.utc).isoformat()
     for item in itens:

@@ -20,11 +20,13 @@ export const RADIUS = { sm: 6, md: 12, lg: 20, pill: 999 };
 
 export const STATUS = [
   { id: 'pendente', label: 'Pendente', color: '#C7A25C' },
+  { id: 'pagamento_confirmado', label: 'Pagamento confirmado', color: '#A98A56' },
   { id: 'preparando', label: 'Preparando', color: '#8C3A4A' },
+  { id: 'pronto', label: 'Pronto', color: '#9A7554' },
   { id: 'enviado', label: 'Enviado', color: '#6E8FA0' },
   { id: 'entregue', label: 'Entregue', color: '#8FA07A' },
   { id: 'cancelado', label: 'Cancelado', color: '#C1552F' },
-];
+] as const;
 
 export const FAMILIAS = [
   'Almiscarado',
