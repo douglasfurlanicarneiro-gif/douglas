@@ -40,9 +40,11 @@ async def obter_vitrine():
     itens = [dict(item) for item in snapshot.get("itens", [])]
     for item in itens:
         qtd = estoque_map.get(item.get("id"), 0)
-        item["disponivel"] = qtd > 0
+        # Estoque baixo gera alerta interno, mas não bloqueia tamanhos na
+        # vitrine. A disponibilidade comercial continua sob controle manual.
+        item["disponivel"] = True
         item["estoqueAtualMl"] = max(qtd, 0)
-        item["statusEstoque"] = "envio_imediato" if qtd > 0 else "indisponivel"
+        item["statusEstoque"] = "sob_consulta" if qtd <= 0 else "envio_imediato"
 
     return {"atualizadoEm": snapshot.get("atualizadoEm"), "itens": itens}
 
@@ -61,9 +63,9 @@ async def publicar_vitrine(_: str = Depends(require_atelie_auth)):
     for p in perfumes:
         item = serialize(p)
         qtd = estoque_map.get(item["id"], 0)
-        item["disponivel"] = qtd > 0
+        item["disponivel"] = True
         item["estoqueAtualMl"] = max(qtd, 0)
-        item["statusEstoque"] = "envio_imediato" if qtd > 0 else "indisponivel"
+        item["statusEstoque"] = "sob_consulta" if qtd <= 0 else "envio_imediato"
         itens.append(item)
 
     atualizado_em = datetime.now(timezone.utc).isoformat()

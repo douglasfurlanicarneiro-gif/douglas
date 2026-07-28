@@ -93,6 +93,8 @@ export const completarEstoque = (quantidadeMl = 1000) => request<{
   body: JSON.stringify({ quantidadeMl, somentePublicaveis: true }),
 }, true);
 export const getEstoqueMap = () => request<Record<string, number>>('/estoque');
+export const getEstoqueResumo = () =>
+  request<import('./types').EstoqueResumo>('/estoque/resumo', {}, true);
 export const buscarCep = (cep: string) => request<{
   cep: string;
   endereco: string;

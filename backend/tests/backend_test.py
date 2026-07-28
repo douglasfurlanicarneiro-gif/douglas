@@ -118,7 +118,7 @@ class TestFullFlow:
         est = s.get(f"{API}/estoque").json()
         assert est.get(pid, 0) >= 500
 
-    def test_pedido_gera_saida(self, s):
+    def test_pedido_reserva_e_preparo_gera_saida(self, s):
         pid = TestFullFlow.created["perfume_id"]
         est_before = s.get(f"{API}/estoque").json().get(pid, 0)
         payload = {
@@ -133,9 +133,25 @@ class TestFullFlow:
         assert d["cliente"] == "TEST_Cliente"
         TestFullFlow.created["pedido_id"] = d["id"]
 
-        # estoque deve ter diminuído em 100 (2 * 50)
+        # Pendente reserva 100ml, mas ainda não altera o saldo físico.
         est_after = s.get(f"{API}/estoque").json().get(pid, 0)
-        assert est_after == est_before - 100
+        assert est_after == est_before
+        resumo = s.get(f"{API}/estoque/resumo", headers=AUTH).json()[pid]
+        assert resumo["reservadoMl"] >= 100
+        assert resumo["disponivelMl"] == resumo["saldoAtualMl"] - resumo["reservadoMl"]
+
+        # Ao iniciar o preparo, a reserva vira baixa física.
+        payload["status"] = "preparando"
+        r2 = s.put(
+            f"{API}/pedidos/{d['id']}",
+            json=payload,
+            headers=AUTH,
+        )
+        assert r2.status_code == 200, r2.text
+        est_preparando = s.get(f"{API}/estoque").json().get(pid, 0)
+        assert est_preparando == est_before - 100
+        resumo_preparando = s.get(f"{API}/estoque/resumo", headers=AUTH).json()[pid]
+        assert resumo_preparando["reservadoMl"] == 0
 
     def test_opiniao(self, s):
         pid = TestFullFlow.created["perfume_id"]

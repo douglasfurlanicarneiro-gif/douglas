@@ -29,9 +29,18 @@ export type Movimento = {
   tipo: 'entrada' | 'saida';
   quantidadeMl: number;
   motivo: string;
+  categoria?: string;
   origem: string;
   data: string;
 };
+
+export type EstoqueResumoItem = {
+  saldoAtualMl: number;
+  reservadoMl: number;
+  disponivelMl: number;
+};
+
+export type EstoqueResumo = Record<string, EstoqueResumoItem>;
 
 export type OrderStatus = 'pendente' | 'preparando' | 'enviado' | 'entregue' | 'cancelado';
 

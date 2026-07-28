@@ -1,9 +1,4 @@
-"""Regression tests for the dynamic 'disponivel' field on GET /api/vitrine.
-
-Bug context: Previously GET /api/vitrine returned the frozen 'disponivel' value
-that was computed at POST /api/vitrine/publish time. Now it must be
-recalculated on-the-fly from the 'movimentos' collection.
-"""
+"""Regression tests for stock alerts that do not block the storefront."""
 import os
 import pytest
 import requests
@@ -52,62 +47,49 @@ class TestVitrineShape:
             assert k in it, f"Missing field {k} in vitrine item"
 
 
-# ---- FIX: disponivel reflects current stock in real time ----
-class TestVitrineDinamica:
-    def test_ab_autentica_disponivel_true_with_stock(self, s, vitrine_snapshot):
-        """Ab Autentica (Nº 001) currently has 200ml stock -> disponivel must be True."""
+# ---- Stock is internal planning data and never blocks a published size ----
+class TestVitrineSemBloqueio:
+    def test_publicado_continua_disponivel_com_estoque(self, s, vitrine_snapshot):
         ab = next((i for i in vitrine_snapshot["itens"] if i.get("seq") == 1), None)
         assert ab is not None, "Perfume Nº 001 not found in vitrine"
-        # sanity: name should include Ab Autentica
-        assert "Ab Autentica" in ab["nome"] or "autentica" in ab["nome"].lower()
-        # Cross-check with /api/estoque
-        est = s.get(f"{API}/estoque").json()
-        stock = est.get(ab["id"], 0)
-        assert stock == 200, f"Expected 200ml stock for Ab Autentica, got {stock}"
-        assert ab["disponivel"] is True, \
-            "Ab Autentica has 200ml stock but vitrine returned disponivel=False"
+        assert ab["disponivel"] is True
 
-    def test_other_perfumes_without_stock_are_unavailable(self, s, vitrine_snapshot):
+    def test_perfumes_sem_saldo_continuam_disponiveis(self, s, vitrine_snapshot):
         est = s.get(f"{API}/estoque").json()
-        unavailable = [i for i in vitrine_snapshot["itens"]
-                       if est.get(i["id"], 0) <= 0 and i["disponivel"] is False]
-        assert len(unavailable) > 0, "Expected some perfumes without stock to show disponivel=False"
+        sem_saldo = [i for i in vitrine_snapshot["itens"] if est.get(i["id"], 0) <= 0]
+        assert len(sem_saldo) > 0
+        assert all(i["disponivel"] is True for i in sem_saldo)
 
-    def test_dynamic_add_stock_flips_disponivel_to_true(self, s, vitrine_snapshot):
-        """Pick a perfume currently disponivel=False, add 100ml, re-GET vitrine,
-        it must now show disponivel=True — WITHOUT calling publish."""
+    def test_movimentacao_nao_bloqueia_vitrine(self, s, vitrine_snapshot):
         est = s.get(f"{API}/estoque").json()
         target = next((i for i in vitrine_snapshot["itens"]
-                       if i["disponivel"] is False and est.get(i["id"], 0) == 0), None)
-        assert target is not None, "No candidate perfume with disponivel=False"
+                       if est.get(i["id"], 0) == 0), None)
+        assert target is not None, "No candidate perfume without stock"
         pid = target["id"]
 
         try:
-            # add entrada 100ml
             r = s.post(f"{API}/movimentos",
                        json={"perfumeId": pid, "tipo": "entrada",
-                             "quantidadeMl": 100, "motivo": "TEST_dynamic"},
+                             "quantidadeMl": 100, "motivo": "TEST_dynamic",
+                             "categoria": "entrada"},
                        headers=AUTH)
             assert r.status_code == 200, r.text
 
-            # re-GET vitrine (NO publish call)
             v = s.get(f"{API}/vitrine").json()
             it = next((i for i in v["itens"] if i["id"] == pid), None)
             assert it is not None
-            assert it["disponivel"] is True, \
-                "After adding 100ml entrada, vitrine still shows disponivel=False"
+            assert it["disponivel"] is True
 
-            # add saida 100ml -> back to 0
             r2 = s.post(f"{API}/movimentos",
                         json={"perfumeId": pid, "tipo": "saida",
-                              "quantidadeMl": 100, "motivo": "TEST_dynamic_out"},
+                              "quantidadeMl": 100, "motivo": "TEST_dynamic_out",
+                              "categoria": "ajuste-negativo"},
                         headers=AUTH)
             assert r2.status_code == 200, r2.text
 
             v2 = s.get(f"{API}/vitrine").json()
             it2 = next((i for i in v2["itens"] if i["id"] == pid), None)
-            assert it2["disponivel"] is False, \
-                "After zeroing stock via saida, vitrine still shows disponivel=True"
+            assert it2["disponivel"] is True
         finally:
             # cleanup TEST_ movimentos
             movs = s.get(f"{API}/movimentos", headers=AUTH).json()

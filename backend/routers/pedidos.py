@@ -40,39 +40,10 @@ async def _reverter_movimentos_do_pedido(db, pedido_id: str):
     await db.movimentos.delete_many({"origem": f"pedido:{pedido_id}"})
 
 
-async def _validar_estoque(db, itens: List[ItemPedido], ignorar_pedido_id: str | None = None):
-    filtro = {}
-    if ignorar_pedido_id:
-        filtro["origem"] = {"$ne": f"pedido:{ignorar_pedido_id}"}
-    pipeline = []
-    if filtro:
-        pipeline.append({"$match": filtro})
-    pipeline.append({
-        "$group": {
-            "_id": "$perfumeId",
-            "total": {"$sum": {"$cond": [
-                {"$eq": ["$tipo", "entrada"]},
-                "$quantidadeMl",
-                {"$multiply": ["$quantidadeMl", -1]},
-            ]}},
-        },
-    })
-    estoque = {}
-    async for linha in db.movimentos.aggregate(pipeline):
-        estoque[linha["_id"]] = linha["total"]
-    consumo = {}
-    for item in itens:
-        consumo[item.perfumeId] = consumo.get(item.perfumeId, 0) + item.ml * item.quantidade
-    insuficientes = [perfume_id for perfume_id, ml in consumo.items() if estoque.get(perfume_id, 0) < ml]
-    if insuficientes:
-        raise HTTPException(status_code=409, detail="Estoque insuficiente para concluir o pedido.")
-
-
 async def _aplicar_saida_estoque(db, pedido_id: str, itens: List[ItemPedido], status: str):
-    # Regra de negócio (PRD): pedidos com status != cancelado geram saída de
-    # estoque automática. Editar/excluir sempre estorna antes de reaplicar,
-    # pra nunca deixar saldo de estoque "fantasma".
-    if status == "cancelado":
+    # Enquanto o pedido está pendente, a quantidade aparece apenas como
+    # reservada no resumo. A baixa física começa quando o preparo é iniciado.
+    if status not in ("preparando", "enviado", "entregue"):
         return
     agora = datetime.now(timezone.utc).isoformat()
     for item in itens:
@@ -80,7 +51,8 @@ async def _aplicar_saida_estoque(db, pedido_id: str, itens: List[ItemPedido], st
             "perfumeId": item.perfumeId,
             "tipo": "saida",
             "quantidadeMl": item.ml * item.quantidade,
-            "motivo": "Saída automática por pedido",
+            "motivo": "Baixa automática ao iniciar preparação",
+            "categoria": "pedido",
             "origem": f"pedido:{pedido_id}",
             "data": agora,
         })
@@ -97,8 +69,6 @@ async def listar_pedidos(_: str = Depends(require_atelie_auth)):
 async def criar_pedido(payload: PedidoIn, _: str = Depends(require_atelie_auth)):
     async with stock_lock:
         db = get_db()
-        if payload.status != "cancelado":
-            await _validar_estoque(db, payload.itens)
         doc = payload.model_dump()
         doc["seq"] = await next_seq(db, "pedidos")
         agora = datetime.now(timezone.utc).isoformat()
@@ -118,8 +88,6 @@ async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(r
         existente = await db.pedidos.find_one({"_id": _oid(pedido_id)})
         if not existente:
             raise HTTPException(status_code=404, detail="Pedido não encontrado.")
-        if payload.status != "cancelado":
-            await _validar_estoque(db, payload.itens, ignorar_pedido_id=pedido_id)
         await _reverter_movimentos_do_pedido(db, pedido_id)
         await _aplicar_saida_estoque(db, pedido_id, payload.itens, payload.status)
         atualizacao = payload.model_dump()

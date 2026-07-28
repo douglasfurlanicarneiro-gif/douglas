@@ -11,14 +11,14 @@ import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
   listPerfumes, createPerfume, updatePerfume, deletePerfume, bulkImport, padronizarTamanhos,
-  listMovimentos, createMovimento, completarEstoque, getEstoqueMap,
+  listMovimentos, createMovimento, completarEstoque, getEstoqueMap, getEstoqueResumo,
   listPedidos, createPedido, updatePedido, deletePedido,
   listOpinioes, deleteOpiniao,
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
   downloadBackup, getMetricas, resetAllOrders,
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
-import type { Compra, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
+import type { Compra, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean }
@@ -325,7 +325,28 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
 }
 
 function MovimentoForm({ perfumes, onSave, onCancel }: any) {
-  const [f, setF] = useState({ perfumeId: perfumes[0]?.id || '', tipo: 'entrada', quantidadeMl: 100, motivo: '' });
+  const opcoes = [
+    { id: 'entrada', label: 'Entrada', tipo: 'entrada', motivo: 'Entrada de estoque' },
+    { id: 'perda', label: 'Perda', tipo: 'saida', motivo: 'Perda ou vazamento' },
+    { id: 'ajuste-positivo', label: 'Ajuste +', tipo: 'entrada', motivo: 'Ajuste positivo de inventário' },
+    { id: 'ajuste-negativo', label: 'Ajuste −', tipo: 'saida', motivo: 'Ajuste negativo de inventário' },
+    { id: 'devolucao', label: 'Devolução', tipo: 'entrada', motivo: 'Devolução ao estoque' },
+  ] as const;
+  const [f, setF] = useState({
+    perfumeId: perfumes[0]?.id || '',
+    tipo: 'entrada',
+    quantidadeMl: 100,
+    motivo: 'Entrada de estoque',
+    categoria: 'entrada',
+  });
+  const selecionarMovimento = (opcao: typeof opcoes[number]) => {
+    setF({
+      ...f,
+      tipo: opcao.tipo,
+      motivo: opcao.motivo,
+      categoria: opcao.id,
+    });
+  };
   return (
     <View>
       <Field label="Perfume">
@@ -337,17 +358,23 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
           ))}
         </ScrollView>
       </Field>
-      <Field label="Tipo">
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          {['entrada', 'saida'].map((t) => (
-            <Pressable key={t} onPress={() => setF({ ...f, tipo: t })} style={[styles.miniChip, f.tipo === t && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-              <Text style={{ color: f.tipo === t ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{t === 'entrada' ? 'Entrada' : 'Saída'}</Text>
+      <Field label="Movimentação">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {opcoes.map((opcao) => (
+            <Pressable
+              key={opcao.id}
+              onPress={() => selecionarMovimento(opcao)}
+              style={[styles.miniChip, f.categoria === opcao.id && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}
+            >
+              <Text style={{ color: f.categoria === opcao.id ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{opcao.label}</Text>
             </Pressable>
           ))}
         </View>
       </Field>
       <Field label="Quantidade (ml)"><TInput keyboardType="numeric" value={String(f.quantidadeMl)} onChangeText={(v) => setF({ ...f, quantidadeMl: Number(v) || 0 })} testID="mov-qtd" /></Field>
-      <Field label="Motivo"><TInput value={f.motivo} onChangeText={(v) => setF({ ...f, motivo: v })} placeholder="Ex: compra de insumo" /></Field>
+      <Field label="Observação">
+        <TInput value={f.motivo} onChangeText={(v) => setF({ ...f, motivo: v })} placeholder="Descreva o motivo desta movimentação" />
+      </Field>
       <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
         <SecondaryButton label="Cancelar" onPress={onCancel} />
         <PrimaryButton label="Lançar" onPress={() => f.perfumeId && f.quantidadeMl > 0 && onSave(f)} testID="mov-save" />
@@ -488,7 +515,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
   const [opinioes, setOpinioes] = useState<Opiniao[]>([]);
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
-  const [estoqueMap, setEstoqueMap] = useState<Record<string, number>>({});
+  const [estoqueResumo, setEstoqueResumo] = useState<EstoqueResumo>({});
   const [sheet, setSheet] = useState<SheetType>(null);
   const [search, setSearch] = useState('');
   const [publicando, setPublicando] = useState(false);
@@ -497,10 +524,17 @@ export function Atelie({ onSair }: { onSair: () => void }) {
   const load = useCallback(async () => {
     try {
       const [p, m, pe, o, s, c, e, metrics] = await Promise.all([
-        listPerfumes(), listMovimentos(), listPedidos(), listOpinioes(), listSugestoes(), listCompras(), getEstoqueMap(),
+        listPerfumes(), listMovimentos(), listPedidos(), listOpinioes(), listSugestoes(), listCompras(),
+        getEstoqueResumo().catch(async () => {
+          const mapa = await getEstoqueMap();
+          return Object.fromEntries(Object.entries(mapa).map(([id, saldoAtualMl]) => [
+            id,
+            { saldoAtualMl, reservadoMl: 0, disponivelMl: saldoAtualMl },
+          ]));
+        }),
         getMetricas().catch(() => null),
       ]);
-      setPerfumes(p); setMovimentos(m); setPedidos(pe); setOpinioes(o); setSugestoes(s); setCompras(c); setEstoqueMap(e);
+      setPerfumes(p); setMovimentos(m); setPedidos(pe); setOpinioes(o); setSugestoes(s); setCompras(c); setEstoqueResumo(e);
       setMetricas(metrics);
     } catch (err) { console.error(err); }
     finally { setLoading(false); setRefreshing(false); }
@@ -547,8 +581,20 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     return [...atuais, ...legados];
   }, [compras, pedidos]);
 
-  const estoqueDe = (id: string) => estoqueMap[id] || 0;
-  const estoqueBaixo = perfumes.filter((p) => estoqueDe(p.id) <= (p.estoqueMinimoMl || 0)).length;
+  const resumoDe = (id: string) => estoqueResumo[id] || {
+    saldoAtualMl: 0,
+    reservadoMl: 0,
+    disponivelMl: 0,
+  };
+  const disponivelDe = (id: string) => resumoDe(id).disponivelMl;
+  const estoqueBaixo = perfumes.filter((p) => disponivelDe(p.id) <= (p.estoqueMinimoMl || 0)).length;
+  const totaisEstoque = perfumes.reduce((totais, perfume) => {
+    const resumo = resumoDe(perfume.id);
+    totais.saldo += resumo.saldoAtualMl;
+    totais.reservado += resumo.reservadoMl;
+    totais.disponivel += resumo.disponivelMl;
+    return totais;
+  }, { saldo: 0, reservado: 0, disponivel: 0 });
   const pendentes = pedidosUnificados.filter((p) => p.status === 'pendente').length;
   const notaMedia = opinioes.length ? (opinioes.reduce((s, o) => s + o.nota, 0) / opinioes.length).toFixed(1) : '–';
 
@@ -732,7 +778,8 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           </Pressable>
           {perfumesFiltrados.length === 0 && <EmptyState text="Nenhum contratipo. Toque em + para começar." />}
           {perfumesFiltrados.map((p) => {
-            const baixo = estoqueDe(p.id) <= (p.estoqueMinimoMl || 0);
+            const resumo = resumoDe(p.id);
+            const baixo = resumo.disponivelMl <= (p.estoqueMinimoMl || 0);
             return (
               <View key={p.id} style={styles.perfumeCard} testID={`perfume-card-${p.id}`}>
                 {p.imagemUrl ? (
@@ -765,7 +812,11 @@ export function Atelie({ onSair }: { onSair: () => void }) {
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
                     {baixo && <Feather name="alert-triangle" size={11} color={COLORS.rust} />}
-                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: 11 }}>{estoqueDe(p.id)}ml em estoque{baixo ? ' · baixo' : ''}</Text>
+                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: 11 }}>
+                      {resumo.disponivelMl}ml disponíveis
+                      {resumo.reservadoMl > 0 ? ` · ${resumo.reservadoMl}ml reservados` : ''}
+                      {baixo ? ' · baixo' : ''}
+                    </Text>
                   </View>
                 </View>
               </View>
@@ -778,6 +829,28 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     if (tab === 'estoque') {
       return (
         <View style={{ padding: SPACING.lg }}>
+          <View style={styles.stockSummary}>
+            <Text style={styles.sectionLabel}>RESUMO DO ESTOQUE</Text>
+            <View style={styles.stockSummaryGrid}>
+              <View style={styles.stockSummaryItem}>
+                <Text style={styles.stockSummaryValue}>{totaisEstoque.saldo.toLocaleString('pt-BR')}ml</Text>
+                <Text style={styles.stockSummaryLabel}>Saldo físico</Text>
+              </View>
+              <View style={styles.stockSummaryItem}>
+                <Text style={styles.stockSummaryValue}>{totaisEstoque.reservado.toLocaleString('pt-BR')}ml</Text>
+                <Text style={styles.stockSummaryLabel}>Reservado</Text>
+              </View>
+              <View style={styles.stockSummaryItem}>
+                <Text style={[styles.stockSummaryValue, totaisEstoque.disponivel < 0 && { color: COLORS.rust }]}>
+                  {totaisEstoque.disponivel.toLocaleString('pt-BR')}ml
+                </Text>
+                <Text style={styles.stockSummaryLabel}>Disponível</Text>
+              </View>
+            </View>
+            <Text style={styles.stockSummaryHint}>
+              Pedidos pendentes ficam reservados. A baixa ocorre quando o pedido entra em preparação.
+            </Text>
+          </View>
           <Pressable
             onPress={() => setSheet({
               type: 'confirm',
@@ -792,8 +865,9 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           </Pressable>
           {perfumes.length === 0 && <EmptyState text="Cadastre um contratipo antes." />}
           {perfumes.map((p) => {
-            const atual = estoqueDe(p.id);
-            const baixo = atual <= (p.estoqueMinimoMl || 0);
+            const resumo = resumoDe(p.id);
+            const baixo = resumo.disponivelMl <= (p.estoqueMinimoMl || 0);
+            const precisaRepor = Math.max(0, -resumo.disponivelMl);
             return (
               <View key={p.id} style={styles.rowCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -802,10 +876,22 @@ export function Atelie({ onSair }: { onSair: () => void }) {
                     <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '500' }}>{p.nome}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: 15 }}>{atual}ml</Text>
-                    {baixo && <Text style={{ color: COLORS.rust, fontSize: 11 }}>baixo</Text>}
+                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: 15 }}>{resumo.disponivelMl}ml</Text>
+                    <Text style={{ color: COLORS.muted, fontSize: 10 }}>disponíveis</Text>
                   </View>
                 </View>
+                <View style={styles.stockBreakdown}>
+                  <Text style={styles.stockBreakdownText}>Físico: {resumo.saldoAtualMl}ml</Text>
+                  <Text style={styles.stockBreakdownText}>Reservado: {resumo.reservadoMl}ml</Text>
+                </View>
+                {baixo && (
+                  <View style={styles.stockAlertRow}>
+                    <Feather name="alert-triangle" size={12} color={COLORS.rust} />
+                    <Text style={styles.stockAlertText}>
+                      {precisaRepor > 0 ? `Repor ao menos ${precisaRepor}ml para atender as reservas.` : `Abaixo do alerta de ${p.estoqueMinimoMl || 0}ml.`}
+                    </Text>
+                  </View>
+                )}
               </View>
             );
           })}
@@ -1012,6 +1098,16 @@ const styles = StyleSheet.create({
   rankingQty: { color: COLORS.muted, fontSize: 11 },
   sectionLabel: { color: COLORS.muted, fontSize: 11, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
+  stockSummary: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.md },
+  stockSummaryGrid: { flexDirection: 'row', gap: 8 },
+  stockSummaryItem: { flex: 1, padding: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
+  stockSummaryValue: { color: COLORS.gold, fontSize: 15, fontWeight: '600' },
+  stockSummaryLabel: { color: COLORS.muted, fontSize: 9, marginTop: 3 },
+  stockSummaryHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginTop: SPACING.sm },
+  stockBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
+  stockBreakdownText: { color: COLORS.muted, fontSize: 10 },
+  stockAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7 },
+  stockAlertText: { color: COLORS.rust, fontSize: 10, flex: 1 },
   swipeOrderHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm, paddingHorizontal: 2 },
   swipeOrderHintText: { color: COLORS.muted, fontSize: 11, flex: 1 },
   ordersManagement: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },

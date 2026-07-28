@@ -14,7 +14,6 @@ from routers.pedidos import (
     ItemPedido,
     _aplicar_saida_estoque,
     _reverter_movimentos_do_pedido,
-    _validar_estoque,
 )
 from security import require_atelie_auth
 from utils import next_seq, serialize
@@ -101,22 +100,7 @@ async def _criar_compra(payload: CompraIn):
 
     perfumes = await db.perfumes.find({"_id": {"$in": ids}}).to_list(len(ids))
     perfumes_por_id = {str(p["_id"]): p for p in perfumes}
-    estoque_map: dict[str, int] = {}
-    async for linha in db.movimentos.aggregate([
-        {"$match": {"perfumeId": {"$in": [str(oid) for oid in ids]}}},
-        {"$group": {
-            "_id": "$perfumeId",
-            "total": {"$sum": {"$cond": [
-                {"$eq": ["$tipo", "entrada"]},
-                "$quantidadeMl",
-                {"$multiply": ["$quantidadeMl", -1]},
-            ]}},
-        }},
-    ]):
-        estoque_map[linha["_id"]] = linha["total"]
-
     itens_doc = []
-    consumo_por_perfume: dict[str, int] = {}
     total = 0.0
     for item in itens_entrada:
         perfume = perfumes_por_id.get(item.perfumeId)
@@ -125,7 +109,6 @@ async def _criar_compra(payload: CompraIn):
         opcao = next((p for p in perfume.get("precos", []) if p.get("ml") == item.ml), None)
         if not opcao or float(opcao.get("preco", 0)) <= 0:
             raise HTTPException(status_code=400, detail=f"Tamanho indisponível para {perfume['nome']}.")
-        consumo_por_perfume[item.perfumeId] = consumo_por_perfume.get(item.perfumeId, 0) + item.ml * item.quantidade
         subtotal = round(float(opcao["preco"]) * item.quantidade, 2)
         total += subtotal
         itens_doc.append({
@@ -136,11 +119,6 @@ async def _criar_compra(payload: CompraIn):
             "precoUnitario": float(opcao["preco"]),
             "subtotal": subtotal,
         })
-
-    for perfume_id, quantidade_ml in consumo_por_perfume.items():
-        if estoque_map.get(perfume_id, 0) < quantidade_ml:
-            nome = perfumes_por_id[perfume_id]["nome"]
-            raise HTTPException(status_code=409, detail=f"Estoque insuficiente para {nome}.")
 
     doc = payload.model_dump(exclude={"perfumeId", "perfumeNome", "ml", "preco", "itens"})
     doc["itens"] = itens_doc
@@ -182,15 +160,8 @@ async def _criar_compra(payload: CompraIn):
     resultado = await db.pedidos.insert_one(doc)
     pedido_id = str(resultado.inserted_id)
 
-    for item in itens_entrada:
-        await db.movimentos.insert_one({
-            "perfumeId": item.perfumeId,
-            "tipo": "saida",
-            "quantidadeMl": item.ml * item.quantidade,
-            "motivo": "Saída automática por pedido da vitrine",
-            "origem": f"pedido:{pedido_id}",
-            "data": agora,
-        })
+    # O pedido pendente reserva a quantidade no resumo, sem alterar o saldo
+    # físico. A saída será lançada quando o status mudar para "preparando".
 
     if payload.formaPagamento:
         pagamento = await iniciar_pagamento(payload.formaPagamento, pedido_id, doc["total"])
@@ -235,8 +206,6 @@ async def atualizar_status_compra(compra_id: str, payload: CompraStatusIn, _: st
             )
             for item in pedido.get("itens", [])
         ]
-        if payload.status != "cancelado":
-            await _validar_estoque(db, itens, ignorar_pedido_id=compra_id)
         await _reverter_movimentos_do_pedido(db, compra_id)
         await _aplicar_saida_estoque(db, compra_id, itens, payload.status)
 

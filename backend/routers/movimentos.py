@@ -37,6 +37,7 @@ class MovimentoIn(BaseModel):
     tipo: str  # 'entrada' | 'saida'
     quantidadeMl: int
     motivo: str = ""
+    categoria: str = "ajuste"
 
 
 class CompletarEstoqueIn(BaseModel):
@@ -123,3 +124,35 @@ async def mapa_estoque():
     async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
         mapa[linha["_id"]] = linha["total"]
     return mapa
+
+
+@router.get("/api/estoque/resumo")
+async def resumo_estoque(_: str = Depends(require_atelie_auth)):
+    """Separa saldo físico, reservas pendentes e saldo livre para planejamento."""
+    db = get_db()
+    saldo_atual: dict[str, int] = {}
+    async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
+        saldo_atual[linha["_id"]] = linha["total"]
+
+    reservado: dict[str, int] = {}
+    pedidos_pendentes = await db.pedidos.find(
+        {"status": "pendente"},
+        {"itens": 1},
+    ).to_list(5000)
+    for pedido in pedidos_pendentes:
+        for item in pedido.get("itens", []):
+            perfume_id = item.get("perfumeId")
+            if not perfume_id:
+                continue
+            quantidade_ml = int(item.get("ml", 0)) * int(item.get("quantidade", 1))
+            reservado[perfume_id] = reservado.get(perfume_id, 0) + quantidade_ml
+
+    ids = set(saldo_atual) | set(reservado)
+    return {
+        perfume_id: {
+            "saldoAtualMl": saldo_atual.get(perfume_id, 0),
+            "reservadoMl": reservado.get(perfume_id, 0),
+            "disponivelMl": saldo_atual.get(perfume_id, 0) - reservado.get(perfume_id, 0),
+        }
+        for perfume_id in ids
+    }
