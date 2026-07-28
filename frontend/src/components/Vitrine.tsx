@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import { COLORS, SPACING, RADIUS, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Chip, Stars } from './atoms';
-import { createOpiniao, createSugestao, getVitrine } from '../api';
+import { createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
 import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
 import { storage } from '../utils/storage';
@@ -14,8 +14,8 @@ import type { Acompanhamento, Compra, Perfume } from '../types';
 
 type VitrineItem = Perfume;
 const FAVORITES_KEY = 'favorite-perfumes-v1';
-const ORDERS_KEY = 'customer-orders-v2';
-const LEGACY_ORDERS_KEYS = ['customer-orders-v1'];
+const ORDERS_KEY_PREFIX = 'customer-orders-v';
+const ORDERS_INITIAL_VERSION = 2;
 const CART_KEY = 'customer-cart-v1';
 type SavedCartLine = { perfumeId: string; ml: number; quantidade: number };
 const normalize = (value: string) => value
@@ -156,6 +156,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [orderCodes, setOrderCodes] = useState<string[]>([]);
   const [successOrder, setSuccessOrder] = useState<Compra | null>(null);
   const cartRestored = useRef(false);
+  const ordersKeyRef = useRef(`${ORDERS_KEY_PREFIX}${ORDERS_INITIAL_VERSION}`);
 
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
@@ -171,20 +172,49 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const syncOrdersStorage = useCallback(async (loadSaved = false) => {
+    let version = ORDERS_INITIAL_VERSION;
+    try {
+      const response = await getOrdersResetVersion();
+      version = Math.max(ORDERS_INITIAL_VERSION, Number(response.version) || ORDERS_INITIAL_VERSION);
+    } catch {
+      // Mantém a versão conhecida se o aparelho estiver temporariamente offline.
+    }
+
+    const nextKey = `${ORDERS_KEY_PREFIX}${version}`;
+    const changed = ordersKeyRef.current !== nextKey;
+    ordersKeyRef.current = nextKey;
+
+    if (changed) {
+      setOrderCodes([]);
+      await Promise.all(
+        Array.from({ length: Math.max(0, version - 1) }, (_, index) => (
+          storage.removeItem(`${ORDERS_KEY_PREFIX}${index + 1}`)
+        )),
+      );
+    }
+
+    if (!loadSaved) return;
+    const savedOrders = await storage.getItem(nextKey, '');
+    try {
+      setOrderCodes(savedOrders ? JSON.parse(savedOrders) : []);
+    } catch {
+      setOrderCodes([]);
+      storage.removeItem(nextKey);
+    }
+  }, []);
+
   useEffect(() => {
-    LEGACY_ORDERS_KEYS.forEach((key) => storage.removeItem(key));
     Promise.all([
       storage.getItem(FAVORITES_KEY, ''),
-      storage.getItem(ORDERS_KEY, ''),
-    ]).then(([savedFavorites, savedOrders]) => {
+      syncOrdersStorage(true),
+    ]).then(([savedFavorites]) => {
       try {
         if (savedFavorites) setFavorites(new Set(JSON.parse(savedFavorites)));
       } catch { storage.removeItem(FAVORITES_KEY); }
-      try {
-        if (savedOrders) setOrderCodes(JSON.parse(savedOrders));
-      } catch { storage.removeItem(ORDERS_KEY); }
     });
-  }, []);
+  }, [syncOrdersStorage]);
 
   const itens = useMemo(() => snapshot?.itens || [], [snapshot?.itens]);
 
@@ -277,7 +307,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     if (!order.codigoAcompanhamento) return;
     setOrderCodes((current) => {
       const next = [order.codigoAcompanhamento!, ...current.filter((code) => code !== order.codigoAcompanhamento)].slice(0, 30);
-      storage.setItem(ORDERS_KEY, JSON.stringify(next));
+      storage.setItem(ordersKeyRef.current, JSON.stringify(next));
       return next;
     });
   };
@@ -285,9 +315,14 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const addOrderCode = (code: string) => {
     setOrderCodes((current) => {
       const next = [code, ...current.filter((saved) => saved !== code)].slice(0, 30);
-      storage.setItem(ORDERS_KEY, JSON.stringify(next));
+      storage.setItem(ordersKeyRef.current, JSON.stringify(next));
       return next;
     });
+  };
+
+  const openOrders = async () => {
+    await syncOrdersStorage();
+    setOrdersOpen(true);
   };
 
   const rebuy = (order: Acompanhamento) => {
@@ -478,7 +513,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
           <Text style={styles.navText}>Carrinho</Text>
         </Pressable>
         <Pressable
-          onPress={() => setOrdersOpen(true)}
+          onPress={openOrders}
           style={styles.navItem}
           testID="orders-button"
         >

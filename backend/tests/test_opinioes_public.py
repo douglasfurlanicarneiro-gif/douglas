@@ -103,6 +103,15 @@ class TestRegression:
         r = s.post(f"{API}/pedidos", json={"cliente": "X", "itens": [], "total": 0})
         assert r.status_code == 401
 
+    def test_orders_reset_version_is_public(self, s):
+        r = s.get(f"{API}/admin/pedidos/reset-version")
+        assert r.status_code == 200
+        assert int(r.json()["version"]) >= 2
+
+    def test_orders_reset_requires_token(self, s):
+        r = s.post(f"{API}/admin/pedidos/reset")
+        assert r.status_code == 401
+
     def test_sugestoes_public_post(self, s):
         r = s.post(f"{API}/sugestoes", json={"cliente": "TEST_reg", "mensagem": "TEST_msg"})
         assert r.status_code == 200

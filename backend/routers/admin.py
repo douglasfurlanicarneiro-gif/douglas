@@ -6,11 +6,15 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from fastapi import APIRouter, Depends
 from fastapi.responses import Response
+from pymongo import ReturnDocument
 
 from database import get_db
+from locks import stock_lock
 from security import require_atelie_auth
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+PEDIDOS_RESET_ID = "pedidos-reset"
+PEDIDOS_RESET_VERSAO_INICIAL = 2
 
 
 def _json_seguro(valor):
@@ -118,4 +122,57 @@ async def obter_metricas(_: str = Depends(require_atelie_auth)):
             {**item, "faturamento": round(item["faturamento"], 2)}
             for item in mais_vendidos
         ],
+    }
+
+
+@router.get("/pedidos/reset-version")
+async def obter_versao_reset_pedidos():
+    """Versão pública usada pelos aparelhos para invalidar históricos locais."""
+    doc = await get_db().configuracoes.find_one({"_id": PEDIDOS_RESET_ID})
+    return {
+        "version": int(
+            doc.get("version", PEDIDOS_RESET_VERSAO_INICIAL)
+            if doc
+            else PEDIDOS_RESET_VERSAO_INICIAL
+        )
+    }
+
+
+@router.post("/pedidos/reset")
+async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
+    """Apaga pedidos e invalida os códigos salvos em todos os aparelhos."""
+    async with stock_lock:
+        db = get_db()
+        pedidos = await db.pedidos.count_documents({})
+        compras_legadas = await db.compras.count_documents({})
+
+        # Os movimentos com essa origem são as baixas automáticas dos pedidos.
+        # Removê-los devolve o saldo ao estado anterior sem tocar nas entradas.
+        movimentos = await db.movimentos.delete_many({
+            "origem": {"$regex": r"^pedido:"},
+        })
+        await db.pedidos.delete_many({})
+        await db.compras.delete_many({})
+        await db.counters.delete_one({"_id": "pedidos"})
+
+        await db.configuracoes.update_one(
+            {"_id": PEDIDOS_RESET_ID},
+            {"$setOnInsert": {"version": PEDIDOS_RESET_VERSAO_INICIAL}},
+            upsert=True,
+        )
+        versao = await db.configuracoes.find_one_and_update(
+            {"_id": PEDIDOS_RESET_ID},
+            {
+                "$inc": {"version": 1},
+                "$set": {"atualizadoEm": datetime.now(timezone.utc).isoformat()},
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+
+    return {
+        "status": "Base de pedidos zerada.",
+        "pedidosApagados": pedidos,
+        "comprasLegadasApagadas": compras_legadas,
+        "movimentosEstornados": movimentos.deleted_count,
+        "resetVersion": versao["version"],
     }

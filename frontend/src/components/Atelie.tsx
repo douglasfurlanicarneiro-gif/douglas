@@ -15,7 +15,7 @@ import {
   listPedidos, createPedido, updatePedido, deletePedido,
   listOpinioes, deleteOpiniao,
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
-  downloadBackup, getMetricas,
+  downloadBackup, getMetricas, resetAllOrders,
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { Compra, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
@@ -614,6 +614,18 @@ export function Atelie({ onSair }: { onSair: () => void }) {
       setSheet({ type: 'info', label: 'Não foi possível baixar o backup. Abra o painel no navegador e tente novamente.' });
     }
   };
+  const doResetPedidos = async () => {
+    try {
+      const result = await resetAllOrders();
+      setSheet({
+        type: 'info',
+        label: `Base zerada com segurança: ${result.pedidosApagados + result.comprasLegadasApagadas} pedido(s) removido(s) e ${result.movimentosEstornados} baixa(s) automática(s) de estoque estornada(s). Os históricos antigos serão removidos dos aparelhos quando o aplicativo for aberto.`,
+      });
+      load();
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível zerar os pedidos. Tente novamente.' });
+    }
+  };
 
   const perfumesFiltrados = perfumes.filter((p) => p.nome.toLowerCase().includes(search.toLowerCase()));
 
@@ -819,6 +831,26 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     if (tab === 'pedidos') {
       return (
         <View style={{ padding: SPACING.lg }}>
+          <View style={styles.ordersManagement}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ordersManagementTitle}>GESTÃO DA BASE</Text>
+              <Text style={styles.ordersManagementText}>Apague pedidos de teste e limpe o histórico de todos os aparelhos.</Text>
+            </View>
+            <Pressable
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: 'Zerar toda a base de pedidos? Pedidos, compras antigas e históricos salvos nos celulares e computadores serão removidos. As baixas automáticas de estoque serão estornadas. Perfumes, entradas de estoque e opiniões serão preservados.',
+                onConfirm: doResetPedidos,
+                confirmLabel: 'Zerar pedidos',
+                danger: true,
+              })}
+              style={styles.resetOrdersButton}
+              testID="reset-orders-button"
+            >
+              <Feather name="trash-2" size={15} color={COLORS.rust} />
+              <Text style={styles.resetOrdersText}>Zerar base</Text>
+            </Pressable>
+          </View>
           {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
           {pedidosUnificados.length > 0 && (
             <View style={styles.swipeOrderHint}>
@@ -982,6 +1014,11 @@ const styles = StyleSheet.create({
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
   swipeOrderHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm, paddingHorizontal: 2 },
   swipeOrderHintText: { color: COLORS.muted, fontSize: 11, flex: 1 },
+  ordersManagement: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
+  ordersManagementTitle: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, marginBottom: 3 },
+  ordersManagementText: { color: COLORS.muted, fontSize: 11, lineHeight: 15 },
+  resetOrdersButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingHorizontal: 11, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.rust + '88', backgroundColor: COLORS.ink },
+  resetOrdersText: { color: COLORS.rust, fontSize: 10, fontWeight: '700' },
   swipeOrderWrap: { position: 'relative', marginBottom: SPACING.sm, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: COLORS.surfaceRaised },
   swipeOrderActions: { position: 'absolute', top: 0, right: 0, bottom: 0, width: ORDER_ACTIONS_WIDTH, flexDirection: 'row' },
   swipeOrderAction: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5 },

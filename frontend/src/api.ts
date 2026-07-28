@@ -130,6 +130,15 @@ export const deleteCompra = (id: string) => request<{ status: string }>(`/compra
 export const acompanharPedido = (codigo: string) =>
   request<Acompanhamento>(`/acompanhamento/${encodeURIComponent(codigo)}`);
 export const getMetricas = () => request<Metricas>('/admin/metricas', {}, true);
+export const getOrdersResetVersion = () =>
+  request<{ version: number }>('/admin/pedidos/reset-version');
+export const resetAllOrders = () => request<{
+  status: string;
+  pedidosApagados: number;
+  comprasLegadasApagadas: number;
+  movimentosEstornados: number;
+  resetVersion: number;
+}>('/admin/pedidos/reset', { method: 'POST' }, true);
 
 export async function downloadBackup(): Promise<void> {
   const token = await getToken();
