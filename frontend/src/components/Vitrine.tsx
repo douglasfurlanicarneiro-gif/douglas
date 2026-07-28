@@ -93,7 +93,7 @@ function VitrineCard({
               testID={`buy-${item.id}-${pr.ml}`}
               style={[styles.sizeButton, !item.disponivel && styles.sizeButtonDisabled]}
             >
-              <Text style={[styles.sizeButtonText, !item.disponivel && { color: COLORS.muted }]}>+ {pr.ml}ml</Text>
+              <Text style={[styles.sizeButtonText, !item.disponivel && { color: COLORS.muted }]}>{pr.ml} ml</Text>
               <Text style={[styles.sizePrice, !item.disponivel && { color: COLORS.muted }]}>{brl(pr.preco)}</Text>
             </Pressable>
           ))}

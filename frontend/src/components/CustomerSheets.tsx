@@ -64,7 +64,7 @@ export function PerfumeDetailSheet({
                 onPress={() => onBuy(opcao.ml, opcao.preco)}
                 style={[styles.sizeButton, !perfume.disponivel && { opacity: 0.45 }]}
               >
-                <Text style={styles.sizeText}>+ {opcao.ml}ml</Text>
+                <Text style={styles.sizeText}>{opcao.ml} ml</Text>
                 <Text style={styles.sizePrice}>{brl(opcao.preco)}</Text>
               </Pressable>
             ))}
