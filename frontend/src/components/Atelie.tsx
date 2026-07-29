@@ -597,8 +597,8 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
           <View style={{ flex: 1 }}>
             <Text style={styles.orderDeliveryTitle}>
               {initial.entrega.tipo === 'retirada'
-                ? 'Retirada no ateliê · Grátis'
-                : `${initial.entrega.transportadora} · ${initial.entrega.servico}`}
+                ? 'Retirada Combinada · Grátis'
+                : (initial.entrega.nomeExibicao || 'Entrega')}
             </Text>
             <Text style={styles.orderDeliveryMeta}>
               {initial.entrega.tipo === 'retirada'

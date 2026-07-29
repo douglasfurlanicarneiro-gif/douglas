@@ -337,8 +337,8 @@ export function OrdersSheet({
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bodyText}>
                     {order.entrega.tipo === 'retirada'
-                      ? 'Retirada no ateliê · Grátis'
-                      : `${order.entrega.transportadora} · ${order.entrega.servico}`}
+                      ? 'Retirada Combinada · Grátis'
+                      : (order.entrega.nomeExibicao || 'Entrega')}
                   </Text>
                   <Text style={styles.orderItemMeta}>
                     {order.entrega.tipo === 'retirada'

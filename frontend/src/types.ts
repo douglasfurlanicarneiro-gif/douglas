@@ -124,6 +124,7 @@ export type CompraItem = {
 
 export type OpcaoFrete = {
   tipo?: 'entrega' | 'retirada';
+  nomeExibicao?: string;
   serviceId: number;
   transportadora: string;
   servico: string;

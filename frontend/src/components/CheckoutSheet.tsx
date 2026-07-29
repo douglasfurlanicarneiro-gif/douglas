@@ -64,7 +64,6 @@ export function CheckoutSheet({
   const [form, setForm] = useState<CustomerForm>(EMPTY_FORM);
   const [step, setStep] = useState<CheckoutStep>('dados');
   const [tipoEntrega, setTipoEntrega] = useState<DeliveryType>('entrega');
-  const [showAlternatives, setShowAlternatives] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [cepLoading, setCepLoading] = useState(false);
@@ -79,6 +78,23 @@ export function CheckoutSheet({
   );
   const valorEntrega = tipoEntrega === 'entrega' ? (freteSelecionado?.preco || 0) : 0;
   const total = subtotal + valorEntrega;
+  const priorityServiceId = useMemo(() => {
+    if (opcoesFrete.length < 2) return null;
+    return opcoesFrete.reduce((fastest, option) => (
+      option.prazoDias < fastest.prazoDias
+      || (option.prazoDias === fastest.prazoDias && option.preco < fastest.preco)
+        ? option
+        : fastest
+    )).serviceId;
+  }, [opcoesFrete]);
+  const displayedShippingOptions = useMemo(
+    () => [...opcoesFrete].sort((first, second) => {
+      if (first.serviceId === priorityServiceId) return -1;
+      if (second.serviceId === priorityServiceId) return 1;
+      return first.preco - second.preco;
+    }),
+    [opcoesFrete, priorityServiceId],
+  );
 
   const itensFrete = useMemo(
     () => items.map(({ perfume, option, quantidade }) => ({
@@ -109,7 +125,6 @@ export function CheckoutSheet({
   useEffect(() => {
     if (!visible) return;
     setStep('dados');
-    setShowAlternatives(false);
     setError('');
   }, [visible]);
 
@@ -223,7 +238,6 @@ export function CheckoutSheet({
 
   const selectDeliveryType = (type: DeliveryType) => {
     setTipoEntrega(type);
-    setShowAlternatives(false);
     setFreteError('');
   };
 
@@ -277,15 +291,15 @@ export function CheckoutSheet({
     { id: 'pagamento', label: 'Pagamento' },
   ];
 
-  const optionCard = (opcao: OpcaoFrete, recommended = false) => {
+  const optionCard = (opcao: OpcaoFrete) => {
     const active = freteSelecionado?.serviceId === opcao.serviceId;
+    const displayName = opcao.serviceId === priorityServiceId
+      ? 'Entrega Prioritária'
+      : 'Entrega Padrão';
     return (
       <Pressable
         key={opcao.serviceId}
-        onPress={() => {
-          setFreteSelecionado(opcao);
-          setShowAlternatives(false);
-        }}
+        onPress={() => setFreteSelecionado(opcao)}
         style={{
           padding: 13,
           borderRadius: 12,
@@ -301,11 +315,10 @@ export function CheckoutSheet({
         <Feather name={active ? 'check-circle' : 'circle'} size={18} color={active ? COLORS.gold : COLORS.muted} />
         <View style={{ flex: 1 }}>
           <Text style={{ color: COLORS.bone, fontSize: 13, fontWeight: '600' }}>
-            {opcao.transportadora} · {opcao.servico}
+            {displayName}
           </Text>
           <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 2 }}>
-            {opcao.prazoDias} {opcao.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
-            {recommended ? ' · Recomendado' : ''}
+            Prazo estimado: {opcao.prazoDias} {opcao.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
           </Text>
         </View>
         <Text style={{ color: COLORS.gold, fontSize: 14, fontWeight: '600' }}>{brl(opcao.preco)}</Text>
@@ -413,7 +426,7 @@ export function CheckoutSheet({
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: SPACING.lg }}>
               {([
                 { id: 'entrega' as const, icon: 'truck' as const, title: 'Receber', meta: 'No endereço' },
-                { id: 'retirada' as const, icon: 'shopping-bag' as const, title: 'Retirar', meta: 'Grátis' },
+                { id: 'retirada' as const, icon: 'shopping-bag' as const, title: 'Retirada Combinada', meta: 'Grátis' },
               ]).map((method) => {
                 const active = tipoEntrega === method.id;
                 return (
@@ -453,8 +466,8 @@ export function CheckoutSheet({
                   <Feather name="check" size={19} color={COLORS.ink} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '600' }}>Retirada no ateliê · Grátis</Text>
-                  <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 3 }}>Combinaremos o horário pelo WhatsApp.</Text>
+                  <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '600' }}>Retirada Combinada · Grátis</Text>
+                  <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 3 }}>Combine o local e o horário pelo WhatsApp.</Text>
                 </View>
               </View>
             ) : (
@@ -481,17 +494,7 @@ export function CheckoutSheet({
                     <Text style={{ color: COLORS.muted }}>Calculando entrega…</Text>
                   </View>
                 )}
-                {!freteLoading && freteSelecionado && optionCard(freteSelecionado, true)}
-                {!freteLoading && opcoesFrete.length > 1 && (
-                  <Pressable onPress={() => setShowAlternatives((current) => !current)} style={{ paddingVertical: 8, marginBottom: SPACING.sm }}>
-                    <Text style={{ color: COLORS.gold, fontSize: 12, textAlign: 'center' }}>
-                      {showAlternatives ? 'Ocultar outras opções' : 'Ver outra opção de entrega'}
-                    </Text>
-                  </Pressable>
-                )}
-                {showAlternatives && opcoesFrete
-                  .filter((opcao) => opcao.serviceId !== freteSelecionado?.serviceId)
-                  .map((opcao) => optionCard(opcao))}
+                {!freteLoading && displayedShippingOptions.map((opcao) => optionCard(opcao))}
                 {!!freteError && (
                   <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: SPACING.sm }}>
                     <Text style={{ color: COLORS.rust, fontSize: 12 }}>{freteError}</Text>
