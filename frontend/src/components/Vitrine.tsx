@@ -36,6 +36,15 @@ const PRODUCT_CARD_COLORS = {
   muted: '#756A5B',
   gold: '#A97D38',
 };
+const STOREFRONT_COLORS = {
+  background: '#D8CBB9',
+  surface: '#F3ECE2',
+  surfaceRaised: '#EADFCF',
+  border: '#C5AF8F',
+  ink: '#251F18',
+  muted: '#746858',
+  gold: '#A97D38',
+};
 const normalize = (value: string) => value
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
@@ -459,7 +468,7 @@ export function Vitrine({
         testID="atelie-access-button"
         hitSlop={12}
       >
-        <Feather name="user" size={14} color={COLORS.muted} />
+        <Feather name="user" size={14} color={STOREFRONT_COLORS.muted} />
       </Pressable>
 
       <FlatList
@@ -496,12 +505,12 @@ export function Vitrine({
             {!showEmpty && (
               <View style={{ paddingHorizontal: SPACING.lg }}>
                 <View style={styles.searchBox}>
-                  <Feather name="search" size={16} color={COLORS.muted} />
+                  <Feather name="search" size={16} color={STOREFRONT_COLORS.muted} />
                   <TextInput
                     value={search}
                     onChangeText={setSearch}
                     placeholder="Buscar fragrância, nota ou ocasião…"
-                    placeholderTextColor={COLORS.muted}
+                    placeholderTextColor={STOREFRONT_COLORS.muted}
                     style={styles.searchInput}
                     testID="vitrine-search"
                   />
@@ -586,7 +595,7 @@ export function Vitrine({
           testID="cart-button"
         >
           <View>
-            <Feather name="shopping-cart" size={23} color={COLORS.muted} />
+            <Feather name="shopping-cart" size={23} color={STOREFRONT_COLORS.muted} />
             {cartCount > 0 && <View style={styles.cartBadge}><Text style={styles.cartBadgeText}>{cartCount}</Text></View>}
           </View>
           <Text style={styles.navText}>Carrinho</Text>
@@ -597,7 +606,7 @@ export function Vitrine({
           testID="orders-button"
         >
           <View>
-            <Feather name="package" size={22} color={COLORS.muted} />
+            <Feather name="package" size={22} color={STOREFRONT_COLORS.muted} />
             {orderCodes.length > 0 && (
               <View style={styles.cartBadge}><Text style={styles.cartBadgeText}>{Math.min(orderCodes.length, 9)}</Text></View>
             )}
@@ -927,24 +936,24 @@ export function Vitrine({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.ink },
+  screen: { flex: 1, backgroundColor: STOREFRONT_COLORS.background },
   brandHeader: { alignItems: 'center', paddingHorizontal: 56, paddingTop: 26, paddingBottom: 20 },
   storeLogo: { width: 118, height: 86, marginBottom: 4 },
   eyebrow: { color: COLORS.gold, fontSize: 11, letterSpacing: 5, fontWeight: '500' },
-  h1: { color: COLORS.bone, fontSize: 26, lineHeight: 30, letterSpacing: 1.5, fontWeight: '700', marginTop: 7 },
-  subtitle: { color: COLORS.muted, fontSize: 9, letterSpacing: 2.2, marginTop: 5 },
-  atelieAccess: { position: 'absolute', top: 51, right: SPACING.lg, zIndex: 40, width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.surface + '99', borderWidth: 1, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
-  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 56, paddingHorizontal: 18, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, marginBottom: 12 },
-  searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 15, fontSize: 14 },
-  quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.gold + '70', marginBottom: SPACING.sm },
+  h1: { color: STOREFRONT_COLORS.ink, fontSize: 26, lineHeight: 30, letterSpacing: 1.5, fontWeight: '700', marginTop: 7 },
+  subtitle: { color: STOREFRONT_COLORS.muted, fontSize: 9, letterSpacing: 2.2, marginTop: 5 },
+  atelieAccess: { position: 'absolute', top: 51, right: SPACING.lg, zIndex: 40, width: 32, height: 32, borderRadius: 16, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  searchBox: { flexDirection: 'row', alignItems: 'center', gap: 11, minHeight: 56, paddingHorizontal: 18, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.md, marginBottom: 12 },
+  searchInput: { flex: 1, color: STOREFRONT_COLORS.ink, paddingVertical: 15, fontSize: 14 },
+  quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: STOREFRONT_COLORS.surfaceRaised, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold + '88', marginBottom: SPACING.sm },
   quizIcon: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
-  quizTitle: { color: COLORS.bone, fontSize: 14, fontWeight: '700' },
-  quizSubtitle: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  quizTitle: { color: STOREFRONT_COLORS.ink, fontSize: 14, fontWeight: '700' },
+  quizSubtitle: { color: STOREFRONT_COLORS.muted, fontSize: 10, marginTop: 2 },
   quickFilters: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, marginBottom: SPACING.sm },
-  quickFilterButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  quickFilterButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   quickFilterGrow: { flex: 1 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
-  quickFilterText: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
+  quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: 11, fontWeight: '600' },
   quickFilterTextActive: { color: COLORS.ink },
   filterBadge: { minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
   filterBadgeText: { color: COLORS.gold, fontSize: 8, fontWeight: '700' },
@@ -1000,10 +1009,10 @@ const styles = StyleSheet.create({
   detailsButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
   detailsText: { color: PRODUCT_CARD_COLORS.gold, fontSize: 10, fontWeight: '600' },
   fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
   navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
   navTextActive: { color: COLORS.gold, fontSize: 11, marginTop: 3 },
-  navText: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  navText: { color: STOREFRONT_COLORS.muted, fontSize: 11, marginTop: 3 },
   cartBadge: { position: 'absolute', top: -7, right: -10, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   cartBadgeText: { color: COLORS.ink, fontSize: 9, fontWeight: '700' },
   successContent: { alignItems: 'center', paddingTop: 4 },
