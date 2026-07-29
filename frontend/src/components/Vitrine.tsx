@@ -12,6 +12,7 @@ import { createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from
 import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
 import { storage } from '../utils/storage';
+import { createManualPixPayload } from '../utils/pix';
 import type { Acompanhamento, Compra, Perfume } from '../types';
 
 type VitrineItem = Perfume;
@@ -164,6 +165,12 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
   const [enviando, setEnviando] = useState(false);
+  const manualPixCode = successOrder?.pagamento?.metodo === 'pix'
+    ? successOrder.pagamento.pixCopiaECola || createManualPixPayload(
+      successOrder.pagamento.referencia || successOrder.id,
+      successOrder.pagamento.valor || successOrder.total || 0,
+    )
+    : '';
 
   const load = useCallback(async () => {
     try {
@@ -639,16 +646,16 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
             <Feather name="check" size={30} color={COLORS.ink} />
           </View>
           <Text style={styles.successEyebrow}>
-            {successOrder?.pagamento?.pixCopiaECola ? 'PEDIDO REGISTRADO' : 'OBRIGADO PELA SUA COMPRA'}
+            {manualPixCode ? 'PEDIDO REGISTRADO' : 'OBRIGADO PELA SUA COMPRA'}
           </Text>
           <Text style={styles.successTitle}>
-            {successOrder?.pagamento?.pixCopiaECola ? 'Agora, conclua o pagamento' : 'Seu pedido foi recebido!'}
+            {manualPixCode ? 'Agora, conclua o pagamento' : 'Seu pedido foi recebido!'}
           </Text>
           {!!successOrder?.seq && (
             <Text style={styles.successOrderNumber}>PEDIDO Nº {padSeq(successOrder.seq)}</Text>
           )}
           <Text style={styles.successText}>A L’Essence Furlani agradece por fazer parte deste momento.</Text>
-          {!!successOrder?.pagamento?.pixCopiaECola && (
+          {!!manualPixCode && (
             <View style={styles.pixCard}>
               <View style={styles.pixHeading}>
                 <View>
@@ -662,7 +669,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
               </View>
               <View style={styles.qrFrame}>
                 <QRCode
-                  value={successOrder.pagamento.pixCopiaECola}
+                  value={manualPixCode}
                   size={176}
                   color="#15130F"
                   backgroundColor="#FFFFFF"
@@ -671,7 +678,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
               <Text style={styles.pixHint}>Escaneie o QR Code ou copie o código para pagar pelo aplicativo do seu banco.</Text>
               <Pressable
                 onPress={async () => {
-                  await Clipboard.setStringAsync(successOrder.pagamento?.pixCopiaECola || '');
+                  await Clipboard.setStringAsync(manualPixCode);
                   setPixCopied(true);
                 }}
                 style={({ pressed }) => [styles.copyPixButton, pressed && { opacity: 0.82 }]}
