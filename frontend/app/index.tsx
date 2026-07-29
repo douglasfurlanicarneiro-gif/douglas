@@ -116,7 +116,6 @@ export default function Index() {
       {showIntro && (
         <LaunchIntro
           onFinish={finishIntro}
-          logoUrl={storeConfig.logoUrl}
           storeName={storeConfig.nomeLoja}
         />
       )}

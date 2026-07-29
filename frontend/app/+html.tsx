@@ -19,7 +19,7 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="apple-mobile-web-app-title" content="L’Essence Furlani" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="preload" as="image" href="/launch-logo.jpg" />
+        <link rel="preload" as="image" href="/launch-logo-transparent.png" />
         {/*
           Disable body scrolling on web to make ScrollView components work correctly.
           If you want to enable scrolling, remove `ScrollViewStyleReset` and
@@ -75,7 +75,7 @@ export default function Root({ children }: PropsWithChildren) {
         }}
       >
         <div id="brand-preloader" aria-hidden="true">
-          <img src="/launch-logo.jpg" alt="" />
+          <img src="/launch-logo-transparent.png" alt="" />
         </div>
         {children}
       </body>

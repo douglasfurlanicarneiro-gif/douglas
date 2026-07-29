@@ -7,15 +7,12 @@ const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
 export function LaunchIntro({
   onFinish,
-  logoUrl = '',
   storeName = 'L’Essence Furlani',
 }: {
   onFinish: () => void;
-  logoUrl?: string;
   storeName?: string;
 }) {
   const [logoReady, setLogoReady] = useState(false);
-  const [remoteLogoFailed, setRemoteLogoFailed] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.94)).current;
@@ -43,10 +40,6 @@ export function LaunchIntro({
   };
 
   const handleLogoError = () => {
-    if (logoUrl && !remoteLogoFailed) {
-      setRemoteLogoFailed(true);
-      return;
-    }
     hideHtmlPreloader();
     onFinish();
   };
@@ -141,9 +134,7 @@ export function LaunchIntro({
     >
       <View style={styles.stage}>
         <Animated.Image
-          source={logoUrl && !remoteLogoFailed
-            ? { uri: logoUrl }
-            : require('../../assets/images/launch-logo.jpg')}
+          source={require('../../assets/images/launch-logo-transparent.png')}
           resizeMode="contain"
           onLoad={handleLogoLoad}
           onError={handleLogoError}
