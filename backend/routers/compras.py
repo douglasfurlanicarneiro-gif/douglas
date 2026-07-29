@@ -239,7 +239,16 @@ async def _criar_compra(payload: CompraIn):
     # físico. A saída será lançada quando o status mudar para "preparando".
 
     if payload.formaPagamento:
-        pagamento = await iniciar_pagamento(payload.formaPagamento, pedido_id, doc["total"])
+        config_loja = await db.configuracoes.find_one({"_id": "loja"}) or {}
+        pagamento = await iniciar_pagamento(
+            payload.formaPagamento,
+            pedido_id,
+            doc["total"],
+            {
+                "pix": config_loja.get("pix", ""),
+                "nomeLoja": config_loja.get("nomeLoja", "L’Essence Furlani"),
+            },
+        )
         await db.pedidos.update_one({"_id": resultado.inserted_id}, {"$set": {"pagamento": pagamento}})
 
     nova = await db.pedidos.find_one({"_id": resultado.inserted_id})

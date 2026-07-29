@@ -1,6 +1,7 @@
 """Recursos operacionais do painel: métricas e backup."""
 import asyncio
 import json
+import os
 from datetime import datetime, timezone
 
 from bson import ObjectId
@@ -11,6 +12,7 @@ from pymongo import ReturnDocument
 
 from database import get_db
 from locks import stock_lock
+from payments.pix import PIX_KEY
 from security import require_atelie_auth
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -27,6 +29,23 @@ class ConfiguracoesLojaIn(BaseModel):
     pix: str = Field(default="", max_length=160)
     cnpj: str = Field(default="", max_length=30)
     margemLucro: float = Field(default=0, ge=0, le=10000)
+
+
+class ConfiguracoesLojaPublica(BaseModel):
+    nomeLoja: str
+    logoUrl: str
+    whatsapp: str
+    instagram: str
+    email: str
+    pix: str
+
+
+def _configuracoes_completas(doc: dict | None = None) -> dict:
+    documento = doc or {}
+    return {
+        chave: documento.get(chave, padrao)
+        for chave, padrao in ConfiguracoesLojaIn().model_dump().items()
+    }
 
 
 def _json_seguro(valor):
@@ -140,10 +159,25 @@ async def obter_metricas(_: str = Depends(require_atelie_auth)):
 @router.get("/configuracoes")
 async def obter_configuracoes(_: str = Depends(require_atelie_auth)):
     doc = await get_db().configuracoes.find_one({"_id": "loja"}) or {}
-    return ConfiguracoesLojaIn(**{
-        chave: doc.get(chave, padrao)
-        for chave, padrao in ConfiguracoesLojaIn().model_dump().items()
-    }).model_dump()
+    return ConfiguracoesLojaIn(**_configuracoes_completas(doc)).model_dump()
+
+
+@router.get("/configuracoes/publicas")
+async def obter_configuracoes_publicas():
+    """Identidade e contatos necessários à vitrine, sem dados administrativos."""
+    doc = await get_db().configuracoes.find_one({"_id": "loja"}) or {}
+    dados = _configuracoes_completas(doc)
+    return ConfiguracoesLojaPublica(
+        nomeLoja=str(dados["nomeLoja"]).strip() or "L’Essence Furlani",
+        logoUrl=str(dados["logoUrl"]).strip(),
+        whatsapp=(
+            str(dados["whatsapp"]).strip()
+            or os.getenv("WHATSAPP_NUMBER", "").strip()
+        ),
+        instagram=str(dados["instagram"]).strip(),
+        email=str(dados["email"]).strip(),
+        pix=str(dados["pix"]).strip() or PIX_KEY,
+    ).model_dump()
 
 
 @router.put("/configuracoes")
@@ -151,14 +185,29 @@ async def salvar_configuracoes(
     payload: ConfiguracoesLojaIn,
     _: str = Depends(require_atelie_auth),
 ):
-    dados = payload.model_dump()
+    db = get_db()
+    atuais = _configuracoes_completas(
+        await db.configuracoes.find_one({"_id": "loja"}) or {}
+    )
+    enviados = payload.model_dump()
+    dados = {
+        chave: (
+            valor.strip()
+            if isinstance(valor, str) and valor.strip()
+            else atuais[chave]
+            if isinstance(valor, str)
+            else valor
+        )
+        for chave, valor in enviados.items()
+    }
+    dados["nomeLoja"] = dados["nomeLoja"] or "L’Essence Furlani"
     dados["atualizadoEm"] = datetime.now(timezone.utc).isoformat()
-    await get_db().configuracoes.update_one(
+    await db.configuracoes.update_one(
         {"_id": "loja"},
         {"$set": dados},
         upsert=True,
     )
-    return payload.model_dump()
+    return ConfiguracoesLojaIn(**dados).model_dump()
 
 
 @router.post("/dados/{recurso}/limpar")

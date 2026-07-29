@@ -7,8 +7,8 @@ import { brl, COLORS, familiasDoPerfume, fmtDate, nomeConcentracao, OCASIOES, RA
 import type { Acompanhamento, Perfume } from '../types';
 import { BottomSheet } from './BottomSheet';
 import { Chip, PrimaryButton, SecondaryButton, TInput } from './atoms';
+import { DEFAULT_STORE_CONFIG, whatsappNumber } from '../storeConfig';
 
-const SUPPORT_WHATSAPP = (process.env.EXPO_PUBLIC_WHATSAPP_NUMBER || '').replace(/\D/g, '');
 const CUSTOMER_ORDER_ACTION_WIDTH = 104;
 
 function CustomerOrderSwipe({
@@ -309,6 +309,8 @@ export function OrdersSheet({
   onRebuy,
   onAddCode,
   onRemoveCode,
+  supportWhatsapp,
+  storeName = DEFAULT_STORE_CONFIG.nomeLoja,
 }: {
   visible: boolean;
   codes: string[];
@@ -316,6 +318,8 @@ export function OrdersSheet({
   onRebuy: (order: Acompanhamento) => void;
   onAddCode: (code: string) => void;
   onRemoveCode: (code: string) => void;
+  supportWhatsapp?: string;
+  storeName?: string;
 }) {
   const [orders, setOrders] = useState<Acompanhamento[]>([]);
   const [loading, setLoading] = useState(false);
@@ -327,6 +331,8 @@ export function OrdersSheet({
   const [cancellingCode, setCancellingCode] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState('');
   const [removeConfirmCode, setRemoveConfirmCode] = useState<string | null>(null);
+  const supportNumber = whatsappNumber(supportWhatsapp);
+  const currentStoreName = storeName.trim() || DEFAULT_STORE_CONFIG.nomeLoja;
 
   useEffect(() => {
     if (!visible || !codes.length) return;
@@ -414,10 +420,10 @@ export function OrdersSheet({
   const talkAboutOrder = (order: Acompanhamento) => {
     const orderNumber = String(order.seq || 0).padStart(3, '0');
     const message = [
-      `Olá! Gostaria de saber o andamento do pedido nº ${orderNumber} da L’Essence Furlani.`,
+      `Olá! Gostaria de saber o andamento do pedido nº ${orderNumber} da ${currentStoreName}.`,
       `Código de acompanhamento: ${order.codigoAcompanhamento}.`,
     ].join('\n');
-    Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(message)}`).catch(() => undefined);
+    Linking.openURL(`https://wa.me/${supportNumber}?text=${encodeURIComponent(message)}`).catch(() => undefined);
   };
 
   const cancelOrder = async (order: Acompanhamento) => {
@@ -459,7 +465,7 @@ export function OrdersSheet({
               <Feather name="package" size={30} color={COLORS.ink} />
             </View>
           </View>
-          <Text style={styles.emptyEyebrow}>SUA JORNADA L’ESSENCE</Text>
+          <Text style={styles.emptyEyebrow}>SUA JORNADA {currentStoreName.toUpperCase()}</Text>
           <Text style={styles.emptyTitle}>Seu próximo perfume está aqui! ✨</Text>
           <View style={styles.privacyNote}>
             <Feather name="shield" size={16} color={COLORS.gold} />
@@ -535,7 +541,7 @@ export function OrdersSheet({
                 </View>
               );
             })}
-            {!!SUPPORT_WHATSAPP && (
+            {!!supportNumber && (
               <Pressable
                 onPress={() => talkAboutOrder(order)}
                 style={styles.whatsappButton}

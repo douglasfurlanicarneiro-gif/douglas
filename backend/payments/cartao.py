@@ -9,7 +9,7 @@ from payments.base import PaymentProvider
 
 
 class CartaoProvider(PaymentProvider):
-    async def criar_cobranca(self, referencia: str, valor: float):
+    async def criar_cobranca(self, referencia: str, valor: float, configuracao=None):
         return {
             "metodo": "cartao",
             "status": "gateway_nao_configurado",

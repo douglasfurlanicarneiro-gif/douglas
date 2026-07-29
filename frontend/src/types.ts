@@ -231,3 +231,8 @@ export type ConfiguracoesLoja = {
   cnpj: string;
   margemLucro: number;
 };
+
+export type ConfiguracoesLojaPublicas = Pick<
+  ConfiguracoesLoja,
+  'nomeLoja' | 'logoUrl' | 'whatsapp' | 'instagram' | 'email' | 'pix'
+>;

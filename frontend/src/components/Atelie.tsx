@@ -21,6 +21,7 @@ import {
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
+import { publicStoreConfig, storeNameParts } from '../storeConfig';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
@@ -729,7 +730,13 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
   );
 }
 
-export function Atelie({ onSair }: { onSair: () => void }) {
+export function Atelie({
+  onSair,
+  onStoreConfigChange,
+}: {
+  onSair: () => void;
+  onStoreConfigChange?: (config: ConfiguracoesLoja) => void;
+}) {
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
@@ -767,6 +774,15 @@ export function Atelie({ onSair }: { onSair: () => void }) {
   const [orderSearch, setOrderSearch] = useState('');
   const [movingOrderId, setMovingOrderId] = useState<string | null>(null);
   const kanbanColumnWidth = Math.min(310, Math.max(260, width - 56));
+  const storePreview = publicStoreConfig(storeConfig);
+  const storePreviewName = storeNameParts(storePreview.nomeLoja);
+  const storeInitials = storePreview.nomeLoja
+    .split(/\s+/)
+    .map((word) => word[0])
+    .filter(Boolean)
+    .slice(-2)
+    .join('')
+    .toUpperCase();
 
   const load = useCallback(async () => {
     try {
@@ -855,7 +871,8 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     try {
       const updated = await updateConfiguracoesLoja(storeConfig);
       setStoreConfig(updated);
-      setSheet({ type: 'info', label: 'Configurações da loja salvas com segurança.' });
+      onStoreConfigChange?.(updated);
+      setSheet({ type: 'info', label: 'Configurações salvas. A vitrine e os próximos pagamentos já usarão os novos dados.' });
     } catch {
       setSheet({ type: 'info', label: 'Não foi possível salvar as configurações da loja.' });
     } finally {
@@ -1502,7 +1519,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
             <View style={{ flex: 1 }}>
               <Text style={styles.systemEyebrow}>CENTRAL ADMINISTRATIVA</Text>
               <Text style={styles.systemTitle}>Sistema</Text>
-              <Text style={styles.systemIntro}>Configurações globais, integrações e manutenção da L’Essence Furlani.</Text>
+              <Text style={styles.systemIntro}>Configurações globais, integrações e manutenção da {storePreview.nomeLoja}.</Text>
             </View>
           </View>
 
@@ -1664,8 +1681,35 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           </SystemCard>
 
           <SystemCard icon="sliders" title="Configurações" subtitle="Dados institucionais e canais de contato.">
-            <Field label="Nome da loja"><TInput value={storeConfig.nomeLoja} onChangeText={(value) => setStoreField('nomeLoja', value)} /></Field>
-            <Field label="Logo (endereço da imagem)"><TInput value={storeConfig.logoUrl} onChangeText={(value) => setStoreField('logoUrl', value)} autoCapitalize="none" /></Field>
+            <View style={styles.storePreview} testID="store-brand-preview">
+              <View style={styles.storePreviewVisual}>
+                {storePreview.logoUrl ? (
+                  <Image
+                    source={{ uri: storePreview.logoUrl }}
+                    style={styles.storePreviewLogo}
+                    contentFit="contain"
+                    transition={150}
+                  />
+                ) : (
+                  <Text style={styles.storePreviewInitials}>{storeInitials || 'LF'}</Text>
+                )}
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.storePreviewLabel}>PRÉVIA DA VITRINE</Text>
+                {!!storePreviewName.eyebrow && <Text style={styles.storePreviewEyebrow}>{storePreviewName.eyebrow}</Text>}
+                <Text style={styles.storePreviewTitle} numberOfLines={1}>{storePreviewName.title}</Text>
+                <Text style={styles.storePreviewHint}>
+                  {[
+                    storePreview.whatsapp && 'WhatsApp',
+                    storePreview.instagram && 'Instagram',
+                    storePreview.email && 'E-mail',
+                    storePreview.pix && 'Pix',
+                  ].filter(Boolean).join(' · ') || 'Adicione seus canais de contato'}
+                </Text>
+              </View>
+            </View>
+            <Field label="Nome da loja"><TInput value={storeConfig.nomeLoja} onChangeText={(value) => setStoreField('nomeLoja', value)} testID="store-name-input" /></Field>
+            <Field label="Logo (endereço da imagem)"><TInput value={storeConfig.logoUrl} onChangeText={(value) => setStoreField('logoUrl', value)} autoCapitalize="none" testID="store-logo-input" /></Field>
             <View style={styles.systemFieldGrid}>
               <View style={{ flex: 1 }}><Field label="WhatsApp"><TInput value={storeConfig.whatsapp} onChangeText={(value) => setStoreField('whatsapp', value)} keyboardType="phone-pad" /></Field></View>
               <View style={{ flex: 1 }}><Field label="Instagram"><TInput value={storeConfig.instagram} onChangeText={(value) => setStoreField('instagram', value)} autoCapitalize="none" /></Field></View>
@@ -1673,7 +1717,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
             <Field label="E-mail"><TInput value={storeConfig.email} onChangeText={(value) => setStoreField('email', value)} keyboardType="email-address" autoCapitalize="none" /></Field>
             <Field label="Chave Pix"><TInput value={storeConfig.pix} onChangeText={(value) => setStoreField('pix', value)} autoCapitalize="none" /></Field>
             <Field label="CNPJ (opcional)"><TInput value={storeConfig.cnpj} onChangeText={(value) => setStoreField('cnpj', value)} keyboardType="numeric" /></Field>
-            <Pressable onPress={saveStoreConfig} disabled={savingStore} style={styles.systemPrimaryButton}>
+            <Pressable onPress={saveStoreConfig} disabled={savingStore} style={styles.systemPrimaryButton} testID="store-config-save">
               <Feather name="save" size={15} color={COLORS.ink} />
               <Text style={styles.systemPrimaryText}>{savingStore ? 'Salvando…' : 'Salvar configurações'}</Text>
             </Pressable>
@@ -1805,6 +1849,14 @@ const styles = StyleSheet.create({
   systemCardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
   systemCardTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700' },
   systemCardSubtitle: { color: COLORS.muted, fontSize: 10, lineHeight: 14, marginTop: 2 },
+  storePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 104, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.ink },
+  storePreviewVisual: { width: 74, height: 74, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
+  storePreviewLogo: { width: '100%', height: '100%' },
+  storePreviewInitials: { color: COLORS.gold, fontSize: 25, fontWeight: '700', letterSpacing: 1 },
+  storePreviewLabel: { color: COLORS.gold, fontSize: 8, letterSpacing: 1.4, marginBottom: 4 },
+  storePreviewEyebrow: { color: COLORS.gold, fontSize: 8, letterSpacing: 2.2 },
+  storePreviewTitle: { color: COLORS.bone, fontSize: 18, lineHeight: 22, fontWeight: '700', letterSpacing: 0.8 },
+  storePreviewHint: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 4 },
   systemFieldGrid: { flexDirection: 'row', gap: 8, marginBottom: SPACING.sm },
   systemPriceField: { flex: 1 },
   systemFieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.7, marginBottom: 5 },

@@ -23,9 +23,14 @@ const crc16 = (payload: string) => {
   return crc.toString(16).toUpperCase().padStart(4, '0');
 };
 
-export function createManualPixPayload(reference: string, value: number) {
+export function createManualPixPayload(
+  reference: string,
+  value: number,
+  pixKey = PIX_KEY,
+  receiverName = RECEIVER_NAME,
+) {
   const txid = reference.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 25) || '***';
-  const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', PIX_KEY);
+  const merchantAccount = tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', pixKey || PIX_KEY);
   const payload = [
     tlv('00', '01'),
     tlv('01', '11'),
@@ -34,7 +39,7 @@ export function createManualPixPayload(reference: string, value: number) {
     tlv('53', '986'),
     tlv('54', Number(value || 0).toFixed(2)),
     tlv('58', 'BR'),
-    tlv('59', pixText(RECEIVER_NAME, 25)),
+    tlv('59', pixText(receiverName || RECEIVER_NAME, 25)),
     tlv('60', pixText(RECEIVER_CITY, 15)),
     tlv('62', tlv('05', txid)),
   ].join('');

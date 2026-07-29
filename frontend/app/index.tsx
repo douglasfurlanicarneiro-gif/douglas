@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StatusBar } from 'react-native';
+import { View, Text, StatusBar, Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../src/theme';
 import { Vitrine } from '../src/components/Vitrine';
@@ -7,7 +7,9 @@ import { Atelie } from '../src/components/Atelie';
 import { BottomSheet } from '../src/components/BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton } from '../src/components/atoms';
 import { LaunchIntro } from '../src/components/LaunchIntro';
-import { login, saveToken, getToken, clearToken } from '../src/api';
+import { login, saveToken, getToken, clearToken, getConfiguracoesPublicas } from '../src/api';
+import { DEFAULT_STORE_CONFIG, publicStoreConfig } from '../src/storeConfig';
+import type { ConfiguracoesLojaPublicas } from '../src/types';
 
 function LoginForm({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () => void }) {
   const [usuario, setUsuario] = useState('');
@@ -51,26 +53,56 @@ export default function Index() {
   const [pedindoSenha, setPedindoSenha] = useState(false);
   const [checked, setChecked] = useState(false);
   const [showIntro, setShowIntro] = useState(true);
+  const [storeConfig, setStoreConfig] = useState<ConfiguracoesLojaPublicas>(DEFAULT_STORE_CONFIG);
 
   useEffect(() => {
     (async () => {
-      const t = await getToken();
+      const [t, config] = await Promise.all([
+        getToken(),
+        getConfiguracoesPublicas().catch(() => DEFAULT_STORE_CONFIG),
+      ]);
       if (t) setModo('atelie');
+      setStoreConfig(publicStoreConfig(config));
       setChecked(true);
     })();
   }, []);
 
   const sair = async () => { await clearToken(); setModo('vitrine'); };
   const finishIntro = useCallback(() => setShowIntro(false), []);
+  const refreshStoreConfig = useCallback(async () => {
+    const config = publicStoreConfig(await getConfiguracoesPublicas());
+    setStoreConfig(config);
+    return config;
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    document.title = storeConfig.nomeLoja;
+    const mobileTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+    mobileTitle?.setAttribute('content', storeConfig.nomeLoja);
+
+    const iconUrl = storeConfig.logoUrl || '/apple-touch-icon.png';
+    const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
+    appleIcon?.setAttribute('href', iconUrl);
+    const favicon = document.querySelector('link[rel="icon"]');
+    favicon?.setAttribute('href', storeConfig.logoUrl || '/favicon.png');
+  }, [storeConfig.logoUrl, storeConfig.nomeLoja]);
 
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" backgroundColor={showIntro ? '#080706' : COLORS.ink} />
       {checked ? (
         modo === 'atelie' ? (
-          <Atelie onSair={sair} />
+          <Atelie
+            onSair={sair}
+            onStoreConfigChange={(config) => setStoreConfig(publicStoreConfig(config))}
+          />
         ) : (
-          <Vitrine onAtelieClick={() => setPedindoSenha(true)} />
+          <Vitrine
+            onAtelieClick={() => setPedindoSenha(true)}
+            storeConfig={storeConfig}
+            onRefreshStoreConfig={refreshStoreConfig}
+          />
         )
       ) : (
         <View style={{ flex: 1, backgroundColor: COLORS.ink }} />
@@ -81,7 +113,13 @@ export default function Index() {
           onCancel={() => setPedindoSenha(false)}
         />
       </BottomSheet>
-      {showIntro && <LaunchIntro onFinish={finishIntro} />}
+      {showIntro && (
+        <LaunchIntro
+          onFinish={finishIntro}
+          logoUrl={storeConfig.logoUrl}
+          storeName={storeConfig.nomeLoja}
+        />
+      )}
     </SafeAreaProvider>
   );
 }

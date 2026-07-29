@@ -37,12 +37,21 @@ def _crc16(payload: str) -> str:
     return f"{crc:04X}"
 
 
-def criar_pix_copia_e_cola(referencia: str, valor: float) -> str:
-    if not PIX_KEY:
+def criar_pix_copia_e_cola(
+    referencia: str,
+    valor: float,
+    pix_key: str | None = None,
+    receiver_name: str | None = None,
+    receiver_city: str | None = None,
+) -> str:
+    chave = (pix_key or PIX_KEY).strip()
+    recebedor = (receiver_name or PIX_RECEIVER_NAME).strip()
+    cidade = (receiver_city or PIX_RECEIVER_CITY).strip()
+    if not chave:
         raise RuntimeError("Configure PIX_KEY para habilitar o Pix manual.")
 
     txid = "".join(char for char in referencia.upper() if char.isalnum())[:25] or "***"
-    merchant_account = _tlv("00", "BR.GOV.BCB.PIX") + _tlv("01", PIX_KEY)
+    merchant_account = _tlv("00", "BR.GOV.BCB.PIX") + _tlv("01", chave)
     payload = "".join([
         _tlv("00", "01"),
         _tlv("01", "11"),
@@ -51,8 +60,8 @@ def criar_pix_copia_e_cola(referencia: str, valor: float) -> str:
         _tlv("53", "986"),
         _tlv("54", f"{Decimal(str(valor)):.2f}"),
         _tlv("58", "BR"),
-        _tlv("59", _pix_text(PIX_RECEIVER_NAME, 25)),
-        _tlv("60", _pix_text(PIX_RECEIVER_CITY, 15)),
+        _tlv("59", _pix_text(recebedor, 25)),
+        _tlv("60", _pix_text(cidade, 15)),
         _tlv("62", _tlv("05", txid)),
     ])
     payload_com_crc = f"{payload}6304"
@@ -60,8 +69,15 @@ def criar_pix_copia_e_cola(referencia: str, valor: float) -> str:
 
 
 class PixProvider(PaymentProvider):
-    async def criar_cobranca(self, referencia: str, valor: float):
-        copia_e_cola = criar_pix_copia_e_cola(referencia, valor)
+    async def criar_cobranca(self, referencia: str, valor: float, configuracao=None):
+        config = configuracao or {}
+        recebedor = str(config.get("nomeLoja") or PIX_RECEIVER_NAME).strip()
+        copia_e_cola = criar_pix_copia_e_cola(
+            referencia,
+            valor,
+            pix_key=str(config.get("pix") or PIX_KEY),
+            receiver_name=recebedor,
+        )
         return {
             "metodo": "pix",
             "status": "aguardando_confirmacao_manual",
@@ -69,7 +85,7 @@ class PixProvider(PaymentProvider):
             "valor": valor,
             "cobrancaId": f"pix_{uuid.uuid4().hex[:12]}",
             "pixCopiaECola": copia_e_cola,
-            "recebedor": PIX_RECEIVER_NAME,
+            "recebedor": recebedor,
             "instituicao": "PicPay",
             "criadoEm": datetime.now(timezone.utc).isoformat(),
             "observacao": (

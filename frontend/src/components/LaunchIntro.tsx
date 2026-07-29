@@ -5,8 +5,17 @@ import { COLORS } from '../theme';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
-export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
+export function LaunchIntro({
+  onFinish,
+  logoUrl = '',
+  storeName = 'L’Essence Furlani',
+}: {
+  onFinish: () => void;
+  logoUrl?: string;
+  storeName?: string;
+}) {
   const [logoReady, setLogoReady] = useState(false);
+  const [remoteLogoFailed, setRemoteLogoFailed] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.94)).current;
@@ -33,6 +42,10 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
   };
 
   const handleLogoError = () => {
+    if (logoUrl && !remoteLogoFailed) {
+      setRemoteLogoFailed(true);
+      return;
+    }
     hideHtmlPreloader();
     onFinish();
   };
@@ -113,13 +126,15 @@ export function LaunchIntro({ onFinish }: { onFinish: () => void }) {
 
   return (
     <Animated.View
-      accessibilityLabel="Apresentação L’Essence Furlani"
+      accessibilityLabel={`Apresentação ${storeName}`}
       style={[styles.overlay, { opacity: overlayOpacity }]}
       testID="launch-intro"
     >
       <View style={styles.stage}>
         <Animated.Image
-          source={require('../../assets/images/launch-logo.jpg')}
+          source={logoUrl && !remoteLogoFailed
+            ? { uri: logoUrl }
+            : require('../../assets/images/launch-logo.jpg')}
           resizeMode="contain"
           onLoad={handleLogoLoad}
           onError={handleLogoError}

@@ -8,8 +8,13 @@ _PROVIDERS = {
 }
 
 
-async def iniciar_pagamento(metodo: str, referencia: str, valor: float) -> dict:
+async def iniciar_pagamento(
+    metodo: str,
+    referencia: str,
+    valor: float,
+    configuracao: dict | None = None,
+) -> dict:
     provider = _PROVIDERS.get(metodo)
     if not provider:
         return {"metodo": metodo, "status": "metodo_desconhecido", "referencia": referencia}
-    return await provider.criar_cobranca(referencia, valor)
+    return await provider.criar_cobranca(referencia, valor, configuracao)

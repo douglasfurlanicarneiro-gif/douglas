@@ -11,6 +11,7 @@ import type {
   OpcaoFrete,
   ConfiguracaoFrete,
   ConfiguracoesLoja,
+  ConfiguracoesLojaPublicas,
   Sugestao,
 } from './types';
 
@@ -197,6 +198,8 @@ export const resetAllOrders = () => request<{
 }>('/admin/pedidos/reset', { method: 'POST' }, true);
 export const getConfiguracoesLoja = () =>
   request<ConfiguracoesLoja>('/admin/configuracoes', {}, true);
+export const getConfiguracoesPublicas = () =>
+  request<ConfiguracoesLojaPublicas>('/admin/configuracoes/publicas');
 export const updateConfiguracoesLoja = (data: ConfiguracoesLoja) =>
   request<ConfiguracoesLoja>('/admin/configuracoes', {
     method: 'PUT',

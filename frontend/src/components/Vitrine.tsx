@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -13,7 +13,13 @@ import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
 import { storage } from '../utils/storage';
 import { createManualPixPayload } from '../utils/pix';
-import type { Acompanhamento, Compra, Perfume } from '../types';
+import {
+  instagramLink,
+  publicStoreConfig,
+  storeNameParts,
+  whatsappNumber,
+} from '../storeConfig';
+import type { Acompanhamento, Compra, ConfiguracoesLojaPublicas, Perfume } from '../types';
 
 type VitrineItem = Perfume;
 const FAVORITES_KEY = 'favorite-perfumes-v1';
@@ -137,8 +143,21 @@ function NoteRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
+export function Vitrine({
+  onAtelieClick,
+  storeConfig,
+  onRefreshStoreConfig,
+}: {
+  onAtelieClick: () => void;
+  storeConfig?: ConfiguracoesLojaPublicas;
+  onRefreshStoreConfig?: () => Promise<ConfiguracoesLojaPublicas>;
+}) {
+  const currentStore = publicStoreConfig(storeConfig);
+  const brand = storeNameParts(currentStore.nomeLoja);
+  const supportNumber = whatsappNumber(currentStore.whatsapp);
+  const instagramUrl = instagramLink(currentStore.instagram);
   const [loading, setLoading] = useState(true);
+  const [storeLogoFailed, setStoreLogoFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [snapshot, setSnapshot] = useState<{ atualizadoEm: string | null; itens: VitrineItem[] } | null>(null);
   const [search, setSearch] = useState('');
@@ -146,6 +165,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [ocasiaoAtiva, setOcasiaoAtiva] = useState('Todas');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
   const [sugestaoOpen, setSugestaoOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState<VitrineItem | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -170,19 +190,27 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     ? successOrder.pagamento.pixCopiaECola || createManualPixPayload(
       successOrder.pagamento.referencia || successOrder.id,
       successOrder.pagamento.valor || successOrder.total || 0,
+      currentStore.pix,
+      currentStore.nomeLoja,
     )
     : '';
 
   const load = useCallback(async () => {
     try {
-      const r = await getVitrine();
+      const [r] = await Promise.all([
+        getVitrine(),
+        onRefreshStoreConfig
+          ? onRefreshStoreConfig().catch(() => undefined)
+          : Promise.resolve(undefined),
+      ]);
       setSnapshot(r);
     } catch {
       setSnapshot({ atualizadoEm: null, itens: [] });
     } finally { setLoading(false); setRefreshing(false); }
-  }, []);
+  }, [onRefreshStoreConfig]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => setStoreLogoFailed(false), [currentStore.logoUrl]);
 
   const syncOrdersStorage = useCallback(async (loadSaved = false) => {
     let version = ORDERS_INITIAL_VERSION;
@@ -389,6 +417,17 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     finally { setEnviando(false); }
   };
 
+  const openContactUrl = (url: string) => {
+    setContactOpen(false);
+    Linking.openURL(url).catch(() => setInfo('Não foi possível abrir este canal de contato.'));
+  };
+
+  const openStoreWhatsapp = () => {
+    if (!supportNumber) return;
+    const message = `Olá! Gostaria de falar com a ${currentStore.nomeLoja}.`;
+    openContactUrl(`https://wa.me/${supportNumber}?text=${encodeURIComponent(message)}`);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
@@ -431,8 +470,18 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         ListHeaderComponent={
           <View>
             <View style={styles.brandHeader}>
-              <Text style={styles.eyebrow}>L’ESSENCE</Text>
-              <Text style={styles.h1}>FURLANI</Text>
+              {!!currentStore.logoUrl && !storeLogoFailed && (
+                <Image
+                  source={{ uri: currentStore.logoUrl }}
+                  style={styles.storeLogo}
+                  contentFit="contain"
+                  transition={180}
+                  onError={() => setStoreLogoFailed(true)}
+                  accessibilityLabel={`Logo ${currentStore.nomeLoja}`}
+                />
+              )}
+              {(!currentStore.logoUrl || storeLogoFailed) && !!brand.eyebrow && <Text style={styles.eyebrow}>{brand.eyebrow}</Text>}
+              {(!currentStore.logoUrl || storeLogoFailed) && <Text style={styles.h1}>{brand.title}</Text>}
               <Text style={styles.subtitle}>PERFUMARIA AUTORAL</Text>
             </View>
             {!showEmpty && (
@@ -506,11 +555,13 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         contentContainerStyle={{ paddingHorizontal: SPACING.lg, paddingBottom: 160 }}
       />
 
-      {/* Floating suggestion button */}
+      {/* Atendimento e sugestões em um único ponto de contato */}
       <Pressable
-        onPress={() => setSugestaoOpen(true)}
+        onPress={() => setContactOpen(true)}
         style={styles.fabSuggestion}
-        testID="sugestao-fab"
+        testID="contact-fab"
+        accessibilityRole="button"
+        accessibilityLabel="Abrir atendimento"
       >
         <Feather name="message-circle" size={22} color={COLORS.ink} />
       </Pressable>
@@ -595,6 +646,8 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         onRebuy={rebuy}
         onAddCode={addOrderCode}
         onRemoveCode={removeOrderCode}
+        supportWhatsapp={currentStore.whatsapp}
+        storeName={currentStore.nomeLoja}
       />
 
       <BottomSheet visible={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrar fragrâncias" compact testID="filters-sheet">
@@ -628,6 +681,59 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
             />
             <PrimaryButton label="Aplicar filtros" onPress={() => setFiltersOpen(false)} />
           </View>
+        </View>
+      </BottomSheet>
+
+      <BottomSheet visible={contactOpen} onClose={() => setContactOpen(false)} title="Fale com a gente" compact testID="contact-sheet">
+        <View>
+          <Text style={styles.contactIntro}>
+            Escolha o melhor canal para conversar com a {currentStore.nomeLoja}.
+          </Text>
+          {!!supportNumber && (
+            <Pressable onPress={openStoreWhatsapp} style={styles.contactAction} testID="contact-whatsapp">
+              <View style={styles.contactActionIcon}><Feather name="message-circle" size={17} color={COLORS.gold} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.contactActionTitle}>WhatsApp</Text>
+                <Text style={styles.contactActionSubtitle}>Atendimento e informações sobre pedidos</Text>
+              </View>
+              <Feather name="arrow-up-right" size={15} color={COLORS.muted} />
+            </Pressable>
+          )}
+          {!!instagramUrl && (
+            <Pressable onPress={() => openContactUrl(instagramUrl)} style={styles.contactAction} testID="contact-instagram">
+              <View style={styles.contactActionIcon}><Feather name="instagram" size={17} color={COLORS.gold} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.contactActionTitle}>Instagram</Text>
+                <Text style={styles.contactActionSubtitle}>{currentStore.instagram}</Text>
+              </View>
+              <Feather name="arrow-up-right" size={15} color={COLORS.muted} />
+            </Pressable>
+          )}
+          {!!currentStore.email && (
+            <Pressable onPress={() => openContactUrl(`mailto:${currentStore.email}`)} style={styles.contactAction} testID="contact-email">
+              <View style={styles.contactActionIcon}><Feather name="mail" size={17} color={COLORS.gold} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.contactActionTitle}>E-mail</Text>
+                <Text style={styles.contactActionSubtitle}>{currentStore.email}</Text>
+              </View>
+              <Feather name="arrow-up-right" size={15} color={COLORS.muted} />
+            </Pressable>
+          )}
+          <Pressable
+            onPress={() => {
+              setContactOpen(false);
+              setSugestaoOpen(true);
+            }}
+            style={styles.contactAction}
+            testID="contact-suggestion"
+          >
+            <View style={styles.contactActionIcon}><Feather name="star" size={17} color={COLORS.gold} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.contactActionTitle}>Sugerir uma fragrância</Text>
+              <Text style={styles.contactActionSubtitle}>Conte qual perfume você gostaria de encontrar</Text>
+            </View>
+            <Feather name="chevron-right" size={15} color={COLORS.muted} />
+          </Pressable>
         </View>
       </BottomSheet>
 
@@ -674,7 +780,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
           {!!successOrder?.seq && (
             <Text style={styles.successOrderNumber}>PEDIDO Nº {padSeq(successOrder.seq)}</Text>
           )}
-          <Text style={styles.successText}>A L’Essence Furlani agradece por fazer parte deste momento.</Text>
+          <Text style={styles.successText}>A {currentStore.nomeLoja} agradece por fazer parte deste momento.</Text>
           {!!manualPixCode && (
             <View style={styles.pixCard}>
               <View style={styles.pixHeading}>
@@ -739,7 +845,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
                   <Pressable
                     onPress={() => {
                       void Share.share({
-                        message: `Meu pedido L’Essence Furlani pode ser acompanhado com este código: ${successOrder.codigoAcompanhamento}`,
+                        message: `Meu pedido ${currentStore.nomeLoja} pode ser acompanhado com este código: ${successOrder.codigoAcompanhamento}`,
                       });
                     }}
                     style={styles.shareCodeButton}
@@ -782,7 +888,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
           </View>
           <Text style={styles.successEyebrow}>OBRIGADO POR COMPARTILHAR</Text>
           <Text style={styles.successTitle}>Sua opinião é muito importante!</Text>
-          <Text style={styles.successText}>Recebemos sua sugestão com carinho e vamos trabalhar em cima do seu feedback para tornar a experiência L’Essence Furlani ainda mais especial.</Text>
+          <Text style={styles.successText}>Recebemos sua sugestão com carinho e vamos trabalhar em cima do seu feedback para tornar a experiência {currentStore.nomeLoja} ainda mais especial.</Text>
           <PrimaryButton label="Continuar explorando" onPress={() => setSuggestionSuccess(false)} testID="suggestion-success-close" />
         </View>
       </BottomSheet>
@@ -812,6 +918,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.ink },
   brandHeader: { alignItems: 'center', paddingHorizontal: 56, paddingTop: 26, paddingBottom: 20 },
+  storeLogo: { width: 118, height: 86, marginBottom: 4 },
   eyebrow: { color: COLORS.gold, fontSize: 11, letterSpacing: 5, fontWeight: '500' },
   h1: { color: COLORS.bone, fontSize: 26, lineHeight: 30, letterSpacing: 1.5, fontWeight: '700', marginTop: 7 },
   subtitle: { color: COLORS.muted, fontSize: 9, letterSpacing: 2.2, marginTop: 5 },
@@ -833,6 +940,11 @@ const styles = StyleSheet.create({
   filterSheetLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.2, marginBottom: 9 },
   filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg },
   filterSheetActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
+  contactIntro: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: SPACING.md },
+  contactAction: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  contactActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
+  contactActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
+  contactActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
   card: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: 12, padding: SPACING.md, overflow: 'hidden' },
   cardFavorite: { position: 'absolute', right: 10, top: 9, zIndex: 4, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.ink + 'DD' },
   productTop: { flexDirection: 'row', gap: SPACING.md },
