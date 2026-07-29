@@ -816,10 +816,12 @@ export function Vitrine({
               <Text style={styles.manualConfirmation}>A confirmação será feita manualmente após o recebimento.</Text>
             </View>
           )}
-          <View style={styles.successNextStep}>
-            <Feather name="message-circle" size={18} color={COLORS.gold} />
-            <Text style={styles.successNextText}>{orderSuccess}</Text>
-          </View>
+          {!manualPixCode && (
+            <View style={styles.successNextStep}>
+              <Feather name="message-circle" size={18} color={COLORS.gold} />
+              <Text style={styles.successNextText}>{orderSuccess}</Text>
+            </View>
+          )}
           {!!successOrder?.codigoAcompanhamento && (
             <View style={styles.trackingAccess}>
               <Pressable
