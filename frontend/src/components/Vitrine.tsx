@@ -159,6 +159,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [orderCodes, setOrderCodes] = useState<string[]>([]);
   const [successOrder, setSuccessOrder] = useState<Compra | null>(null);
   const [pixCopied, setPixCopied] = useState(false);
+  const [trackingCodeOpen, setTrackingCodeOpen] = useState(false);
   const cartRestored = useRef(false);
   const ordersKeyRef = useRef(`${ORDERS_KEY_PREFIX}${ORDERS_INITIAL_VERSION}`);
 
@@ -561,6 +562,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
           saveOrderCode(order);
           setSuccessOrder(order);
           setPixCopied(false);
+          setTrackingCodeOpen(false);
           setOrderSuccess(message);
           load();
         }}
@@ -649,7 +651,16 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         <PrimaryButton label="Entendi" onPress={() => setInfo(null)} testID="info-ok" />
       </BottomSheet>
 
-      <BottomSheet visible={!!orderSuccess} onClose={() => setOrderSuccess(null)} title="Pedido recebido" compact testID="order-success-sheet">
+      <BottomSheet
+        visible={!!orderSuccess}
+        onClose={() => {
+          setOrderSuccess(null);
+          setTrackingCodeOpen(false);
+        }}
+        title="Pedido recebido"
+        compact
+        testID="order-success-sheet"
+      >
         <View style={styles.successContent}>
           <View style={styles.successIcon}>
             <Feather name="check" size={30} color={COLORS.ink} />
@@ -704,21 +715,41 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
             <Text style={styles.successNextText}>{orderSuccess}</Text>
           </View>
           {!!successOrder?.codigoAcompanhamento && (
-            <View style={styles.trackingCodeCard}>
-              <Text style={styles.trackingCodeLabel}>CÓDIGO PARA ACESSAR EM OUTRO APARELHO</Text>
-              <Text selectable style={styles.trackingCode}>{successOrder.codigoAcompanhamento}</Text>
+            <View style={styles.trackingAccess}>
               <Pressable
-                onPress={() => {
-                  void Share.share({
-                    message: `Meu pedido L’Essence Furlani pode ser acompanhado com este código: ${successOrder.codigoAcompanhamento}`,
-                  });
-                }}
-                style={styles.shareCodeButton}
-                testID="share-tracking-code"
+                onPress={() => setTrackingCodeOpen((open) => !open)}
+                style={({ pressed }) => [styles.trackingAccessButton, pressed && { opacity: 0.82 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Acessar pedido em outro aparelho"
+                testID="tracking-code-toggle"
               >
-                <Feather name="share-2" size={14} color={COLORS.gold} />
-                <Text style={styles.shareCodeText}>Compartilhar código</Text>
+                <View style={styles.trackingKeyIcon}>
+                  <Feather name="key" size={16} color={COLORS.gold} />
+                </View>
+                <View style={styles.trackingAccessCopy}>
+                  <Text style={styles.trackingAccessTitle}>Acessar em outro aparelho</Text>
+                  <Text style={styles.trackingAccessHint}>Use o código exclusivo deste pedido</Text>
+                </View>
+                <Feather name={trackingCodeOpen ? 'chevron-up' : 'chevron-down'} size={17} color={COLORS.muted} />
               </Pressable>
+              {trackingCodeOpen && (
+                <View style={styles.trackingCodeCard}>
+                  <Text style={styles.trackingCodeLabel}>CÓDIGO PARA ACESSAR EM OUTRO APARELHO</Text>
+                  <Text selectable style={styles.trackingCode}>{successOrder.codigoAcompanhamento}</Text>
+                  <Pressable
+                    onPress={() => {
+                      void Share.share({
+                        message: `Meu pedido L’Essence Furlani pode ser acompanhado com este código: ${successOrder.codigoAcompanhamento}`,
+                      });
+                    }}
+                    style={styles.shareCodeButton}
+                    testID="share-tracking-code"
+                  >
+                    <Feather name="share-2" size={14} color={COLORS.gold} />
+                    <Text style={styles.shareCodeText}>Compartilhar código</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
           )}
           <View style={{ width: '100%', gap: 8 }}>
@@ -727,11 +758,19 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
                 label="Acompanhar meu pedido"
                 onPress={() => {
                   setOrderSuccess(null);
+                  setTrackingCodeOpen(false);
                   setOrdersOpen(true);
                 }}
               />
             )}
-            <PrimaryButton label="Voltar à vitrine" onPress={() => setOrderSuccess(null)} testID="success-close" />
+            <PrimaryButton
+              label="Voltar à vitrine"
+              onPress={() => {
+                setOrderSuccess(null);
+                setTrackingCodeOpen(false);
+              }}
+              testID="success-close"
+            />
           </View>
         </View>
       </BottomSheet>
@@ -852,7 +891,13 @@ const styles = StyleSheet.create({
   copyPixText: { color: COLORS.ink, fontSize: 14, fontWeight: '700' },
   manualConfirmation: { color: COLORS.muted, fontSize: 10, textAlign: 'center', marginTop: 10 },
   successNextText: { flex: 1, color: COLORS.bone, fontSize: 12, lineHeight: 18 },
-  trackingCodeCard: { width: '100%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.gold + '0C', marginBottom: SPACING.lg },
+  trackingAccess: { width: '100%', marginBottom: SPACING.lg },
+  trackingAccessButton: { width: '100%', minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SPACING.md, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  trackingKeyIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '70', backgroundColor: COLORS.ink },
+  trackingAccessCopy: { flex: 1 },
+  trackingAccessTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
+  trackingAccessHint: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  trackingCodeCard: { width: '100%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.gold + '0C', marginTop: 8 },
   trackingCodeLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, textAlign: 'center' },
   trackingCode: { color: COLORS.bone, fontSize: 17, fontWeight: '700', letterSpacing: 1.2, marginTop: 8 },
   shareCodeButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 12, marginTop: 7 },
