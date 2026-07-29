@@ -25,6 +25,7 @@ async def acompanhar_pedido(codigo: str):
         "itens": pedido.get("itens", []),
         "subtotal": pedido.get("subtotal", pedido.get("total", 0)),
         "frete": pedido.get("frete", 0),
+        "entrega": pedido.get("entrega"),
         "total": pedido.get("total", 0),
         "formaPagamento": pedido.get("formaPagamento"),
         "pagamento": pedido.get("pagamento"),

@@ -22,6 +22,7 @@ from routers import (
     cep,
     clientes,
     compras,
+    frete,
     movimentos,
     opinioes,
     pedidos,
@@ -95,6 +96,7 @@ app.include_router(pedidos.router)
 app.include_router(opinioes.router)
 app.include_router(sugestoes.router)
 app.include_router(compras.router)
+app.include_router(frete.router)
 app.include_router(vitrine.router)
 app.include_router(clientes.router)
 app.include_router(acompanhamento.router)

@@ -27,3 +27,32 @@ JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "72"))
 # --- CORS ---
 # Em produção, prefira restringir a origens conhecidas em vez de "*".
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",")]
+
+# --- Frete / Melhor Envio ---
+# O Sandbox e a produção são ambientes independentes. Para entrar em produção,
+# troque a URL e cadastre um novo aplicativo no painel oficial do Melhor Envio.
+MELHOR_ENVIO_BASE_URL = os.getenv(
+    "MELHOR_ENVIO_BASE_URL",
+    "https://sandbox.melhorenvio.com.br",
+).rstrip("/")
+MELHOR_ENVIO_CLIENT_ID = os.getenv("MELHOR_ENVIO_CLIENT_ID", "")
+MELHOR_ENVIO_CLIENT_SECRET = os.getenv("MELHOR_ENVIO_CLIENT_SECRET", "")
+MELHOR_ENVIO_REDIRECT_URI = os.getenv(
+    "MELHOR_ENVIO_REDIRECT_URI",
+    "https://douglas-8rer.onrender.com/api/integracoes/melhor-envio/callback",
+)
+MELHOR_ENVIO_ACCESS_TOKEN = os.getenv("MELHOR_ENVIO_ACCESS_TOKEN", "")
+MELHOR_ENVIO_USER_AGENT = os.getenv(
+    "MELHOR_ENVIO_USER_AGENT",
+    "L'Essence Furlani (contato tecnico configurado no Render)",
+)
+MELHOR_ENVIO_FROM_CEP = os.getenv("MELHOR_ENVIO_FROM_CEP", "")
+MELHOR_ENVIO_ALLOWED_COMPANIES = [
+    item.strip()
+    for item in os.getenv(
+        "MELHOR_ENVIO_ALLOWED_COMPANIES",
+        "Jadlog,Buslog,J&T Express,Pegaki",
+    ).split(",")
+    if item.strip()
+]
+FRETE_TAXA_EMBALAGEM = float(os.getenv("FRETE_TAXA_EMBALAGEM", "0"))

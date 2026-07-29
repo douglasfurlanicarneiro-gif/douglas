@@ -16,6 +16,7 @@ from routers.pedidos import (
     _reverter_movimentos_do_pedido,
 )
 from security import require_atelie_auth
+from shipping.melhor_envio import MelhorEnvioError, cotar_frete
 from utils import next_seq, serialize
 
 router = APIRouter(prefix="/api/compras", tags=["compras"])
@@ -37,6 +38,10 @@ class ItemCompraIn(BaseModel):
     quantidade: int = Field(gt=0, le=20)
 
 
+class FreteEscolhidoIn(BaseModel):
+    serviceId: int = Field(gt=0)
+
+
 class CompraIn(BaseModel):
     # Campos legados continuam aceitos para não quebrar versões antigas do app.
     perfumeId: Optional[str] = None
@@ -53,6 +58,7 @@ class CompraIn(BaseModel):
     email: Optional[EmailStr] = None
     endereco: Optional[EnderecoIn] = None
     formaPagamento: Optional[Literal["pix", "cartao"]] = None
+    freteEscolhido: Optional[FreteEscolhidoIn] = None
 
     @model_validator(mode="after")
     def validar_formato(self):
@@ -120,11 +126,47 @@ async def _criar_compra(payload: CompraIn):
             "subtotal": subtotal,
         })
 
-    doc = payload.model_dump(exclude={"perfumeId", "perfumeNome", "ml", "preco", "itens"})
+    doc = payload.model_dump(
+        exclude={
+            "perfumeId",
+            "perfumeNome",
+            "ml",
+            "preco",
+            "itens",
+            "freteEscolhido",
+        }
+    )
     doc["itens"] = itens_doc
     doc["subtotal"] = round(total, 2)
-    doc["frete"] = 0
-    doc["total"] = round(total, 2)
+    doc["frete"] = 0.0
+    doc["entrega"] = None
+    if payload.freteEscolhido:
+        if not payload.endereco:
+            raise HTTPException(status_code=400, detail="Informe o endereço de entrega.")
+        try:
+            opcoes_frete = await cotar_frete(
+                db,
+                cep_destino=payload.endereco.cep,
+                itens=itens_doc,
+            )
+        except MelhorEnvioError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+        escolha = next(
+            (
+                opcao
+                for opcao in opcoes_frete
+                if opcao["serviceId"] == payload.freteEscolhido.serviceId
+            ),
+            None,
+        )
+        if not escolha:
+            raise HTTPException(
+                status_code=400,
+                detail="A opção de entrega escolhida não está mais disponível. Calcule novamente.",
+            )
+        doc["frete"] = escolha["preco"]
+        doc["entrega"] = escolha
+    doc["total"] = round(total + doc["frete"], 2)
     agora = datetime.now(timezone.utc).isoformat()
     doc["data"] = agora
     doc["criadoEm"] = agora
