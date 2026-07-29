@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 
 export default function Root({ children }: PropsWithChildren) {
   return (
-    <html lang="pt-BR" style={{ height: "100%", backgroundColor: "#080706" }}>
+    <html lang="pt-BR" style={{ height: "100%", backgroundColor: "#D8CBB9" }}>
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
@@ -13,9 +13,9 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no"
         />
-        <meta name="theme-color" content="#080706" />
+        <meta name="theme-color" content="#D8CBB9" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="L’Essence Furlani" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
@@ -32,6 +32,14 @@ export default function Root({ children }: PropsWithChildren) {
               body > div:first-child { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; }
               [role="tablist"] [role="tab"] * { overflow: visible !important; }
               [role="heading"], [role="heading"] * { overflow: visible !important; }
+              input:-webkit-autofill,
+              input:-webkit-autofill:hover,
+              input:-webkit-autofill:focus {
+                -webkit-text-fill-color: #251F18 !important;
+                -webkit-box-shadow: 0 0 0 1000px #FFF9F0 inset !important;
+                box-shadow: 0 0 0 1000px #FFF9F0 inset !important;
+                caret-color: #251F18;
+              }
               #brand-preloader {
                 position: fixed;
                 inset: 0;
@@ -39,7 +47,7 @@ export default function Root({ children }: PropsWithChildren) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: #080706;
+                background: #D8CBB9;
                 transition: opacity 180ms ease;
               }
               #brand-preloader img {
@@ -60,7 +68,7 @@ export default function Root({ children }: PropsWithChildren) {
         style={{
           margin: 0,
           height: "100%",
-          backgroundColor: "#080706",
+          backgroundColor: "#D8CBB9",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",

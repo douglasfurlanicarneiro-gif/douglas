@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { acompanharPedido, cancelarPedidoCliente } from '../api';
 import { brl, COLORS, familiasDoPerfume, fmtDate, nomeConcentracao, OCASIOES, RADIUS, SPACING, STATUS } from '../theme';
@@ -129,7 +129,7 @@ function CustomerOrderSwipe({
             accessibilityLabel="Remover pedido cancelado da lista"
             testID={`${testID}-remover`}
           >
-            <Feather name="trash-2" size={18} color={COLORS.bone} />
+            <Feather name="trash-2" size={18} color="#FFF9F0" />
             <Text style={styles.customerSwipeRemoveText}>Remover</Text>
           </Pressable>
         </View>
@@ -158,7 +158,7 @@ export function PerfumeDetailSheet({
   onBuy: (ml: number, preco: number) => void;
 }) {
   return (
-    <BottomSheet visible={!!perfume} onClose={onClose} title="Detalhes da fragrância">
+    <BottomSheet visible={!!perfume} onClose={onClose} title="Detalhes da fragrância" tone="light">
       {perfume && (
         <View>
           <View style={styles.detailHero}>
@@ -170,33 +170,41 @@ export function PerfumeDetailSheet({
               </View>
             )}
             <Pressable onPress={onToggleFavorite} style={styles.heartButton}>
-              <Feather name="heart" size={20} color={favorite ? COLORS.wine : COLORS.gold} />
+              {favorite ? (
+                <FontAwesome name="heart" size={20} color={COLORS.favorite} />
+              ) : (
+                <Feather name="heart" size={20} color={COLORS.gold} />
+              )}
             </Pressable>
           </View>
           <Text style={styles.eyebrow}>FRAGRÂNCIA Nº {String(perfume.seq || 0).padStart(3, '0')}</Text>
           <Text style={styles.detailTitle}>{perfume.nome}</Text>
-          <Text style={styles.detailMeta}>{familiasDoPerfume(perfume).join(' · ')} · {nomeConcentracao(perfume.concentracao)}</Text>
+          <Text style={styles.perfumeMeta}>{familiasDoPerfume(perfume).join(' · ')} · {nomeConcentracao(perfume.concentracao)}</Text>
 
           <View style={styles.occasionBox}>
-            <Text style={styles.sectionLabel}>CLIMA & OCASIÃO</Text>
-            <Text style={styles.bodyText}>
+            <Text style={[styles.sectionLabel, styles.detailSectionLabel]}>CLIMA & OCASIÃO</Text>
+            <Text style={[styles.bodyText, styles.detailBodyText]}>
               {perfume.ocasioes?.length ? perfume.ocasioes.join(' · ') : 'Versátil · Todas as ocasiões'}
             </Text>
           </View>
 
-          <Text style={styles.sectionLabel}>PIRÂMIDE OLFATIVA</Text>
+          <Text style={[styles.sectionLabel, styles.detailSectionLabel]}>PIRÂMIDE OLFATIVA</Text>
           <Note label="TOPO" value={perfume.notasSaida} />
           <Note label="CORAÇÃO" value={perfume.notasCoracao} />
           <Note label="BASE" value={perfume.notasFundo} />
 
-          <Text style={[styles.sectionLabel, { marginTop: SPACING.lg }]}>ESCOLHA O TAMANHO</Text>
+          <Text style={[styles.sectionLabel, styles.detailSectionLabel, { marginTop: SPACING.lg }]}>ESCOLHA O TAMANHO</Text>
           <View style={styles.sizeWrap}>
             {perfume.precos.map((opcao) => (
               <Pressable
                 key={opcao.ml}
                 disabled={!perfume.disponivel}
                 onPress={() => onBuy(opcao.ml, opcao.preco)}
-                style={[styles.sizeButton, !perfume.disponivel && { opacity: 0.45 }]}
+                style={({ pressed }) => [
+                  styles.sizeButton,
+                  pressed && perfume.disponivel && styles.sizeButtonPressed,
+                  !perfume.disponivel && { opacity: 0.45 },
+                ]}
               >
                 <Text style={styles.sizeText}>{opcao.ml} ml</Text>
                 <Text style={styles.sizePrice}>{brl(opcao.preco)}</Text>
@@ -644,44 +652,48 @@ export function OrdersSheet({
 }
 
 const styles = StyleSheet.create({
-  detailHero: { height: 250, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.lg },
+  detailHero: { height: 250, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: '#EAE0D2', borderWidth: 1, borderColor: '#C5AF8F', marginBottom: SPACING.lg },
   detailImage: { width: '100%', height: '100%' },
   placeholder: { alignItems: 'center', justifyContent: 'center' },
-  heartButton: { position: 'absolute', right: 12, top: 12, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border },
+  heartButton: { position: 'absolute', right: 12, top: 12, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF9F0', borderWidth: 1, borderColor: '#C5AF8F' },
   eyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.5 },
-  detailTitle: { color: COLORS.bone, fontSize: 25, fontWeight: '700', marginTop: 4 },
+  detailTitle: { color: '#251F18', fontSize: 25, fontWeight: '700', marginTop: 4 },
+  perfumeMeta: { color: '#746858', fontSize: 13, marginTop: 3 },
   detailMeta: { color: COLORS.muted, fontSize: 13, marginTop: 3 },
-  occasionBox: { backgroundColor: COLORS.ink, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, padding: SPACING.md, marginVertical: SPACING.lg },
+  occasionBox: { backgroundColor: '#EADFCF', borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C5AF8F', padding: SPACING.md, marginVertical: SPACING.lg },
   sectionLabel: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.3, marginBottom: 8 },
+  detailSectionLabel: { color: '#A97D38' },
   bodyText: { color: COLORS.bone, fontSize: 13 },
-  noteRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  noteLabel: { color: COLORS.muted, width: 70, fontSize: 11 },
-  noteValue: { color: COLORS.bone, flex: 1, fontSize: 13, fontStyle: 'italic' },
+  detailBodyText: { color: '#251F18' },
+  noteRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#D5C4AA' },
+  noteLabel: { color: '#746858', width: 70, fontSize: 11 },
+  noteValue: { color: '#43392D', flex: 1, fontSize: 13, fontStyle: 'italic' },
   sizeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  sizeButton: { minWidth: 94, flexGrow: 1, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: COLORS.gold, borderRadius: RADIUS.md },
-  sizeText: { color: COLORS.gold, fontWeight: '700' },
-  sizePrice: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  sizeButton: { minWidth: 94, flexGrow: 1, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: '#A97D38', borderRadius: RADIUS.md, backgroundColor: '#FFF9F0' },
+  sizeButtonPressed: { backgroundColor: '#EADFCF' },
+  sizeText: { color: '#251F18', fontWeight: '700' },
+  sizePrice: { color: '#746858', fontSize: 11, marginTop: 2 },
   quizLead: { color: COLORS.bone, fontSize: 15, lineHeight: 22, marginBottom: SPACING.xl },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   results: { marginTop: SPACING.xl, paddingTop: SPACING.lg, borderTopWidth: 1, borderTopColor: COLORS.border },
   resultTitle: { color: COLORS.bone, fontSize: 21, fontWeight: '700' },
   resultSub: { color: COLORS.muted, fontSize: 13, marginTop: 4, marginBottom: SPACING.md },
-  resultCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, backgroundColor: COLORS.ink, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginBottom: 8 },
+  resultCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginBottom: 8 },
   resultNumber: { width: 30, height: 30, borderRadius: 15, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   resultNumberText: { color: COLORS.ink, fontWeight: '700' },
   resultName: { color: COLORS.bone, fontSize: 14, fontWeight: '600' },
   resultMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
-  orderCard: { backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md },
+  orderCard: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md },
   customerSwipeWrap: { position: 'relative', overflow: 'hidden', borderRadius: RADIUS.lg, marginBottom: SPACING.md, userSelect: 'none' },
   customerSwipeActions: { ...StyleSheet.absoluteFillObject, alignItems: 'flex-end', justifyContent: 'stretch', borderRadius: RADIUS.lg, overflow: 'hidden' },
   customerSwipeRemove: { width: CUSTOMER_ORDER_ACTION_WIDTH, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.rust },
-  customerSwipeRemoveText: { color: COLORS.bone, fontSize: 11, fontWeight: '700' },
+  customerSwipeRemoveText: { color: '#FFF9F0', fontSize: 11, fontWeight: '700' },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
   orderDate: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   orderItem: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   orderItemMeta: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
-  deliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, backgroundColor: COLORS.ink, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
+  deliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, backgroundColor: COLORS.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
   deliveryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface },
   orderTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.md },
   timeline: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
@@ -699,24 +711,24 @@ const styles = StyleSheet.create({
   cancelError: { color: COLORS.rust, fontSize: 11, lineHeight: 16, marginTop: 7 },
   cancelConfirmActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.md },
   cancelConfirmButton: { flex: 1, minHeight: 45, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
-  cancelConfirmButtonText: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
+  cancelConfirmButtonText: { color: '#FFF9F0', fontSize: 12, fontWeight: '700' },
   removeOrderHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 34, marginTop: SPACING.sm },
   removeOrderHintText: { color: COLORS.muted, fontSize: 10 },
   removeConfirm: { marginTop: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   removeConfirmButton: { flex: 1, minHeight: 45, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
-  removeConfirmButtonText: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
+  removeConfirmButtonText: { color: '#FFF9F0', fontSize: 12, fontWeight: '700' },
   emptyOrdersContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACING.lg },
   emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg, transform: [{ translateY: -30 }] },
   emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
   emptyOrdersIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.gold, shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
   emptyEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.8, textAlign: 'center' },
   emptyTitle: { color: COLORS.bone, fontSize: 22, lineHeight: 28, fontWeight: '700', textAlign: 'center', marginTop: 8, maxWidth: 300 },
-  privacyNote: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginTop: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '45', backgroundColor: COLORS.ink },
+  privacyNote: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginTop: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '45', backgroundColor: COLORS.surface },
   privacyText: { flex: 1, color: COLORS.bone, fontSize: 11, lineHeight: 17 },
   recoveryArea: { width: '100%', marginTop: SPACING.md },
   recoveryLink: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   recoveryLinkText: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
-  recoveryCard: { width: '100%', padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
+  recoveryCard: { width: '100%', padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   recoveryTitle: { color: COLORS.bone, fontSize: 15, fontWeight: '700' },
   recoveryText: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 3, marginBottom: SPACING.sm },
   recoveryError: { color: COLORS.rust, fontSize: 11, marginTop: 7 },

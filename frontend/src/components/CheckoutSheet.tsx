@@ -375,7 +375,7 @@ export function CheckoutSheet({
                 style={{
                   padding: SPACING.md,
                   borderRadius: 12,
-                  backgroundColor: COLORS.ink,
+                  backgroundColor: COLORS.surface,
                   borderWidth: 1,
                   borderColor: COLORS.border,
                   marginBottom: SPACING.sm,
@@ -554,7 +554,7 @@ export function CheckoutSheet({
             </Field>
             <Field label="Observações (opcional)"><TInput multiline style={{ minHeight: 72, textAlignVertical: 'top' }} value={form.observacoes} onChangeText={(observacoes) => setForm({ ...form, observacoes })} /></Field>
 
-            <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink, marginBottom: SPACING.md }}>
+            <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                 <Text style={{ color: COLORS.muted }}>Produtos</Text>
                 <Text style={{ color: COLORS.bone }}>{brl(subtotal)}</Text>

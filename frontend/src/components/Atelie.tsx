@@ -140,7 +140,7 @@ function SwipeablePedidoCard({
           accessibilityLabel="Excluir pedido"
           testID={`${testID}-excluir`}
         >
-          <Feather name="trash-2" size={18} color={COLORS.bone} />
+          <Feather name="trash-2" size={18} color="#FFF9F0" />
           <Text style={styles.swipeOrderDeleteText}>Excluir</Text>
         </Pressable>
       </View>
@@ -355,7 +355,7 @@ function ConfirmSheetContent({
             !ready && styles.confirmActionDisabled,
           ]}
         >
-          <Text style={{ color: sheet.danger ? COLORS.bone : COLORS.ink, fontWeight: '600' }}>
+          <Text style={{ color: sheet.danger ? '#FFF9F0' : COLORS.ink, fontWeight: '600' }}>
             {!ready ? 'Aguarde…' : (sheet.confirmLabel || (sheet.danger ? 'Sim, excluir' : 'Confirmar'))}
           </Text>
         </Pressable>
@@ -439,7 +439,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
           ))}
         </View>
       </Field>
-      <View style={{ padding: SPACING.md, backgroundColor: COLORS.ink, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
+      <View style={{ padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
         <Text style={{ color: COLORS.gold, fontSize: 11, marginBottom: 8 }}>PIRÂMIDE OLFATIVA</Text>
         {[
           { c: COLORS.topNote, label: 'Saída', k: 'notasSaida' },
@@ -580,7 +580,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
         const p = perfumes.find((pf: any) => pf.id === it.perfumeId);
         const editando = searchingIdx === i;
         return (
-          <View key={i} style={{ padding: SPACING.md, backgroundColor: COLORS.ink, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.sm }}>
+          <View key={i} style={{ padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.sm }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
               <Pressable
                 onPress={() => { if (!pedidoRecebido) { setSearchingIdx(editando ? null : i); setQ(''); } }}
@@ -719,7 +719,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
           style={styles.deleteAdminOrderButton}
           testID="pedido-excluir-definitivamente"
         >
-          <Feather name="trash-2" size={16} color={COLORS.bone} />
+          <Feather name="trash-2" size={16} color="#FFF9F0" />
           <View style={{ flex: 1 }}>
             <Text style={styles.deleteAdminOrderTitle}>Excluir definitivamente</Text>
             <Text style={styles.deleteAdminOrderHint}>Remove o pedido e seu histórico do painel.</Text>
@@ -1811,7 +1811,7 @@ export function Atelie({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.ink },
+  screen: { flex: 1, backgroundColor: COLORS.background },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.md },
   topBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   statCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg },
@@ -1840,16 +1840,16 @@ const styles = StyleSheet.create({
   shippingEnvironment: { color: COLORS.muted, fontSize: 9, textAlign: 'center', marginTop: 8 },
   systemPage: { padding: SPACING.lg },
   systemHero: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
-  systemHeroIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.ink },
+  systemHeroIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface },
   systemEyebrow: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.4 },
   systemTitle: { color: COLORS.bone, fontSize: 22, fontWeight: '600', marginTop: 1 },
   systemIntro: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
   systemCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
   systemCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SPACING.md },
-  systemCardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
+  systemCardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   systemCardTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700' },
   systemCardSubtitle: { color: COLORS.muted, fontSize: 10, lineHeight: 14, marginTop: 2 },
-  storePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 104, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.ink },
+  storePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 104, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   storePreviewVisual: { width: 74, height: 74, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   storePreviewLogo: { width: '100%', height: '100%' },
   storePreviewInitials: { color: COLORS.gold, fontSize: 25, fontWeight: '700', letterSpacing: 1 },
@@ -1863,18 +1863,18 @@ const styles = StyleSheet.create({
   systemPrimaryButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, marginTop: SPACING.sm },
   systemPrimaryText: { color: COLORS.ink, fontSize: 12, fontWeight: '700' },
   systemMiniActions: { flexDirection: 'row', gap: 6, marginTop: 7 },
-  systemMiniButton: { flex: 1, minHeight: 35, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  systemMiniButton: { flex: 1, minHeight: 35, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   systemMiniText: { color: COLORS.gold, fontSize: 9, fontWeight: '600', textAlign: 'center' },
   systemAction: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
   systemActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '600' },
   systemActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
   systemBadge: { color: COLORS.muted, fontSize: 8, letterSpacing: 0.5, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border },
-  supplierActive: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 4, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.gold + '44' },
+  supplierActive: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 4, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.gold + '44' },
   supplierName: { color: COLORS.bone, fontSize: 13, fontWeight: '700' },
   supplierMeta: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
   connectedPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.sage + '88' },
   connectedPillText: { color: COLORS.sage, fontSize: 8, fontWeight: '700', letterSpacing: 0.6 },
-  orderDeliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, marginBottom: SPACING.md },
+  orderDeliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, marginBottom: SPACING.md },
   orderDeliveryIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
   orderDeliveryTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '600' },
   orderDeliveryMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
@@ -1882,7 +1882,7 @@ const styles = StyleSheet.create({
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
   stockSummary: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.md },
   stockSummaryGrid: { flexDirection: 'row', gap: 8 },
-  stockSummaryItem: { flex: 1, padding: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
+  stockSummaryItem: { flex: 1, padding: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   stockSummaryValue: { color: COLORS.gold, fontSize: 15, fontWeight: '600' },
   stockSummaryLabel: { color: COLORS.muted, fontSize: 9, marginTop: 3 },
   stockSummaryHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginTop: SPACING.sm },
@@ -1895,10 +1895,10 @@ const styles = StyleSheet.create({
   ordersManagement: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
   ordersManagementTitle: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, marginBottom: 3 },
   ordersManagementText: { color: COLORS.muted, fontSize: 11, lineHeight: 15 },
-  resetOrdersButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingHorizontal: 11, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.rust + '88', backgroundColor: COLORS.ink },
+  resetOrdersButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingHorizontal: 11, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.rust + '88', backgroundColor: COLORS.surface },
   resetOrdersText: { color: COLORS.rust, fontSize: 10, fontWeight: '700' },
   orderToolbar: { marginBottom: SPACING.md, gap: SPACING.sm },
-  orderViewToggle: { flexDirection: 'row', alignSelf: 'flex-start', padding: 3, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  orderViewToggle: { flexDirection: 'row', alignSelf: 'flex-start', padding: 3, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   orderViewButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 34, paddingHorizontal: 13, borderRadius: RADIUS.pill },
   orderViewButtonActive: { backgroundColor: COLORS.gold },
   orderViewText: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
@@ -1912,9 +1912,9 @@ const styles = StyleSheet.create({
   kanbanColumnTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
   kanbanStatusDot: { width: 8, height: 8, borderRadius: 4 },
   kanbanColumnTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
-  kanbanCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  kanbanCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   kanbanCountText: { color: COLORS.muted, fontSize: 10, fontWeight: '700' },
-  kanbanEmpty: { minHeight: 98, alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  kanbanEmpty: { minHeight: 98, alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border, backgroundColor: COLORS.surface },
   kanbanEmptyText: { color: COLORS.muted, fontSize: 11, textAlign: 'center' },
   kanbanCard: { marginBottom: 8, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   kanbanCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
@@ -1924,9 +1924,9 @@ const styles = StyleSheet.create({
   kanbanOrderMeta: { color: COLORS.bone, fontSize: 11, marginTop: 4 },
   kanbanContact: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
   kanbanCardActions: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
-  kanbanMoveButton: { width: 34, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  kanbanMoveButton: { width: 34, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   kanbanMoveDisabled: { opacity: 0.45 },
-  kanbanEditButton: { flex: 1, minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.ink },
+  kanbanEditButton: { flex: 1, minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface },
   kanbanEditText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
   cancelledOrders: { marginTop: SPACING.lg },
   cancelledOrderCard: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, marginBottom: 7, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '55', backgroundColor: COLORS.surface },
@@ -1938,17 +1938,17 @@ const styles = StyleSheet.create({
   swipeOrderDelete: { backgroundColor: COLORS.rust },
   swipeOrderActionPressed: { opacity: 0.82 },
   swipeOrderEditText: { color: COLORS.ink, fontSize: 11, fontWeight: '700' },
-  swipeOrderDeleteText: { color: COLORS.bone, fontSize: 11, fontWeight: '700' },
+  swipeOrderDeleteText: { color: '#FFF9F0', fontSize: 11, fontWeight: '700' },
   swipeOrderFront: { backgroundColor: COLORS.surface },
   swipeOrderCard: { padding: SPACING.md, minHeight: 88, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, justifyContent: 'center' },
-  deleteSafetyNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  deleteSafetyNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   deleteSafetyText: { color: COLORS.muted, fontSize: 11, lineHeight: 16, flex: 1 },
   confirmAction: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   confirmActionDisabled: { opacity: 0.45 },
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
-  catalogThumb: { width: 84, minHeight: 126, backgroundColor: COLORS.ink },
-  catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
-  imagePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginTop: -6, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  catalogThumb: { width: 84, minHeight: 126, backgroundColor: COLORS.surface },
+  catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
+  imagePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginTop: -6, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   imagePreviewPhoto: { width: 64, height: 64, borderRadius: 8, backgroundColor: COLORS.surface },
   imagePreviewText: { color: COLORS.muted, fontSize: 12 },
   orderChoiceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: SPACING.md, paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border },
@@ -1962,10 +1962,10 @@ const styles = StyleSheet.create({
   cancelAdminOrderButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '80' },
   cancelAdminOrderText: { color: COLORS.rust, fontSize: 12, fontWeight: '700' },
   deleteAdminOrderButton: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
-  deleteAdminOrderTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
-  deleteAdminOrderHint: { color: COLORS.bone, opacity: 0.78, fontSize: 10, marginTop: 2 },
-  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.ink },
-  tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  deleteAdminOrderTitle: { color: '#FFF9F0', fontSize: 12, fontWeight: '700' },
+  deleteAdminOrderHint: { color: '#FFF9F0', opacity: 0.78, fontSize: 10, marginTop: 2 },
+  pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.surface },
+  tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, marginBottom: SPACING.sm },
   searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 10, fontSize: 14 },

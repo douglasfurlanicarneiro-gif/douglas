@@ -6,7 +6,7 @@ import { COLORS, RADIUS, SPACING } from '../theme';
 
 export const inputStyle: TextStyle = {
   width: '100%',
-  backgroundColor: COLORS.ink,
+  backgroundColor: '#FFF9F0',
   borderWidth: 1,
   borderColor: COLORS.border,
   borderRadius: 10,

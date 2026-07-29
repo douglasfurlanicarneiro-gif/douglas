@@ -90,7 +90,7 @@ export default function Index() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={showIntro ? '#080706' : COLORS.ink} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       {checked ? (
         modo === 'atelie' ? (
           <Atelie
@@ -105,7 +105,7 @@ export default function Index() {
           />
         )
       ) : (
-        <View style={{ flex: 1, backgroundColor: COLORS.ink }} />
+        <View style={{ flex: 1, backgroundColor: COLORS.background }} />
       )}
       <BottomSheet visible={checked && pedindoSenha} onClose={() => setPedindoSenha(false)} title="Painel de Controle" testID="login-sheet">
         <LoginForm

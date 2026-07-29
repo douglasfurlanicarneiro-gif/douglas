@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { COLORS, SPACING, RADIUS, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
-import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Chip, Stars } from './atoms';
+import { Field, TInput, PrimaryButton, SecondaryButton, Chip, Stars } from './atoms';
 import { createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
 import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
@@ -80,11 +80,15 @@ function VitrineCard({
   const familiasResumo = resumirCategorias(familias, 2, 'família', 'famílias');
   return (
     <View style={styles.card} testID={`vitrine-card-${item.id}`}>
-      <Pressable onPress={onToggleFavorite} style={styles.cardFavorite} hitSlop={8}>
-        <Feather name="heart" size={18} color={favorite ? COLORS.wine : PRODUCT_CARD_COLORS.gold} />
+      <Pressable onPress={onToggleFavorite} style={styles.cardFavorite} hitSlop={8} testID={`favorite-${item.id}`}>
+        {favorite ? (
+          <FontAwesome name="heart" size={18} color={COLORS.favorite} />
+        ) : (
+          <Feather name="heart" size={18} color={PRODUCT_CARD_COLORS.gold} />
+        )}
       </Pressable>
       <View style={styles.productTop}>
-        <Pressable style={styles.imageFrame} onPress={onDetails}>
+        <Pressable style={styles.imageFrame} onPress={onDetails} testID={`details-image-${item.id}`}>
           {item.imagemUrl ? (
             <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="cover" transition={180} />
           ) : (
@@ -95,7 +99,7 @@ function VitrineCard({
           )}
         </Pressable>
         <View style={styles.productInfo}>
-          <Pressable onPress={onDetails}>
+          <Pressable onPress={onDetails} testID={`details-title-${item.id}`}>
             <Text style={styles.cardTitle} numberOfLines={2}>{item.nome}</Text>
           </Pressable>
           <Text style={styles.occasionLabel}>CLIMA & OCASIÃO</Text>
@@ -118,10 +122,14 @@ function VitrineCard({
               disabled={!item.disponivel}
               onPress={() => onBuy(pr.ml, pr.preco)}
               testID={`buy-${item.id}-${pr.ml}`}
-              style={[styles.sizeButton, !item.disponivel && styles.sizeButtonDisabled]}
+              style={({ pressed }) => [
+                styles.sizeButton,
+                pressed && item.disponivel && styles.sizeButtonPressed,
+                !item.disponivel && styles.sizeButtonDisabled,
+              ]}
             >
-              <Text style={[styles.sizeButtonText, !item.disponivel && { color: COLORS.muted }]}>{pr.ml} ml</Text>
-              <Text style={[styles.sizePrice, !item.disponivel && { color: COLORS.muted }]}>{brl(pr.preco)}</Text>
+              <Text style={[styles.sizeButtonText, !item.disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>{pr.ml} ml</Text>
+              <Text style={[styles.sizePrice, !item.disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>{brl(pr.preco)}</Text>
             </Pressable>
           ))}
       </View>
@@ -538,7 +546,11 @@ export function Vitrine({
                     style={[styles.quickFilterButton, styles.quickFilterGrow, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
                     testID="filter-favorites"
                   >
-                    <Feather name="heart" size={14} color={familiaAtiva === 'Favoritos' ? COLORS.ink : COLORS.gold} />
+                    {familiaAtiva === 'Favoritos' ? (
+                      <FontAwesome name="heart" size={14} color={COLORS.favorite} />
+                    ) : (
+                      <Feather name="heart" size={14} color={COLORS.gold} />
+                    )}
                     <Text style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]}>Favoritos</Text>
                   </Pressable>
                   <Pressable
@@ -567,7 +579,12 @@ export function Vitrine({
               <Text style={{ color: COLORS.muted, marginTop: 6, textAlign: 'center' }}>Volte em breve para conferir a coleção.</Text>
             </View>
           ) : (
-            <View style={{ paddingHorizontal: SPACING.lg }}><EmptyState text="Nenhum contratipo encontrado." /></View>
+            <View style={{ paddingHorizontal: SPACING.lg }}>
+              <View style={styles.storefrontEmpty}>
+                <Text style={styles.storefrontEmptyTitle}>Nenhuma fragrância encontrada</Text>
+                <Text style={styles.storefrontEmptyText}>Ajuste os filtros para descobrir outras opções.</Text>
+              </View>
+            </View>
           )
         }
         contentContainerStyle={{ paddingHorizontal: SPACING.lg, paddingBottom: 160 }}
@@ -917,7 +934,7 @@ export function Vitrine({
       <BottomSheet visible={!!reviewItem} onClose={() => setReviewItem(null)} title="Deixar avaliação" testID="review-sheet">
         {reviewItem && (
           <View>
-            <View style={{ padding: SPACING.md, borderRadius: 12, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
+            <View style={{ padding: SPACING.md, borderRadius: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
               <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(reviewItem.seq)}</Text>
               <Text style={{ color: COLORS.bone, fontSize: 16, fontWeight: '500' }}>{reviewItem.nome}</Text>
             </View>
@@ -955,13 +972,16 @@ const styles = StyleSheet.create({
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: 11, fontWeight: '600' },
   quickFilterTextActive: { color: COLORS.ink },
+  storefrontEmpty: { alignItems: 'center', padding: SPACING.xl, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
+  storefrontEmptyTitle: { color: STOREFRONT_COLORS.ink, fontSize: 14, fontWeight: '700' },
+  storefrontEmptyText: { color: STOREFRONT_COLORS.muted, fontSize: 11, marginTop: 5, textAlign: 'center' },
   filterBadge: { minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
   filterBadgeText: { color: COLORS.gold, fontSize: 8, fontWeight: '700' },
   filterSheetLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.2, marginBottom: 9 },
   filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg },
   filterSheetActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
   contactIntro: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: SPACING.md },
-  contactAction: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  contactAction: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   contactActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   contactActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
   contactActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
@@ -993,10 +1013,11 @@ const styles = StyleSheet.create({
   metaText: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9 },
   availabilityDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: SPACING.md },
-  sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', backgroundColor: COLORS.ink },
-  sizeButtonDisabled: { borderColor: COLORS.border, opacity: 0.65 },
-  sizeButtonText: { color: COLORS.gold, fontSize: 12, lineHeight: 15, fontWeight: '700' },
-  sizePrice: { color: COLORS.bone, fontSize: 9, lineHeight: 12, marginTop: 1 },
+  sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold, alignItems: 'center', backgroundColor: '#FFF9F0' },
+  sizeButtonPressed: { backgroundColor: '#EADFCF' },
+  sizeButtonDisabled: { borderColor: PRODUCT_CARD_COLORS.border, opacity: 0.65 },
+  sizeButtonText: { color: PRODUCT_CARD_COLORS.ink, fontSize: 12, lineHeight: 15, fontWeight: '700' },
+  sizePrice: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9, lineHeight: 12, marginTop: 1 },
   notes: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10, gap: 6 },
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   noteLabel: { width: 58, color: PRODUCT_CARD_COLORS.muted, fontSize: 9, lineHeight: 15, letterSpacing: 0.8 },
@@ -1021,8 +1042,8 @@ const styles = StyleSheet.create({
   successTitle: { color: COLORS.bone, fontSize: 21, fontWeight: '700', textAlign: 'center', marginTop: 6 },
   successOrderNumber: { color: COLORS.gold, fontSize: 11, letterSpacing: 1.2, marginTop: 7 },
   successText: { color: COLORS.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7, marginBottom: SPACING.lg, maxWidth: 330 },
-  successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink, marginBottom: SPACING.lg },
-  pixCard: { width: '100%', padding: SPACING.lg, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.ink, marginBottom: SPACING.md },
+  successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.lg },
+  pixCard: { width: '100%', padding: SPACING.lg, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface, marginBottom: SPACING.md },
   pixHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
   pixEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.2 },
   pixValue: { color: COLORS.bone, fontSize: 22, fontWeight: '700', marginTop: 2 },
@@ -1037,7 +1058,7 @@ const styles = StyleSheet.create({
   successNextText: { flex: 1, color: COLORS.bone, fontSize: 12, lineHeight: 18 },
   trackingAccess: { width: '100%', marginBottom: SPACING.lg },
   trackingAccessButton: { width: '100%', minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SPACING.md, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  trackingKeyIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '70', backgroundColor: COLORS.ink },
+  trackingKeyIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '70', backgroundColor: COLORS.surface },
   trackingAccessCopy: { flex: 1 },
   trackingAccessTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
   trackingAccessHint: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
