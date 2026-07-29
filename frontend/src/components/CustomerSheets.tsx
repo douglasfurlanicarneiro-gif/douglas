@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Linking, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Linking, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { acompanharPedido, cancelarPedidoCliente } from '../api';
@@ -25,6 +25,9 @@ function CustomerOrderSwipe({
   const translateX = useRef(new Animated.Value(0)).current;
   const openRef = useRef(false);
   const dragStartRef = useRef(0);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const pointerLastXRef = useRef(0);
+  const pointerDraggingRef = useRef(false);
 
   const animateTo = useCallback((open: boolean) => {
     openRef.current = open;
@@ -63,6 +66,55 @@ function CustomerOrderSwipe({
     onPanResponderTerminationRequest: () => false,
   }), [animateTo, shouldCaptureHorizontalDrag, translateX]);
 
+  const pointerCoordinate = (event: any, axis: 'X' | 'Y') => (
+    event?.nativeEvent?.[`page${axis}`]
+    ?? event?.nativeEvent?.[`client${axis}`]
+    ?? event?.[`page${axis}`]
+    ?? event?.[`client${axis}`]
+    ?? 0
+  );
+
+  const webPointerHandlers = Platform.OS === 'web' ? {
+    onPointerDown: (event: any) => {
+      if (!enabled) return;
+      pointerStartRef.current = {
+        x: pointerCoordinate(event, 'X'),
+        y: pointerCoordinate(event, 'Y'),
+      };
+      pointerLastXRef.current = 0;
+      pointerDraggingRef.current = false;
+      dragStartRef.current = openRef.current ? -CUSTOMER_ORDER_ACTION_WIDTH : 0;
+      event.currentTarget?.setPointerCapture?.(event.nativeEvent?.pointerId);
+    },
+    onPointerMove: (event: any) => {
+      if (!enabled || !pointerStartRef.current) return;
+      const dx = pointerCoordinate(event, 'X') - pointerStartRef.current.x;
+      const dy = pointerCoordinate(event, 'Y') - pointerStartRef.current.y;
+      if (!pointerDraggingRef.current) {
+        if (Math.abs(dx) <= 6 || Math.abs(dx) <= Math.abs(dy)) return;
+        pointerDraggingRef.current = true;
+      }
+      event.preventDefault?.();
+      pointerLastXRef.current = dx;
+      translateX.setValue(Math.max(
+        -CUSTOMER_ORDER_ACTION_WIDTH,
+        Math.min(0, dragStartRef.current + dx),
+      ));
+    },
+    onPointerUp: () => {
+      if (!pointerStartRef.current) return;
+      const finalPosition = dragStartRef.current + pointerLastXRef.current;
+      animateTo(pointerDraggingRef.current && finalPosition < -(CUSTOMER_ORDER_ACTION_WIDTH / 2));
+      pointerStartRef.current = null;
+      pointerDraggingRef.current = false;
+    },
+    onPointerCancel: () => {
+      animateTo(openRef.current);
+      pointerStartRef.current = null;
+      pointerDraggingRef.current = false;
+    },
+  } : panResponder.panHandlers;
+
   return (
     <View style={styles.customerSwipeWrap} testID={testID}>
       {enabled && (
@@ -84,7 +136,7 @@ function CustomerOrderSwipe({
       )}
       <Animated.View
         style={{ transform: [{ translateX }] }}
-        {...panResponder.panHandlers}
+        {...webPointerHandlers}
       >
         {children}
       </Animated.View>
