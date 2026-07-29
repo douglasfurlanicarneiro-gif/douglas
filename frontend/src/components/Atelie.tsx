@@ -17,9 +17,10 @@ import {
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
   downloadBackup, getMetricas, resetAllOrders,
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
+  aplicarPrecos, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
-import type { Compra, ConfiguracaoFrete, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
+import type { Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
@@ -36,6 +37,7 @@ const TABS = [
   { id: 'estoque', label: 'Estoque', icon: 'package' as const },
   { id: 'pedidos', label: 'Pedidos', icon: 'clipboard' as const },
   { id: 'opinioes', label: 'Opiniões', icon: 'star' as const },
+  { id: 'sistema', label: 'Sistema', icon: 'settings' as const },
 ];
 
 const KANBAN_FLOW: OrderStatus[] = [
@@ -155,6 +157,65 @@ function SwipeablePedidoCard({
         </Pressable>
       </Animated.View>
     </View>
+  );
+}
+
+function SystemCard({
+  icon,
+  title,
+  subtitle,
+  children,
+}: {
+  icon: any;
+  title: string;
+  subtitle: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.systemCard}>
+      <View style={styles.systemCardHeader}>
+        <View style={styles.systemCardIcon}><Feather name={icon} size={17} color={COLORS.gold} /></View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.systemCardTitle}>{title}</Text>
+          <Text style={styles.systemCardSubtitle}>{subtitle}</Text>
+        </View>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function SystemAction({
+  icon,
+  title,
+  subtitle,
+  onPress,
+  danger,
+  disabled,
+  badge,
+}: {
+  icon: any;
+  title: string;
+  subtitle: string;
+  onPress?: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+  badge?: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [styles.systemAction, disabled && { opacity: 0.5 }, pressed && { opacity: 0.75 }]}
+    >
+      <Feather name={icon} size={15} color={danger ? COLORS.rust : COLORS.gold} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.systemActionTitle, danger && { color: COLORS.rust }]}>{title}</Text>
+        <Text style={styles.systemActionSubtitle}>{subtitle}</Text>
+      </View>
+      {!!badge && <Text style={styles.systemBadge}>{badge}</Text>}
+      {!disabled && <Feather name="chevron-right" size={15} color={COLORS.muted} />}
+    </Pressable>
   );
 }
 
@@ -687,7 +748,21 @@ export function Atelie({ onSair }: { onSair: () => void }) {
   const [freteConfig, setFreteConfig] = useState<ConfiguracaoFrete | null>(null);
   const [freteFeeInput, setFreteFeeInput] = useState('0,00');
   const [freteCepInput, setFreteCepInput] = useState('');
+  const [freteGratisInput, setFreteGratisInput] = useState('0,00');
   const [savingFrete, setSavingFrete] = useState(false);
+  const [priceInputs, setPriceInputs] = useState({ 30: '50,00', 50: '80,00', 100: '120,00' });
+  const [savingPrices, setSavingPrices] = useState(false);
+  const [savingStore, setSavingStore] = useState(false);
+  const [storeConfig, setStoreConfig] = useState<ConfiguracoesLoja>({
+    nomeLoja: 'L’Essence Furlani',
+    logoUrl: '',
+    whatsapp: '',
+    instagram: '',
+    email: '',
+    pix: '',
+    cnpj: '',
+    margemLucro: 0,
+  });
   const [orderView, setOrderView] = useState<'kanban' | 'lista'>('kanban');
   const [orderSearch, setOrderSearch] = useState('');
   const [movingOrderId, setMovingOrderId] = useState<string | null>(null);
@@ -695,7 +770,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      const [p, m, pe, o, s, c, e, metrics, shipping] = await Promise.all([
+      const [p, m, pe, o, s, c, e, metrics, shipping, store] = await Promise.all([
         listPerfumes(), listMovimentos(), listPedidos(), listOpinioes(), listSugestoes(), listCompras(),
         getEstoqueResumo().catch(async () => {
           const mapa = await getEstoqueMap();
@@ -706,13 +781,16 @@ export function Atelie({ onSair }: { onSair: () => void }) {
         }),
         getMetricas().catch(() => null),
         getConfiguracaoFrete().catch(() => null),
+        getConfiguracoesLoja().catch(() => null),
       ]);
       setPerfumes(p); setMovimentos(m); setPedidos(pe); setOpinioes(o); setSugestoes(s); setCompras(c); setEstoqueResumo(e);
       setMetricas(metrics);
       setFreteConfig(shipping);
+      if (store) setStoreConfig(store);
       if (shipping) {
         setFreteFeeInput(shipping.taxaEmbalagem.toFixed(2).replace('.', ','));
         setFreteCepInput(shipping.cepOrigem);
+        setFreteGratisInput(shipping.freteGratisAcima.toFixed(2).replace('.', ','));
       }
     } catch (err) { console.error(err); }
     finally { setLoading(false); setRefreshing(false); }
@@ -722,22 +800,76 @@ export function Atelie({ onSair }: { onSair: () => void }) {
 
   const saveFreteConfig = async () => {
     const fee = Number(freteFeeInput.replace(',', '.'));
+    const freeAbove = Number(freteGratisInput.replace(',', '.'));
     const cep = freteCepInput.replace(/\D/g, '');
-    if (!Number.isFinite(fee) || fee < 0 || cep.length !== 8) {
-      setSheet({ type: 'info', label: 'Informe um CEP de origem válido e uma taxa de embalagem igual ou maior que zero.' });
+    if (!Number.isFinite(fee) || fee < 0 || !Number.isFinite(freeAbove) || freeAbove < 0 || cep.length !== 8) {
+      setSheet({ type: 'info', label: 'Informe um CEP válido e valores de frete iguais ou maiores que zero.' });
       return;
     }
     setSavingFrete(true);
     try {
-      const updated = await updateConfiguracaoFrete({ taxaEmbalagem: fee, cepOrigem: cep });
+      const updated = await updateConfiguracaoFrete({
+        taxaEmbalagem: fee,
+        cepOrigem: cep,
+        freteGratisAcima: freeAbove,
+      });
       setFreteConfig(updated);
       setFreteFeeInput(updated.taxaEmbalagem.toFixed(2).replace('.', ','));
       setFreteCepInput(updated.cepOrigem);
+      setFreteGratisInput(updated.freteGratisAcima.toFixed(2).replace('.', ','));
       setSheet({ type: 'info', label: 'Configuração de entrega salva. As próximas cotações já usarão esses valores.' });
     } catch {
       setSheet({ type: 'info', label: 'Não foi possível salvar a configuração de entrega.' });
     } finally {
       setSavingFrete(false);
+    }
+  };
+
+  const applyPriceSizes = async (sizes: number[]) => {
+    const prices = ([30, 50, 100] as const).map((ml) => ({
+      ml,
+      preco: Number(priceInputs[ml].replace(',', '.')),
+    }));
+    if (prices.some((item) => !Number.isFinite(item.preco) || item.preco < 0)) {
+      setSheet({ type: 'info', label: 'Revise os preços informados.' });
+      return;
+    }
+    setSavingPrices(true);
+    try {
+      const result = await aplicarPrecos({ precos: prices, tamanhos: sizes });
+      await publishVitrine();
+      setSheet({
+        type: 'info',
+        label: `Preços atualizados em ${result.atualizados} perfume(s) e publicados na vitrine.`,
+      });
+      await load();
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível aplicar os preços.' });
+    } finally {
+      setSavingPrices(false);
+    }
+  };
+
+  const saveStoreConfig = async () => {
+    setSavingStore(true);
+    try {
+      const updated = await updateConfiguracoesLoja(storeConfig);
+      setStoreConfig(updated);
+      setSheet({ type: 'info', label: 'Configurações da loja salvas com segurança.' });
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível salvar as configurações da loja.' });
+    } finally {
+      setSavingStore(false);
+    }
+  };
+
+  const clearSystemData = async (resource: 'opinioes' | 'estoque' | 'catalogo') => {
+    try {
+      const result = await limparDados(resource);
+      setSheet({ type: 'info', label: `${result.status} ${result.removidos} registro(s) removido(s).` });
+      await load();
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível concluir a limpeza. Verifique se existem pedidos ativos.' });
     }
   };
 
@@ -1005,68 +1137,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
               )}
             </View>
           )}
-          <View style={styles.shippingPanel}>
-            <View style={styles.shippingHeader}>
-              <View>
-                <Text style={styles.sectionLabel}>FRETE E ENTREGA</Text>
-                <Text style={styles.shippingTitle}>Melhor Envio</Text>
-              </View>
-              <View style={[
-                styles.shippingStatus,
-                freteConfig?.integrado && { borderColor: COLORS.sage },
-              ]}>
-                <View style={[
-                  styles.shippingStatusDot,
-                  { backgroundColor: freteConfig?.integrado ? COLORS.sage : COLORS.rust },
-                ]} />
-                <Text style={{
-                  color: freteConfig?.integrado ? COLORS.sage : COLORS.muted,
-                  fontSize: 10,
-                }}>
-                  {freteConfig?.integrado ? 'Conectado' : 'Aguardando conexão'}
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.shippingHint}>
-              O preço e o prazo são calculados pela transportadora. A taxa abaixo é somada ao frete como embalagem e manuseio.
-            </Text>
-            <View style={styles.shippingFields}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.shippingFieldLabel}>CEP DE ORIGEM</Text>
-                <TInput
-                  keyboardType="numeric"
-                  maxLength={9}
-                  value={freteCepInput}
-                  onChangeText={(value) => setFreteCepInput(value)}
-                  placeholder="00000-000"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.shippingFieldLabel}>TAXA DE EMBALAGEM</Text>
-                <TInput
-                  keyboardType="decimal-pad"
-                  value={freteFeeInput}
-                  onChangeText={setFreteFeeInput}
-                  placeholder="0,00"
-                />
-              </View>
-            </View>
-            <Pressable onPress={saveFreteConfig} disabled={savingFrete} style={styles.shippingSaveButton}>
-              <Feather name="save" size={15} color={COLORS.ink} />
-              <Text style={styles.shippingSaveText}>{savingFrete ? 'Salvando…' : 'Salvar configuração'}</Text>
-            </Pressable>
-            {!freteConfig?.integrado && (
-              <Pressable onPress={connectMelhorEnvio} style={styles.shippingConnectButton}>
-                <Feather name="external-link" size={15} color={COLORS.gold} />
-                <Text style={styles.shippingConnectText}>Conectar conta do Melhor Envio</Text>
-              </Pressable>
-            )}
-            {!!freteConfig?.ambiente && (
-              <Text style={styles.shippingEnvironment}>
-                Ambiente: {freteConfig.ambiente === 'sandbox' ? 'testes (Sandbox)' : 'produção'}
-              </Text>
-            )}
-          </View>
           <Text style={styles.sectionLabel}>ÚLTIMOS PEDIDOS</Text>
           {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
           {[...pedidosUnificados].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).slice(0, 5).map((p) => {
@@ -1098,24 +1168,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
             <Feather name="search" size={16} color={COLORS.muted} />
             <TextInput value={search} onChangeText={setSearch} placeholder="Buscar" placeholderTextColor={COLORS.muted + 'BB'} style={styles.searchInput} testID="catalogo-search" />
           </View>
-          <Pressable
-            onPress={() => setSheet({ type: 'confirm', label: `Importar ${PRESET_FORNECEDOR.length} contratipos do fornecedor?`, onConfirm: doImport, confirmLabel: 'Importar' })}
-            style={styles.actionBtn}
-            testID="import-btn"
-          >
-            <Text style={{ color: COLORS.gold, fontSize: 12 }}>Importar lista do fornecedor ({PRESET_FORNECEDOR.length})</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setSheet({
-              type: 'confirm',
-              label: 'Aplicar os preços padrão aos tamanhos sem preço? 30ml = R$ 50, 50ml = R$ 80 e 100ml = R$ 120. Valores personalizados não serão alterados.',
-              onConfirm: doPadronizar,
-              confirmLabel: 'Aplicar preços',
-            })}
-            style={styles.actionBtn}
-          >
-            <Text style={{ color: COLORS.gold, fontSize: 12 }}>Aplicar preços padrão 30/50/100ml</Text>
-          </Pressable>
           {perfumesFiltrados.length === 0 && <EmptyState text="Nenhum contratipo. Toque em + para começar." />}
           {perfumesFiltrados.map((p) => {
             const resumo = resumoDe(p.id);
@@ -1257,26 +1309,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     if (tab === 'pedidos') {
       return (
         <View style={{ padding: SPACING.lg }}>
-          <View style={styles.ordersManagement}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.ordersManagementTitle}>GESTÃO DA BASE</Text>
-              <Text style={styles.ordersManagementText}>Apague pedidos de teste e limpe o histórico de todos os aparelhos.</Text>
-            </View>
-            <Pressable
-              onPress={() => setSheet({
-                type: 'confirm',
-                label: 'Zerar toda a base de pedidos? Pedidos, compras antigas e históricos salvos nos celulares e computadores serão removidos. As baixas automáticas de estoque serão estornadas. Perfumes, entradas de estoque e opiniões serão preservados.',
-                onConfirm: doResetPedidos,
-                confirmLabel: 'Zerar pedidos',
-                danger: true,
-              })}
-              style={styles.resetOrdersButton}
-              testID="reset-orders-button"
-            >
-              <Feather name="trash-2" size={15} color={COLORS.rust} />
-              <Text style={styles.resetOrdersText}>Zerar base</Text>
-            </Pressable>
-          </View>
           <View style={styles.orderToolbar}>
             <View style={styles.orderViewToggle}>
               {([
@@ -1459,6 +1491,205 @@ export function Atelie({ onSair }: { onSair: () => void }) {
       );
     }
 
+    if (tab === 'sistema') {
+      const setStoreField = <K extends keyof ConfiguracoesLoja,>(key: K, value: ConfiguracoesLoja[K]) => {
+        setStoreConfig((current) => ({ ...current, [key]: value }));
+      };
+      return (
+        <View style={styles.systemPage}>
+          <View style={styles.systemHero}>
+            <View style={styles.systemHeroIcon}><Feather name="settings" size={22} color={COLORS.gold} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.systemEyebrow}>CENTRAL ADMINISTRATIVA</Text>
+              <Text style={styles.systemTitle}>Sistema</Text>
+              <Text style={styles.systemIntro}>Configurações globais, integrações e manutenção da L’Essence Furlani.</Text>
+            </View>
+          </View>
+
+          <SystemCard icon="dollar-sign" title="Preços" subtitle="Defina os valores e aplique em todo o catálogo.">
+            <View style={styles.systemFieldGrid}>
+              {([30, 50, 100] as const).map((ml) => (
+                <View key={ml} style={styles.systemPriceField}>
+                  <Text style={styles.systemFieldLabel}>{ml} ML</Text>
+                  <TInput
+                    keyboardType="decimal-pad"
+                    value={priceInputs[ml]}
+                    onChangeText={(value) => setPriceInputs((current) => ({ ...current, [ml]: value }))}
+                    placeholder="0,00"
+                  />
+                </View>
+              ))}
+            </View>
+            <Field label="Margem de lucro de referência (%)">
+              <TInput
+                keyboardType="decimal-pad"
+                value={String(storeConfig.margemLucro).replace('.', ',')}
+                onChangeText={(value) => setStoreField('margemLucro', Number(value.replace(',', '.')) || 0)}
+                placeholder="0"
+              />
+            </Field>
+            <Pressable
+              disabled={savingPrices}
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: 'Aplicar os três preços informados em todos os perfumes e republicar a vitrine?',
+                onConfirm: () => applyPriceSizes([30, 50, 100]),
+                confirmLabel: 'Aplicar preços',
+              })}
+              style={styles.systemPrimaryButton}
+              testID="system-apply-all-prices"
+            >
+              <Feather name="refresh-cw" size={15} color={COLORS.ink} />
+              <Text style={styles.systemPrimaryText}>{savingPrices ? 'Aplicando…' : 'Aplicar para todos os perfumes'}</Text>
+            </Pressable>
+            <View style={styles.systemMiniActions}>
+              {([30, 50, 100] as const).map((ml) => (
+                <Pressable key={ml} onPress={() => applyPriceSizes([ml])} style={styles.systemMiniButton}>
+                  <Text style={styles.systemMiniText}>Somente {ml} ml</Text>
+                </Pressable>
+              ))}
+            </View>
+          </SystemCard>
+
+          <SystemCard icon="truck" title="Frete" subtitle="Valores exibidos ao cliente durante o pagamento.">
+            <View style={styles.shippingHeader}>
+              <Text style={styles.shippingTitle}>Melhor Envio</Text>
+              <View style={[styles.shippingStatus, freteConfig?.integrado && { borderColor: COLORS.sage }]}>
+                <View style={[styles.shippingStatusDot, { backgroundColor: freteConfig?.integrado ? COLORS.sage : COLORS.rust }]} />
+                <Text style={{ color: freteConfig?.integrado ? COLORS.sage : COLORS.muted, fontSize: 10 }}>
+                  {freteConfig?.integrado ? 'Conectado' : 'Aguardando conexão'}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.systemFieldGrid}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.systemFieldLabel}>CEP DE ORIGEM</Text>
+                <TInput keyboardType="numeric" maxLength={9} value={freteCepInput} onChangeText={setFreteCepInput} placeholder="00000-000" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.systemFieldLabel}>EMBALAGEM</Text>
+                <TInput keyboardType="decimal-pad" value={freteFeeInput} onChangeText={setFreteFeeInput} placeholder="0,00" />
+              </View>
+            </View>
+            <Field label="Frete grátis acima de (R$) · zero desativa">
+              <TInput keyboardType="decimal-pad" value={freteGratisInput} onChangeText={setFreteGratisInput} placeholder="0,00" />
+            </Field>
+            <Pressable onPress={saveFreteConfig} disabled={savingFrete} style={styles.systemPrimaryButton}>
+              <Feather name="save" size={15} color={COLORS.ink} />
+              <Text style={styles.systemPrimaryText}>{savingFrete ? 'Salvando…' : 'Salvar frete'}</Text>
+            </Pressable>
+            {!freteConfig?.integrado && (
+              <SystemAction icon="external-link" title="Conectar Melhor Envio" subtitle="Autorize a conta responsável pelas cotações." onPress={connectMelhorEnvio} />
+            )}
+          </SystemCard>
+
+          <SystemCard icon="archive" title="Fornecedores" subtitle="Importe e mantenha seu catálogo sincronizado.">
+            <View style={styles.supplierActive}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.supplierName}>Nova Essência</Text>
+                <Text style={styles.supplierMeta}>{PRESET_FORNECEDOR.length} fragrâncias disponíveis</Text>
+              </View>
+              <View style={styles.connectedPill}><Text style={styles.connectedPillText}>ATIVO</Text></View>
+            </View>
+            <SystemAction
+              icon="download-cloud"
+              title="Importar todos os perfumes"
+              subtitle="Adiciona somente os itens que ainda não existem."
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: `Importar e sincronizar ${PRESET_FORNECEDOR.length} fragrâncias da Nova Essência? Itens existentes serão preservados.`,
+                onConfirm: doImport,
+                confirmLabel: 'Sincronizar catálogo',
+              })}
+            />
+            <SystemAction icon="plus-circle" title="Essencial" subtitle="Novo fornecedor poderá ser conectado aqui." disabled badge="PLANEJADO" />
+            <SystemAction icon="plus-circle" title="Casa das Essências" subtitle="Novo fornecedor poderá ser conectado aqui." disabled badge="PLANEJADO" />
+          </SystemCard>
+
+          <SystemCard icon="database" title="Base de dados" subtitle="Backup e limpezas protegidas por confirmação.">
+            <SystemAction icon="download" title="Exportar backup" subtitle="Baixe uma cópia dos dados atuais." onPress={doBackup} />
+            <SystemAction icon="upload" title="Restaurar backup" subtitle="Importação validada de um arquivo anterior." disabled badge="PRÓXIMA ETAPA" />
+            <SystemAction
+              icon="trash-2"
+              title="Limpar pedidos"
+              subtitle="Remove testes e invalida o histórico nos aparelhos."
+              danger
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: 'Zerar toda a base de pedidos? As baixas automáticas serão estornadas e os históricos serão removidos dos aparelhos.',
+                onConfirm: doResetPedidos,
+                confirmLabel: 'Zerar pedidos',
+                danger: true,
+              })}
+            />
+            <SystemAction
+              icon="star"
+              title="Limpar avaliações"
+              subtitle="Remove opiniões e sugestões recebidas."
+              danger
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: 'Excluir todas as opiniões e sugestões? Esta ação não pode ser desfeita.',
+                onConfirm: () => clearSystemData('opinioes'),
+                confirmLabel: 'Limpar avaliações',
+                danger: true,
+              })}
+            />
+            <SystemAction
+              icon="package"
+              title="Limpar estoque"
+              subtitle="Remove todos os lançamentos de entrada e saída."
+              danger
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: 'Zerar todos os movimentos de estoque? O catálogo será preservado.',
+                onConfirm: () => clearSystemData('estoque'),
+                confirmLabel: 'Limpar estoque',
+                danger: true,
+              })}
+            />
+            <SystemAction
+              icon="alert-triangle"
+              title="Resetar catálogo"
+              subtitle="Remove perfumes, estoque e a vitrine publicada."
+              danger
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: 'Resetar todo o catálogo? Só será permitido se não houver pedidos ativos.',
+                onConfirm: () => clearSystemData('catalogo'),
+                confirmLabel: 'Resetar catálogo',
+                danger: true,
+              })}
+            />
+          </SystemCard>
+
+          <SystemCard icon="sliders" title="Configurações" subtitle="Dados institucionais e canais de contato.">
+            <Field label="Nome da loja"><TInput value={storeConfig.nomeLoja} onChangeText={(value) => setStoreField('nomeLoja', value)} /></Field>
+            <Field label="Logo (endereço da imagem)"><TInput value={storeConfig.logoUrl} onChangeText={(value) => setStoreField('logoUrl', value)} autoCapitalize="none" /></Field>
+            <View style={styles.systemFieldGrid}>
+              <View style={{ flex: 1 }}><Field label="WhatsApp"><TInput value={storeConfig.whatsapp} onChangeText={(value) => setStoreField('whatsapp', value)} keyboardType="phone-pad" /></Field></View>
+              <View style={{ flex: 1 }}><Field label="Instagram"><TInput value={storeConfig.instagram} onChangeText={(value) => setStoreField('instagram', value)} autoCapitalize="none" /></Field></View>
+            </View>
+            <Field label="E-mail"><TInput value={storeConfig.email} onChangeText={(value) => setStoreField('email', value)} keyboardType="email-address" autoCapitalize="none" /></Field>
+            <Field label="Chave Pix"><TInput value={storeConfig.pix} onChangeText={(value) => setStoreField('pix', value)} autoCapitalize="none" /></Field>
+            <Field label="CNPJ (opcional)"><TInput value={storeConfig.cnpj} onChangeText={(value) => setStoreField('cnpj', value)} keyboardType="numeric" /></Field>
+            <Pressable onPress={saveStoreConfig} disabled={savingStore} style={styles.systemPrimaryButton}>
+              <Feather name="save" size={15} color={COLORS.ink} />
+              <Text style={styles.systemPrimaryText}>{savingStore ? 'Salvando…' : 'Salvar configurações'}</Text>
+            </Pressable>
+          </SystemCard>
+
+          <SystemCard icon="zap" title="Automações" subtitle="Rotinas operacionais em um único lugar.">
+            <SystemAction icon="percent" title="Recalcular preços" subtitle="Preenche somente preços ausentes com o padrão atual." onPress={doPadronizar} />
+            <SystemAction icon="refresh-cw" title="Reimportar fornecedores" subtitle="Sincroniza novamente a Nova Essência." onPress={doImport} />
+            <SystemAction icon="package" title="Atualizar estoque" subtitle="Automação reservada para a próxima fase do estoque." disabled badge="PLANEJADO" />
+            <SystemAction icon="image" title="Corrigir imagens" subtitle="Auditoria automática de fotos ausentes." disabled badge="PLANEJADO" />
+            <SystemAction icon="tag" title="Gerar etiquetas" subtitle="Etiquetas prontas para impressão por pedido." disabled badge="PLANEJADO" />
+          </SystemCard>
+        </View>
+      );
+    }
+
     return null;
   };
 
@@ -1470,9 +1701,6 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           <Text style={{ color: COLORS.bone, fontSize: 22, fontWeight: '500' }}>Administração</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable onPress={doBackup} style={styles.topBtn} testID="backup-btn">
-            <Feather name="download" size={13} color={COLORS.gold} />
-          </Pressable>
           <Pressable
             onPress={() => setSheet({ type: 'confirm', label: `Publicar ${perfumes.filter((p) => p.publicavel !== false).length} contratipo(s) na vitrine?`, onConfirm: doPublish, confirmLabel: publicando ? 'Publicando…' : 'Publicar' })}
             style={styles.topBtn}
@@ -1494,7 +1722,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
         {renderContent()}
       </ScrollView>
 
-      {tab !== 'dashboard' && tab !== 'opinioes' && (
+      {tab !== 'dashboard' && tab !== 'opinioes' && tab !== 'sistema' && (
         <Pressable onPress={openCreate} style={styles.fab} testID="fab-add">
           <Feather name="plus" size={24} color={COLORS.ink} />
         </Pressable>
@@ -1566,6 +1794,34 @@ const styles = StyleSheet.create({
   shippingConnectButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginTop: SPACING.sm },
   shippingConnectText: { color: COLORS.gold, fontSize: 12 },
   shippingEnvironment: { color: COLORS.muted, fontSize: 9, textAlign: 'center', marginTop: 8 },
+  systemPage: { padding: SPACING.lg },
+  systemHero: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
+  systemHeroIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.ink },
+  systemEyebrow: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.4 },
+  systemTitle: { color: COLORS.bone, fontSize: 22, fontWeight: '600', marginTop: 1 },
+  systemIntro: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  systemCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
+  systemCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SPACING.md },
+  systemCardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
+  systemCardTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700' },
+  systemCardSubtitle: { color: COLORS.muted, fontSize: 10, lineHeight: 14, marginTop: 2 },
+  systemFieldGrid: { flexDirection: 'row', gap: 8, marginBottom: SPACING.sm },
+  systemPriceField: { flex: 1 },
+  systemFieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.7, marginBottom: 5 },
+  systemPrimaryButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, marginTop: SPACING.sm },
+  systemPrimaryText: { color: COLORS.ink, fontSize: 12, fontWeight: '700' },
+  systemMiniActions: { flexDirection: 'row', gap: 6, marginTop: 7 },
+  systemMiniButton: { flex: 1, minHeight: 35, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
+  systemMiniText: { color: COLORS.gold, fontSize: 9, fontWeight: '600', textAlign: 'center' },
+  systemAction: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
+  systemActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '600' },
+  systemActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
+  systemBadge: { color: COLORS.muted, fontSize: 8, letterSpacing: 0.5, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border },
+  supplierActive: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 4, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.gold + '44' },
+  supplierName: { color: COLORS.bone, fontSize: 13, fontWeight: '700' },
+  supplierMeta: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  connectedPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.sage + '88' },
+  connectedPillText: { color: COLORS.sage, fontSize: 8, fontWeight: '700', letterSpacing: 0.6 },
   orderDeliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, marginBottom: SPACING.md },
   orderDeliveryIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
   orderDeliveryTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '600' },

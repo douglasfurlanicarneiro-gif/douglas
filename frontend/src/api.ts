@@ -10,6 +10,7 @@ import type {
   Perfume,
   OpcaoFrete,
   ConfiguracaoFrete,
+  ConfiguracoesLoja,
   Sugestao,
 } from './types';
 
@@ -106,6 +107,13 @@ export const padronizarTamanhos = () => request<{
   atualizados: number;
   precosPadrao: { ml: number; preco: number }[];
 }>('/perfumes/padronizar-tamanhos', { method: 'POST' }, true);
+export const aplicarPrecos = (data: {
+  precos: { ml: number; preco: number }[];
+  tamanhos: number[];
+}) => request<{ atualizados: number; tamanhos: number[] }>('/perfumes/aplicar-precos', {
+  method: 'POST',
+  body: JSON.stringify(data),
+}, true);
 
 // Estoque
 export const listMovimentos = () => request<Movimento[]>('/movimentos', {}, true);
@@ -137,7 +145,7 @@ export const cotarFrete = (data: {
 });
 export const getConfiguracaoFrete = () =>
   request<ConfiguracaoFrete>('/frete/configuracao', {}, true);
-export const updateConfiguracaoFrete = (data: Pick<ConfiguracaoFrete, 'taxaEmbalagem' | 'cepOrigem'>) =>
+export const updateConfiguracaoFrete = (data: Pick<ConfiguracaoFrete, 'taxaEmbalagem' | 'cepOrigem' | 'freteGratisAcima'>) =>
   request<ConfiguracaoFrete>('/frete/configuracao', {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -187,6 +195,17 @@ export const resetAllOrders = () => request<{
   movimentosEstornados: number;
   resetVersion: number;
 }>('/admin/pedidos/reset', { method: 'POST' }, true);
+export const getConfiguracoesLoja = () =>
+  request<ConfiguracoesLoja>('/admin/configuracoes', {}, true);
+export const updateConfiguracoesLoja = (data: ConfiguracoesLoja) =>
+  request<ConfiguracoesLoja>('/admin/configuracoes', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, true);
+export const limparDados = (recurso: 'opinioes' | 'estoque' | 'catalogo') =>
+  request<{ status: string; removidos: number }>(`/admin/dados/${recurso}/limpar`, {
+    method: 'POST',
+  }, true);
 
 export async function downloadBackup(): Promise<void> {
   const token = await getToken();

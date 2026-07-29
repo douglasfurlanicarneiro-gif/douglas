@@ -4,8 +4,9 @@ import json
 from datetime import datetime, timezone
 
 from bson import ObjectId
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
 from database import get_db
@@ -15,6 +16,17 @@ from security import require_atelie_auth
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 PEDIDOS_RESET_ID = "pedidos-reset"
 PEDIDOS_RESET_VERSAO_INICIAL = 2
+
+
+class ConfiguracoesLojaIn(BaseModel):
+    nomeLoja: str = Field(default="L’Essence Furlani", max_length=120)
+    logoUrl: str = Field(default="", max_length=2000)
+    whatsapp: str = Field(default="", max_length=40)
+    instagram: str = Field(default="", max_length=120)
+    email: str = Field(default="", max_length=160)
+    pix: str = Field(default="", max_length=160)
+    cnpj: str = Field(default="", max_length=30)
+    margemLucro: float = Field(default=0, ge=0, le=10000)
 
 
 def _json_seguro(valor):
@@ -123,6 +135,69 @@ async def obter_metricas(_: str = Depends(require_atelie_auth)):
             for item in mais_vendidos
         ],
     }
+
+
+@router.get("/configuracoes")
+async def obter_configuracoes(_: str = Depends(require_atelie_auth)):
+    doc = await get_db().configuracoes.find_one({"_id": "loja"}) or {}
+    return ConfiguracoesLojaIn(**{
+        chave: doc.get(chave, padrao)
+        for chave, padrao in ConfiguracoesLojaIn().model_dump().items()
+    }).model_dump()
+
+
+@router.put("/configuracoes")
+async def salvar_configuracoes(
+    payload: ConfiguracoesLojaIn,
+    _: str = Depends(require_atelie_auth),
+):
+    dados = payload.model_dump()
+    dados["atualizadoEm"] = datetime.now(timezone.utc).isoformat()
+    await get_db().configuracoes.update_one(
+        {"_id": "loja"},
+        {"$set": dados},
+        upsert=True,
+    )
+    return payload.model_dump()
+
+
+@router.post("/dados/{recurso}/limpar")
+async def limpar_dados(recurso: str, _: str = Depends(require_atelie_auth)):
+    db = get_db()
+    if recurso == "opinioes":
+        opinioes = await db.opinioes.delete_many({})
+        sugestoes = await db.sugestoes.delete_many({})
+        return {
+            "status": "Opiniões e sugestões removidas.",
+            "removidos": opinioes.deleted_count + sugestoes.deleted_count,
+        }
+    if recurso == "estoque":
+        movimentos = await db.movimentos.delete_many({})
+        return {
+            "status": "Movimentos de estoque removidos.",
+            "removidos": movimentos.deleted_count,
+        }
+    if recurso == "catalogo":
+        pedidos_ativos = await db.pedidos.count_documents({
+            "status": {"$nin": ["cancelado", "entregue"]},
+        })
+        if pedidos_ativos:
+            raise HTTPException(
+                status_code=409,
+                detail="Conclua ou cancele os pedidos ativos antes de resetar o catálogo.",
+            )
+        perfumes = await db.perfumes.delete_many({})
+        await asyncio.gather(
+            db.movimentos.delete_many({}),
+            db.opinioes.delete_many({}),
+            db.vitrine.delete_many({}),
+            db.counters.delete_one({"_id": "perfumes"}),
+        )
+        return {
+            "status": "Catálogo resetado.",
+            "removidos": perfumes.deleted_count,
+        }
+    raise HTTPException(status_code=404, detail="Ação de limpeza não encontrada.")
 
 
 @router.get("/pedidos/reset-version")

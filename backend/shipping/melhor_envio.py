@@ -69,6 +69,7 @@ async def configuracao_frete(db) -> dict[str, Any]:
             2,
         ),
         "cepOrigem": str((saved or {}).get("cepOrigem", MELHOR_ENVIO_FROM_CEP)),
+        "freteGratisAcima": round(float((saved or {}).get("freteGratisAcima", 0)), 2),
     }
 
 
@@ -77,6 +78,7 @@ async def salvar_configuracao_frete(
     *,
     taxa_embalagem: float,
     cep_origem: str,
+    frete_gratis_acima: float = 0,
 ) -> dict[str, Any]:
     await db.configuracoes.update_one(
         {"_id": "frete"},
@@ -84,6 +86,7 @@ async def salvar_configuracao_frete(
             "$set": {
                 "taxaEmbalagem": round(taxa_embalagem, 2),
                 "cepOrigem": cep_origem,
+                "freteGratisAcima": round(frete_gratis_acima, 2),
                 "atualizadoEm": datetime.now(timezone.utc).isoformat(),
             }
         },
@@ -306,6 +309,12 @@ async def cotar_frete(
         )
 
     taxa = round(float(config["taxaEmbalagem"]), 2)
+    subtotal = round(sum(
+        float(item["precoUnitario"]) * int(item["quantidade"])
+        for item in itens
+    ), 2)
+    limite_gratis = round(float(config.get("freteGratisAcima", 0)), 2)
+    frete_gratis = limite_gratis > 0 and subtotal >= limite_gratis
     opcoes: list[dict[str, Any]] = []
     for raw in response.json():
         if raw.get("error"):
@@ -328,7 +337,8 @@ async def cotar_frete(
                 "servico": str(raw.get("name") or "Entrega"),
                 "precoTransportadora": round(preco_transportadora, 2),
                 "taxaEmbalagem": taxa,
-                "preco": round(preco_transportadora + taxa, 2),
+                "preco": 0.0 if frete_gratis else round(preco_transportadora + taxa, 2),
+                "freteGratis": frete_gratis,
                 "prazoDias": prazo,
             }
         )

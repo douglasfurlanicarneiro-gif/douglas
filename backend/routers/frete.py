@@ -36,6 +36,7 @@ class CotacaoFreteIn(BaseModel):
 class ConfiguracaoFreteIn(BaseModel):
     taxaEmbalagem: float = Field(ge=0, le=1000)
     cepOrigem: str = Field(min_length=8, max_length=9)
+    freteGratisAcima: float = Field(default=0, ge=0, le=1_000_000)
 
 
 async def itens_para_cotacao(db, itens: list[ItemFreteIn]) -> list[dict[str, Any]]:
@@ -110,6 +111,7 @@ async def atualizar_configuracao(
         db,
         taxa_embalagem=payload.taxaEmbalagem,
         cep_origem=cep,
+        frete_gratis_acima=payload.freteGratisAcima,
     )
     return {**config, **(await status_integracao(db))}
 

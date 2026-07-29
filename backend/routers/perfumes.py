@@ -191,6 +191,11 @@ class BulkImportPayload(BaseModel):
     nomes: List[str]
 
 
+class AplicarPrecosPayload(BaseModel):
+    precos: List[Preco] = Field(min_length=1, max_length=3)
+    tamanhos: List[int] = Field(default_factory=list, max_length=3)
+
+
 @router.post("/bulk-import")
 async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_atelie_auth)):
     db = get_db()
@@ -224,6 +229,40 @@ async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_ateli
         })
         adicionados += 1
     return {"adicionados": adicionados}
+
+
+@router.post("/aplicar-precos")
+async def aplicar_precos(payload: AplicarPrecosPayload, _: str = Depends(require_atelie_auth)):
+    """Aplica os preços escolhidos aos tamanhos selecionados em todo o catálogo."""
+    db = get_db()
+    precos_informados = {preco.ml: preco.preco for preco in payload.precos}
+    tamanhos = set(payload.tamanhos or precos_informados.keys())
+    if not tamanhos or not tamanhos.issubset(precos_informados.keys()):
+        raise HTTPException(status_code=400, detail="Informe um preço para cada tamanho selecionado.")
+
+    atualizados = 0
+    async for perfume in db.perfumes.find():
+        atuais = {
+            int(item.get("ml", 0)): float(item.get("preco", 0))
+            for item in perfume.get("precos", [])
+            if item.get("ml")
+        }
+        for ml in tamanhos:
+            atuais[ml] = float(precos_informados[ml])
+        novos = [
+            {"ml": ml, "preco": preco}
+            for ml, preco in sorted(atuais.items())
+        ]
+        await db.perfumes.update_one(
+            {"_id": perfume["_id"]},
+            {"$set": {"precos": novos}},
+        )
+        atualizados += 1
+
+    return {
+        "atualizados": atualizados,
+        "tamanhos": sorted(tamanhos),
+    }
 
 
 @router.post("/padronizar-tamanhos")

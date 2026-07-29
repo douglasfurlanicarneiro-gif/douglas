@@ -215,7 +215,19 @@ export type CheckoutPayload = {
 export type ConfiguracaoFrete = {
   taxaEmbalagem: number;
   cepOrigem: string;
+  freteGratisAcima: number;
   integrado: boolean;
   aplicativoConfigurado: boolean;
   ambiente: 'sandbox' | 'producao';
+};
+
+export type ConfiguracoesLoja = {
+  nomeLoja: string;
+  logoUrl: string;
+  whatsapp: string;
+  instagram: string;
+  email: string;
+  pix: string;
+  cnpj: string;
+  margemLucro: number;
 };
