@@ -36,12 +36,15 @@ function CustomerOrderSwipe({
     }).start();
   }, [translateX]);
 
+  const shouldCaptureHorizontalDrag = useCallback((gesture: { dx: number; dy: number }) => (
+    enabled
+    && Math.abs(gesture.dx) > 6
+    && Math.abs(gesture.dx) > Math.abs(gesture.dy)
+  ), [enabled]);
+
   const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_, gesture) => (
-      enabled
-      && Math.abs(gesture.dx) > 8
-      && Math.abs(gesture.dx) > Math.abs(gesture.dy)
-    ),
+    onMoveShouldSetPanResponder: (_, gesture) => shouldCaptureHorizontalDrag(gesture),
+    onMoveShouldSetPanResponderCapture: (_, gesture) => shouldCaptureHorizontalDrag(gesture),
     onPanResponderGrant: () => {
       dragStartRef.current = openRef.current ? -CUSTOMER_ORDER_ACTION_WIDTH : 0;
     },
@@ -57,7 +60,8 @@ function CustomerOrderSwipe({
       animateTo(finalPosition < -(CUSTOMER_ORDER_ACTION_WIDTH / 2) || gesture.vx < -0.35);
     },
     onPanResponderTerminate: () => animateTo(openRef.current),
-  }), [animateTo, enabled, translateX]);
+    onPanResponderTerminationRequest: () => false,
+  }), [animateTo, shouldCaptureHorizontalDrag, translateX]);
 
   return (
     <View style={styles.customerSwipeWrap} testID={testID}>
@@ -538,10 +542,16 @@ export function OrdersSheet({
               </View>
             )}
             {order.status === 'cancelado' && removeConfirmCode !== order.codigoAcompanhamento && (
-              <View style={styles.removeOrderHint}>
+              <Pressable
+                onPress={() => setRemoveConfirmCode(order.codigoAcompanhamento)}
+                style={({ pressed }) => [styles.removeOrderHint, pressed && { opacity: 0.72 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Remover pedido cancelado deste aparelho"
+                testID={`order-remove-open-${order.codigoAcompanhamento}`}
+              >
                 <Feather name="chevrons-left" size={14} color={COLORS.muted} />
-                <Text style={styles.removeOrderHintText}>Deslize para remover deste aparelho</Text>
-              </View>
+                <Text style={styles.removeOrderHintText}>Deslize ou toque para remover deste aparelho</Text>
+              </Pressable>
             )}
             {order.status === 'cancelado' && removeConfirmCode === order.codigoAcompanhamento && (
               <View style={styles.removeConfirm}>
@@ -604,7 +614,7 @@ const styles = StyleSheet.create({
   resultName: { color: COLORS.bone, fontSize: 14, fontWeight: '600' },
   resultMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   orderCard: { backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md },
-  customerSwipeWrap: { position: 'relative', overflow: 'hidden', borderRadius: RADIUS.lg, marginBottom: SPACING.md },
+  customerSwipeWrap: { position: 'relative', overflow: 'hidden', borderRadius: RADIUS.lg, marginBottom: SPACING.md, userSelect: 'none' },
   customerSwipeActions: { ...StyleSheet.absoluteFillObject, alignItems: 'flex-end', justifyContent: 'stretch', borderRadius: RADIUS.lg, overflow: 'hidden' },
   customerSwipeRemove: { width: CUSTOMER_ORDER_ACTION_WIDTH, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.rust },
   customerSwipeRemoveText: { color: COLORS.bone, fontSize: 11, fontWeight: '700' },
