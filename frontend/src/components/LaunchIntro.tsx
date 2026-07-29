@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS } from '../theme';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -20,6 +19,7 @@ export function LaunchIntro({
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.94)).current;
   const captionOpacity = useRef(new Animated.Value(0)).current;
+  const captionTranslateY = useRef(new Animated.Value(8)).current;
   const shineOpacity = useRef(new Animated.Value(0)).current;
   const shineProgress = useRef(new Animated.Value(0)).current;
 
@@ -69,12 +69,20 @@ export function LaunchIntro({
         }),
         Animated.sequence([
           Animated.delay(150),
-          Animated.timing(captionOpacity, {
-            toValue: 1,
-            duration: 350,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
+          Animated.parallel([
+            Animated.timing(captionOpacity, {
+              toValue: 1,
+              duration: 350,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.timing(captionTranslateY, {
+              toValue: 0,
+              duration: 430,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+          ]),
         ]),
       ]),
       Animated.parallel([
@@ -122,7 +130,7 @@ export function LaunchIntro({
     });
 
     return () => animation.stop();
-  }, [captionOpacity, logoOpacity, logoReady, logoScale, onFinish, overlayOpacity, shineOpacity, shineProgress]);
+  }, [captionOpacity, captionTranslateY, logoOpacity, logoReady, logoScale, onFinish, overlayOpacity, shineOpacity, shineProgress]);
 
   return (
     <Animated.View
@@ -168,10 +176,28 @@ export function LaunchIntro({
           ]}
         />
       </View>
-      <Animated.View style={[styles.captionWrap, { opacity: captionOpacity }]}>
-        <View style={styles.captionLine} />
-        <Text style={styles.caption}>UMA EXPERIÊNCIA EM PERFUMARIA</Text>
-        <View style={styles.captionLine} />
+      <Animated.View
+        style={[
+          styles.captionWrap,
+          {
+            opacity: captionOpacity,
+            transform: [{ translateY: captionTranslateY }],
+          },
+        ]}
+      >
+        <LinearGradient
+          colors={['rgba(199, 162, 92, 0)', 'rgba(239, 211, 157, 0.95)']}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.captionLine}
+        />
+        <Text style={styles.caption} numberOfLines={1}>UMA EXPERIÊNCIA EM PERFUMARIA</Text>
+        <LinearGradient
+          colors={['rgba(239, 211, 157, 0.95)', 'rgba(199, 162, 92, 0)']}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.captionLine}
+        />
       </Animated.View>
     </Animated.View>
   );
@@ -209,20 +235,30 @@ const styles = StyleSheet.create({
   },
   captionWrap: {
     position: 'absolute',
-    bottom: '10%',
+    bottom: '9%',
+    width: '88%',
+    maxWidth: 500,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    justifyContent: 'center',
+    gap: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   captionLine: {
-    width: 28,
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: COLORS.gold,
-    opacity: 0.65,
+    flex: 1,
+    maxWidth: 54,
+    height: 1,
   },
   caption: {
-    color: COLORS.gold,
-    fontSize: 8,
-    letterSpacing: 2.1,
+    color: '#EFD39D',
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '600',
+    letterSpacing: 2.7,
+    textAlign: 'center',
+    textShadowColor: 'rgba(239, 211, 157, 0.28)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 9,
   },
 });
