@@ -488,7 +488,7 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
   );
 }
 
-function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
+function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
   const [f, setF] = useState<any>(initial || { cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [] });
   const pedidoRecebido = Boolean(initial?.id);
   const [searchingIdx, setSearchingIdx] = useState<number | null>(null);
@@ -641,6 +641,29 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
         <SecondaryButton label="Cancelar" onPress={onCancel} />
         <PrimaryButton label="Salvar pedido" onPress={() => f.cliente.trim() && f.itens.length > 0 && onSave({ ...f, total })} disabled={!f.cliente.trim() || f.itens.length === 0} testID="pedido-save" />
       </View>
+      {pedidoRecebido && initial?.status !== 'cancelado' && (
+        <Pressable
+          onPress={() => onSave({ ...f, status: 'cancelado', total })}
+          style={styles.cancelAdminOrderButton}
+          testID="pedido-cancelar"
+        >
+          <Feather name="x-circle" size={16} color={COLORS.rust} />
+          <Text style={styles.cancelAdminOrderText}>Cancelar pedido</Text>
+        </Pressable>
+      )}
+      {pedidoRecebido && initial?.status === 'cancelado' && (
+        <Pressable
+          onPress={() => onDelete(initial)}
+          style={styles.deleteAdminOrderButton}
+          testID="pedido-excluir-definitivamente"
+        >
+          <Feather name="trash-2" size={16} color={COLORS.bone} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.deleteAdminOrderTitle}>Excluir definitivamente</Text>
+            <Text style={styles.deleteAdminOrderHint}>Remove o pedido e seu histórico do painel.</Text>
+          </View>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -866,6 +889,16 @@ export function Atelie({ onSair }: { onSair: () => void }) {
     await persistPedido(data);
   };
   const doDelPedido = async (id: string) => { await deletePedido(id); setSheet(null); load(); };
+  const requestDeletePedido = (pedido: Pedido) => {
+    setSheet({
+      type: 'confirm',
+      label: `Excluir definitivamente o pedido Nº ${padSeq(pedido.seq)} de ${pedido.cliente}?`,
+      onConfirm: () => doDelPedido(pedido.id),
+      confirmLabel: 'Excluir definitivamente',
+      danger: true,
+      safetyText: 'Esta ação não pode ser desfeita. O pedido, o acompanhamento do cliente e todo o histórico serão removidos.',
+    });
+  };
   const doDelOpiniao = async (id: string) => { await deleteOpiniao(id); setSheet(null); load(); };
   const doPublish = async () => {
     setPublicando(true);
@@ -1482,7 +1515,15 @@ export function Atelie({ onSair }: { onSair: () => void }) {
       <BottomSheet visible={!!sheet} onClose={() => setSheet(null)} title={sheetTitle}>
         {sheet?.type === 'perfume' && <PerfumeForm initial={sheet.data} onSave={doSavePerfume} onCancel={() => setSheet(null)} />}
         {sheet?.type === 'movimento' && <MovimentoForm perfumes={perfumes} onSave={doMov} onCancel={() => setSheet(null)} />}
-        {sheet?.type === 'pedido' && <PedidoForm perfumes={perfumes} initial={sheet.data} onSave={doSavePedido} onCancel={() => setSheet(null)} />}
+        {sheet?.type === 'pedido' && (
+          <PedidoForm
+            perfumes={perfumes}
+            initial={sheet.data}
+            onSave={doSavePedido}
+            onCancel={() => setSheet(null)}
+            onDelete={requestDeletePedido}
+          />
+        )}
         {sheet?.type === 'confirm' && (
           <ConfirmSheetContent sheet={sheet} onCancel={() => setSheet(null)} />
         )}
@@ -1610,6 +1651,11 @@ const styles = StyleSheet.create({
   confirmPaymentButton: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
   confirmPaymentTitle: { color: COLORS.ink, fontSize: 13, fontWeight: '700' },
   confirmPaymentHint: { color: COLORS.ink, opacity: 0.72, fontSize: 10, marginTop: 2 },
+  cancelAdminOrderButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '80' },
+  cancelAdminOrderText: { color: COLORS.rust, fontSize: 12, fontWeight: '700' },
+  deleteAdminOrderButton: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
+  deleteAdminOrderTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
+  deleteAdminOrderHint: { color: COLORS.bone, opacity: 0.78, fontSize: 10, marginTop: 2 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.ink },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },

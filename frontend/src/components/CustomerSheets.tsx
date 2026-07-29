@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { acompanharPedido } from '../api';
+import { acompanharPedido, cancelarPedidoCliente } from '../api';
 import { brl, COLORS, familiasDoPerfume, fmtDate, nomeConcentracao, OCASIOES, RADIUS, SPACING, STATUS } from '../theme';
 import type { Acompanhamento, Perfume } from '../types';
 import { BottomSheet } from './BottomSheet';
@@ -187,6 +187,9 @@ export function OrdersSheet({
   const [recoveryCode, setRecoveryCode] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [recovering, setRecovering] = useState(false);
+  const [cancelConfirmCode, setCancelConfirmCode] = useState<string | null>(null);
+  const [cancellingCode, setCancellingCode] = useState<string | null>(null);
+  const [cancelError, setCancelError] = useState('');
 
   useEffect(() => {
     if (!visible || !codes.length) return;
@@ -278,6 +281,24 @@ export function OrdersSheet({
       `Código de acompanhamento: ${order.codigoAcompanhamento}.`,
     ].join('\n');
     Linking.openURL(`https://wa.me/${SUPPORT_WHATSAPP}?text=${encodeURIComponent(message)}`).catch(() => undefined);
+  };
+
+  const cancelOrder = async (order: Acompanhamento) => {
+    setCancellingCode(order.codigoAcompanhamento);
+    setCancelError('');
+    try {
+      const updated = await cancelarPedidoCliente(order.codigoAcompanhamento);
+      setOrders((current) => current.map((item) => (
+        item.codigoAcompanhamento === updated.codigoAcompanhamento ? updated : item
+      )));
+      setCancelConfirmCode(null);
+    } catch (error) {
+      setCancelError(error instanceof Error
+        ? error.message
+        : 'Não foi possível cancelar o pedido. Tente novamente.');
+    } finally {
+      setCancellingCode(null);
+    }
   };
 
   return (
@@ -376,6 +397,53 @@ export function OrdersSheet({
               </Pressable>
             )}
             <SecondaryButton label="Comprar novamente" onPress={() => onRebuy(order)} />
+            {order.status === 'pendente' && cancelConfirmCode !== order.codigoAcompanhamento && (
+              <Pressable
+                onPress={() => {
+                  setCancelError('');
+                  setCancelConfirmCode(order.codigoAcompanhamento);
+                }}
+                style={styles.cancelOrderLink}
+                testID={`order-cancel-${order.codigoAcompanhamento}`}
+              >
+                <Text style={styles.cancelOrderLinkText}>Cancelar pedido</Text>
+              </Pressable>
+            )}
+            {order.status === 'pendente' && cancelConfirmCode === order.codigoAcompanhamento && (
+              <View style={styles.cancelConfirm}>
+                <View style={styles.cancelConfirmTitleRow}>
+                  <Feather name="alert-circle" size={17} color={COLORS.rust} />
+                  <Text style={styles.cancelConfirmTitle}>Cancelar este pedido?</Text>
+                </View>
+                <Text style={styles.cancelConfirmText}>
+                  O atendimento será interrompido, mas o pedido continuará visível no seu histórico.
+                </Text>
+                {!!cancelError && <Text style={styles.cancelError}>{cancelError}</Text>}
+                <View style={styles.cancelConfirmActions}>
+                  <SecondaryButton
+                    label="Manter pedido"
+                    onPress={() => {
+                      setCancelConfirmCode(null);
+                      setCancelError('');
+                    }}
+                  />
+                  <Pressable
+                    onPress={() => cancelOrder(order)}
+                    disabled={cancellingCode === order.codigoAcompanhamento}
+                    style={({ pressed }) => [
+                      styles.cancelConfirmButton,
+                      pressed && { opacity: 0.85 },
+                      cancellingCode === order.codigoAcompanhamento && { opacity: 0.55 },
+                    ]}
+                    testID={`order-cancel-confirm-${order.codigoAcompanhamento}`}
+                  >
+                    <Text style={styles.cancelConfirmButtonText}>
+                      {cancellingCode === order.codigoAcompanhamento ? 'Cancelando…' : 'Sim, cancelar'}
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
           </View>
         );
       })}
@@ -426,6 +494,16 @@ const styles = StyleSheet.create({
   timelineDate: { color: COLORS.muted, fontSize: 10 },
   whatsappButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: SPACING.md, marginTop: SPACING.md, marginBottom: 8, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
   whatsappButtonText: { color: COLORS.ink, fontSize: 13, fontWeight: '700' },
+  cancelOrderLink: { minHeight: 42, alignItems: 'center', justifyContent: 'center', marginTop: 5 },
+  cancelOrderLinkText: { color: COLORS.rust, fontSize: 12, fontWeight: '600' },
+  cancelConfirm: { marginTop: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '70', backgroundColor: COLORS.surface },
+  cancelConfirmTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  cancelConfirmTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '700' },
+  cancelConfirmText: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 7 },
+  cancelError: { color: COLORS.rust, fontSize: 11, lineHeight: 16, marginTop: 7 },
+  cancelConfirmActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.md },
+  cancelConfirmButton: { flex: 1, minHeight: 45, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
+  cancelConfirmButtonText: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
   emptyOrdersContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACING.lg },
   emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg, transform: [{ translateY: -30 }] },
   emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },

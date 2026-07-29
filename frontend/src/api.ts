@@ -173,6 +173,10 @@ export const deleteCompra = (id: string) => request<{ status: string }>(`/compra
 // Experiência e operação
 export const acompanharPedido = (codigo: string) =>
   request<Acompanhamento>(`/acompanhamento/${encodeURIComponent(codigo)}`);
+export const cancelarPedidoCliente = (codigo: string) =>
+  request<Acompanhamento>(`/acompanhamento/${encodeURIComponent(codigo)}/cancelar`, {
+    method: 'POST',
+  });
 export const getMetricas = () => request<Metricas>('/admin/metricas', {}, true);
 export const getOrdersResetVersion = () =>
   request<{ version: number }>('/admin/pedidos/reset-version');
