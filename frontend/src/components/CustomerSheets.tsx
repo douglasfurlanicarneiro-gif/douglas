@@ -336,11 +336,16 @@ export function OrdersSheet({
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bodyText}>
-                    {order.entrega.transportadora} · {order.entrega.servico}
+                    {order.entrega.tipo === 'retirada'
+                      ? 'Retirada no ateliê · Grátis'
+                      : `${order.entrega.transportadora} · ${order.entrega.servico}`}
                   </Text>
                   <Text style={styles.orderItemMeta}>
-                    {brl(order.entrega.preco)} · previsão de {order.entrega.prazoDias}{' '}
-                    {order.entrega.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
+                    {order.entrega.tipo === 'retirada'
+                      ? 'Combinaremos o horário pelo WhatsApp'
+                      : `${brl(order.entrega.preco)} · previsão de ${order.entrega.prazoDias} ${
+                          order.entrega.prazoDias === 1 ? 'dia útil' : 'dias úteis'
+                        }`}
                   </Text>
                 </View>
               </View>

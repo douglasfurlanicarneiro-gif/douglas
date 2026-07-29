@@ -123,6 +123,7 @@ export type CompraItem = {
 };
 
 export type OpcaoFrete = {
+  tipo?: 'entrega' | 'retirada';
   serviceId: number;
   transportadora: string;
   servico: string;
@@ -193,7 +194,7 @@ export type CheckoutPayload = {
   nomeCompleto: string;
   whatsapp: string;
   email: string;
-  endereco: {
+  endereco?: {
     cep: string;
     endereco: string;
     numero: string;
@@ -204,7 +205,8 @@ export type CheckoutPayload = {
   };
   formaPagamento: 'pix' | 'cartao';
   observacoes: string;
-  freteEscolhido: {
+  tipoEntrega: 'entrega' | 'retirada';
+  freteEscolhido?: {
     serviceId: number;
   };
 };

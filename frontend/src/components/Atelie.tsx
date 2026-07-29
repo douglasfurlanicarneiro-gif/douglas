@@ -596,11 +596,16 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.orderDeliveryTitle}>
-              {initial.entrega.transportadora} · {initial.entrega.servico}
+              {initial.entrega.tipo === 'retirada'
+                ? 'Retirada no ateliê · Grátis'
+                : `${initial.entrega.transportadora} · ${initial.entrega.servico}`}
             </Text>
             <Text style={styles.orderDeliveryMeta}>
-              {brl(initial.frete || initial.entrega.preco)} · prazo estimado de {initial.entrega.prazoDias}{' '}
-              {initial.entrega.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
+              {initial.entrega.tipo === 'retirada'
+                ? 'O cliente combinará o horário pelo WhatsApp'
+                : `${brl(initial.frete || initial.entrega.preco)} · prazo estimado de ${initial.entrega.prazoDias} ${
+                    initial.entrega.prazoDias === 1 ? 'dia útil' : 'dias úteis'
+                  }`}
             </Text>
           </View>
         </View>

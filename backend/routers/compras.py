@@ -58,6 +58,7 @@ class CompraIn(BaseModel):
     email: Optional[EmailStr] = None
     endereco: Optional[EnderecoIn] = None
     formaPagamento: Optional[Literal["pix", "cartao"]] = None
+    tipoEntrega: Literal["entrega", "retirada"] = "entrega"
     freteEscolhido: Optional[FreteEscolhidoIn] = None
 
     @model_validator(mode="after")
@@ -69,11 +70,14 @@ class CompraIn(BaseModel):
                 self.nomeCompleto,
                 self.whatsapp,
                 self.email,
-                self.endereco,
                 self.formaPagamento,
             )
             if not all(obrigatorios):
                 raise ValueError("Complete o cadastro e escolha a forma de pagamento.")
+            if self.tipoEntrega == "entrega" and not (
+                self.endereco and self.freteEscolhido
+            ):
+                raise ValueError("Informe o endereço e escolha uma opção de entrega.")
         return self
 
 
@@ -140,7 +144,7 @@ async def _criar_compra(payload: CompraIn):
     doc["subtotal"] = round(total, 2)
     doc["frete"] = 0.0
     doc["entrega"] = None
-    if payload.freteEscolhido:
+    if payload.tipoEntrega == "entrega" and payload.freteEscolhido:
         if not payload.endereco:
             raise HTTPException(status_code=400, detail="Informe o endereço de entrega.")
         try:
@@ -165,7 +169,19 @@ async def _criar_compra(payload: CompraIn):
                 detail="A opção de entrega escolhida não está mais disponível. Calcule novamente.",
             )
         doc["frete"] = escolha["preco"]
-        doc["entrega"] = escolha
+        doc["entrega"] = {**escolha, "tipo": "entrega"}
+    elif payload.tipoEntrega == "retirada":
+        doc["endereco"] = None
+        doc["entrega"] = {
+            "tipo": "retirada",
+            "serviceId": 0,
+            "transportadora": "Retirada no ateliê",
+            "servico": "Grátis",
+            "precoTransportadora": 0.0,
+            "taxaEmbalagem": 0.0,
+            "preco": 0.0,
+            "prazoDias": 0,
+        }
     doc["total"] = round(total + doc["frete"], 2)
     agora = datetime.now(timezone.utc).isoformat()
     doc["data"] = agora
@@ -181,17 +197,19 @@ async def _criar_compra(payload: CompraIn):
     # GET /api/clientes/por-contato/{contato} antes de abrir o formulário).
     identificador = payload.whatsapp or payload.contato
     if payload.nomeCompleto and identificador:
+        dados_cliente: dict[str, object] = {
+            "contato": identificador,
+            "nomeCompleto": payload.nomeCompleto,
+            "telefone": payload.telefone or payload.whatsapp,
+            "whatsapp": payload.whatsapp,
+            "email": payload.email,
+            "atualizadoEm": agora,
+        }
+        if payload.endereco:
+            dados_cliente["endereco"] = payload.endereco.model_dump()
         await db.clientes.update_one(
             {"contato": identificador},
-            {"$set": {
-                "contato": identificador,
-                "nomeCompleto": payload.nomeCompleto,
-                "telefone": payload.telefone or payload.whatsapp,
-                "whatsapp": payload.whatsapp,
-                "email": payload.email,
-                "endereco": payload.endereco.model_dump() if payload.endereco else None,
-                "atualizadoEm": agora,
-            }},
+            {"$set": dados_cliente},
             upsert=True,
         )
 
