@@ -214,11 +214,12 @@ export function CheckoutSheet({
       .finally(() => setCepLoading(false));
   };
 
+  const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
   const dadosCompletos = Boolean(
     items.length &&
     form.nomeCompleto.trim().length >= 2 &&
     form.whatsapp.trim().length >= 8 &&
-    form.email.includes('@')
+    emailValido
   );
 
   const enderecoCompleto = Boolean(
@@ -409,7 +410,19 @@ export function CheckoutSheet({
             </Text>
             <Field label="Nome completo"><TInput value={form.nomeCompleto} onChangeText={(nomeCompleto) => setForm({ ...form, nomeCompleto })} /></Field>
             <Field label="Celular / WhatsApp"><TInput keyboardType="phone-pad" autoComplete="tel" value={form.whatsapp} onChangeText={(whatsapp) => setForm({ ...form, whatsapp })} /></Field>
-            <Field label="E-mail"><TInput keyboardType="email-address" autoCapitalize="none" value={form.email} onChangeText={(email) => setForm({ ...form, email })} /></Field>
+            <Field label="E-mail">
+              <TInput
+                keyboardType="email-address"
+                autoCapitalize="none"
+                value={form.email}
+                onChangeText={(email) => setForm({ ...form, email })}
+              />
+              {!!form.email && !emailValido && (
+                <Text style={{ color: COLORS.rust, fontSize: 11, marginTop: 5 }}>
+                  Informe um e-mail válido, como nome@exemplo.com.
+                </Text>
+              )}
+            </Field>
 
             <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
               <SecondaryButton label="Continuar comprando" onPress={onClose} />

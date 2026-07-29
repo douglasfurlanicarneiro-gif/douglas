@@ -33,6 +33,30 @@ export class ApiError extends Error {
   }
 }
 
+function apiErrorMessage(body: unknown): string {
+  if (!body || typeof body !== 'object' || !('detail' in body)) return '';
+  const detail = (body as { detail?: unknown }).detail;
+  if (typeof detail === 'string') return detail;
+
+  if (Array.isArray(detail)) {
+    const messages = detail.flatMap((item) => {
+      if (!item || typeof item !== 'object') return [];
+      const error = item as { loc?: unknown; msg?: unknown };
+      const location = Array.isArray(error.loc) ? error.loc.map(String) : [];
+      if (location.includes('email')) return ['Informe um e-mail válido.'];
+      if (typeof error.msg !== 'string') return [];
+      return [error.msg.replace(/^Value error,\s*/i, '')];
+    });
+    return [...new Set(messages)].join(' ');
+  }
+
+  if (detail && typeof detail === 'object' && 'message' in detail) {
+    const message = (detail as { message?: unknown }).message;
+    return typeof message === 'string' ? message : '';
+  }
+  return '';
+}
+
 // Token do Ateliê guardado no armazenamento seguro (Keychain/EncryptedSharedPreferences),
 // não em AsyncStorage puro — é uma credencial de acesso ao painel administrativo.
 export async function saveToken(token: string) { await storage.secureSet(TOKEN_KEY, token); }
@@ -53,7 +77,7 @@ async function request<T>(path: string, opts: RequestInit = {}, needsAuth = fals
     const response = await fetch(`${API}${path}`, { ...opts, headers, signal: controller.signal });
     const body = await response.json().catch(() => null);
     if (!response.ok) {
-      const detail = body && typeof body === 'object' && 'detail' in body ? String(body.detail) : '';
+      const detail = apiErrorMessage(body);
       throw new ApiError(detail || 'Não foi possível concluir a solicitação.', response.status);
     }
     return body as T;

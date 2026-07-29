@@ -35,6 +35,14 @@ def test_entrega_exige_endereco_e_opcao_de_frete():
         CompraIn(**payload_base(), tipoEntrega="entrega")
 
 
+def test_checkout_rejeita_email_incompleto():
+    payload = payload_base()
+    payload["email"] = "@"
+
+    with pytest.raises(ValidationError):
+        CompraIn(**payload, tipoEntrega="retirada")
+
+
 def test_entrega_aceita_endereco_e_frete():
     compra = CompraIn(
         **payload_base(),
