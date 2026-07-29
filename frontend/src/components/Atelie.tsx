@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl, useWindowDimensions } from 'react-native';
+import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl, useWindowDimensions, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -16,9 +16,10 @@ import {
   listOpinioes, deleteOpiniao,
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
   downloadBackup, getMetricas, resetAllOrders,
+  getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
-import type { Compra, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
+import type { Compra, ConfiguracaoFrete, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
@@ -505,7 +506,8 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
     const p = perfumes.find((pf: any) => pf.id === it.perfumeId);
     return p?.precos.find((pr: any) => pr.ml === Number(it.ml))?.preco || 0;
   };
-  const total = f.itens.reduce((s: number, it: any) => s + precoDo(it) * it.quantidade, 0);
+  const totalProdutos = f.itens.reduce((s: number, it: any) => s + precoDo(it) * it.quantidade, 0);
+  const total = totalProdutos + Number(f.frete || 0);
   const filtrados = perfumes.filter((p: any) => p.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
   return (
     <View>
@@ -587,6 +589,22 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
         );
       })}
       {!pedidoRecebido && <Pressable onPress={addItem} testID="pedido-add-item"><Text style={{ color: COLORS.gold, fontSize: 12, marginBottom: SPACING.md }}>+ adicionar item</Text></Pressable>}
+      {pedidoRecebido && initial?.entrega && (
+        <View style={styles.orderDeliveryCard}>
+          <View style={styles.orderDeliveryIcon}>
+            <Feather name="truck" size={17} color={COLORS.gold} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderDeliveryTitle}>
+              {initial.entrega.transportadora} · {initial.entrega.servico}
+            </Text>
+            <Text style={styles.orderDeliveryMeta}>
+              {brl(initial.frete || initial.entrega.preco)} · prazo estimado de {initial.entrega.prazoDias}{' '}
+              {initial.entrega.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
+            </Text>
+          </View>
+        </View>
+      )}
       <Field label="Status">
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           {STATUS.map((s) => (
@@ -638,6 +656,10 @@ export function Atelie({ onSair }: { onSair: () => void }) {
   const [search, setSearch] = useState('');
   const [publicando, setPublicando] = useState(false);
   const [metricas, setMetricas] = useState<Metricas | null>(null);
+  const [freteConfig, setFreteConfig] = useState<ConfiguracaoFrete | null>(null);
+  const [freteFeeInput, setFreteFeeInput] = useState('0,00');
+  const [freteCepInput, setFreteCepInput] = useState('');
+  const [savingFrete, setSavingFrete] = useState(false);
   const [orderView, setOrderView] = useState<'kanban' | 'lista'>('kanban');
   const [orderSearch, setOrderSearch] = useState('');
   const [movingOrderId, setMovingOrderId] = useState<string | null>(null);
@@ -645,7 +667,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      const [p, m, pe, o, s, c, e, metrics] = await Promise.all([
+      const [p, m, pe, o, s, c, e, metrics, shipping] = await Promise.all([
         listPerfumes(), listMovimentos(), listPedidos(), listOpinioes(), listSugestoes(), listCompras(),
         getEstoqueResumo().catch(async () => {
           const mapa = await getEstoqueMap();
@@ -655,14 +677,50 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           ]));
         }),
         getMetricas().catch(() => null),
+        getConfiguracaoFrete().catch(() => null),
       ]);
       setPerfumes(p); setMovimentos(m); setPedidos(pe); setOpinioes(o); setSugestoes(s); setCompras(c); setEstoqueResumo(e);
       setMetricas(metrics);
+      setFreteConfig(shipping);
+      if (shipping) {
+        setFreteFeeInput(shipping.taxaEmbalagem.toFixed(2).replace('.', ','));
+        setFreteCepInput(shipping.cepOrigem);
+      }
     } catch (err) { console.error(err); }
     finally { setLoading(false); setRefreshing(false); }
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const saveFreteConfig = async () => {
+    const fee = Number(freteFeeInput.replace(',', '.'));
+    const cep = freteCepInput.replace(/\D/g, '');
+    if (!Number.isFinite(fee) || fee < 0 || cep.length !== 8) {
+      setSheet({ type: 'info', label: 'Informe um CEP de origem válido e uma taxa de embalagem igual ou maior que zero.' });
+      return;
+    }
+    setSavingFrete(true);
+    try {
+      const updated = await updateConfiguracaoFrete({ taxaEmbalagem: fee, cepOrigem: cep });
+      setFreteConfig(updated);
+      setFreteFeeInput(updated.taxaEmbalagem.toFixed(2).replace('.', ','));
+      setFreteCepInput(updated.cepOrigem);
+      setSheet({ type: 'info', label: 'Configuração de entrega salva. As próximas cotações já usarão esses valores.' });
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível salvar a configuração de entrega.' });
+    } finally {
+      setSavingFrete(false);
+    }
+  };
+
+  const connectMelhorEnvio = async () => {
+    try {
+      const { url } = await autorizarMelhorEnvio();
+      await Linking.openURL(url);
+    } catch {
+      setSheet({ type: 'info', label: 'O aplicativo do Melhor Envio ainda precisa ser configurado no servidor.' });
+    }
+  };
 
   const pedidosUnificados = useMemo<PedidoPainel[]>(() => {
     const statusValido = (status: string): OrderStatus =>
@@ -909,6 +967,68 @@ export function Atelie({ onSair }: { onSair: () => void }) {
               )}
             </View>
           )}
+          <View style={styles.shippingPanel}>
+            <View style={styles.shippingHeader}>
+              <View>
+                <Text style={styles.sectionLabel}>FRETE E ENTREGA</Text>
+                <Text style={styles.shippingTitle}>Melhor Envio</Text>
+              </View>
+              <View style={[
+                styles.shippingStatus,
+                freteConfig?.integrado && { borderColor: COLORS.sage },
+              ]}>
+                <View style={[
+                  styles.shippingStatusDot,
+                  { backgroundColor: freteConfig?.integrado ? COLORS.sage : COLORS.rust },
+                ]} />
+                <Text style={{
+                  color: freteConfig?.integrado ? COLORS.sage : COLORS.muted,
+                  fontSize: 10,
+                }}>
+                  {freteConfig?.integrado ? 'Conectado' : 'Aguardando conexão'}
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.shippingHint}>
+              O preço e o prazo são calculados pela transportadora. A taxa abaixo é somada ao frete como embalagem e manuseio.
+            </Text>
+            <View style={styles.shippingFields}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shippingFieldLabel}>CEP DE ORIGEM</Text>
+                <TInput
+                  keyboardType="numeric"
+                  maxLength={9}
+                  value={freteCepInput}
+                  onChangeText={(value) => setFreteCepInput(value)}
+                  placeholder="00000-000"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.shippingFieldLabel}>TAXA DE EMBALAGEM</Text>
+                <TInput
+                  keyboardType="decimal-pad"
+                  value={freteFeeInput}
+                  onChangeText={setFreteFeeInput}
+                  placeholder="0,00"
+                />
+              </View>
+            </View>
+            <Pressable onPress={saveFreteConfig} disabled={savingFrete} style={styles.shippingSaveButton}>
+              <Feather name="save" size={15} color={COLORS.ink} />
+              <Text style={styles.shippingSaveText}>{savingFrete ? 'Salvando…' : 'Salvar configuração'}</Text>
+            </Pressable>
+            {!freteConfig?.integrado && (
+              <Pressable onPress={connectMelhorEnvio} style={styles.shippingConnectButton}>
+                <Feather name="external-link" size={15} color={COLORS.gold} />
+                <Text style={styles.shippingConnectText}>Conectar conta do Melhor Envio</Text>
+              </Pressable>
+            )}
+            {!!freteConfig?.ambiente && (
+              <Text style={styles.shippingEnvironment}>
+                Ambiente: {freteConfig.ambiente === 'sandbox' ? 'testes (Sandbox)' : 'produção'}
+              </Text>
+            )}
+          </View>
           <Text style={styles.sectionLabel}>ÚLTIMOS PEDIDOS</Text>
           {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
           {[...pedidosUnificados].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).slice(0, 5).map((p) => {
@@ -1387,6 +1507,23 @@ const styles = StyleSheet.create({
   rankingNumber: { color: COLORS.gold, width: 22, fontSize: 12, fontWeight: '700' },
   rankingName: { color: COLORS.bone, flex: 1, fontSize: 12 },
   rankingQty: { color: COLORS.muted, fontSize: 11 },
+  shippingPanel: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
+  shippingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  shippingTitle: { color: COLORS.bone, fontSize: 17, fontWeight: '600', marginTop: -4 },
+  shippingStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border },
+  shippingStatusDot: { width: 6, height: 6, borderRadius: 3 },
+  shippingHint: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginVertical: SPACING.md },
+  shippingFields: { flexDirection: 'row', gap: 8 },
+  shippingFieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.8, marginBottom: 5 },
+  shippingSaveButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, marginTop: SPACING.sm },
+  shippingSaveText: { color: COLORS.ink, fontSize: 12, fontWeight: '600' },
+  shippingConnectButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginTop: SPACING.sm },
+  shippingConnectText: { color: COLORS.gold, fontSize: 12 },
+  shippingEnvironment: { color: COLORS.muted, fontSize: 9, textAlign: 'center', marginTop: 8 },
+  orderDeliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.ink, marginBottom: SPACING.md },
+  orderDeliveryIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
+  orderDeliveryTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '600' },
+  orderDeliveryMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   sectionLabel: { color: COLORS.muted, fontSize: 11, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
   stockSummary: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.md },

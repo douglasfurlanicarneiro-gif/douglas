@@ -8,7 +8,7 @@ services:
     autoDeployTrigger: commit
     envVars:
       - key: EXPO_PUBLIC_BACKEND_URL
-        value: https://douglas-8rer.onrender.com
+        value: https://lessence-furlani-api.onrender.com
     headers:
       - path: /*
         name: X-Content-Type-Options

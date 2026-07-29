@@ -85,6 +85,9 @@ export type Pedido = {
   status: OrderStatus;
   observacoes: string;
   itens: PedidoItem[];
+  subtotal?: number;
+  frete?: number;
+  entrega?: OpcaoFrete | null;
   total: number;
   criadoEm: string;
   codigoAcompanhamento?: string;
@@ -119,6 +122,16 @@ export type CompraItem = {
   subtotal: number;
 };
 
+export type OpcaoFrete = {
+  serviceId: number;
+  transportadora: string;
+  servico: string;
+  precoTransportadora: number;
+  taxaEmbalagem: number;
+  preco: number;
+  prazoDias: number;
+};
+
 export type Compra = {
   id: string;
   seq?: number;
@@ -131,6 +144,7 @@ export type Compra = {
   preco?: number;
   subtotal?: number;
   frete?: number;
+  entrega?: OpcaoFrete | null;
   total?: number;
   status: string;
   observacoes: string;
@@ -150,6 +164,7 @@ export type Acompanhamento = {
   itens: CompraItem[];
   subtotal: number;
   frete: number;
+  entrega?: OpcaoFrete | null;
   total: number;
   formaPagamento?: 'pix' | 'cartao';
   pagamento?: Compra['pagamento'];
@@ -189,4 +204,15 @@ export type CheckoutPayload = {
   };
   formaPagamento: 'pix' | 'cartao';
   observacoes: string;
+  freteEscolhido: {
+    serviceId: number;
+  };
+};
+
+export type ConfiguracaoFrete = {
+  taxaEmbalagem: number;
+  cepOrigem: string;
+  integrado: boolean;
+  aplicativoConfigurado: boolean;
+  ambiente: 'sandbox' | 'producao';
 };

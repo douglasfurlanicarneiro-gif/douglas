@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { ApiError, buscarCep, createCompra } from '../api';
+import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
 import { storage } from '../utils/storage';
-import type { CheckoutPayload, Compra, Perfume, PriceOption } from '../types';
+import type { CheckoutPayload, Compra, OpcaoFrete, Perfume, PriceOption } from '../types';
 import { brl, COLORS, SPACING } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';
@@ -16,7 +16,7 @@ export type CartItem = {
   quantidade: number;
 };
 
-type CustomerForm = Omit<CheckoutPayload, 'itens' | 'cliente' | 'contato' | 'observacoes'> & {
+type CustomerForm = Omit<CheckoutPayload, 'itens' | 'cliente' | 'contato' | 'observacoes' | 'freteEscolhido'> & {
   observacoes: string;
 };
 
@@ -59,8 +59,22 @@ export function CheckoutSheet({
   const [error, setError] = useState('');
   const [cepLoading, setCepLoading] = useState(false);
   const [cepError, setCepError] = useState('');
+  const [freteLoading, setFreteLoading] = useState(false);
+  const [freteError, setFreteError] = useState('');
+  const [opcoesFrete, setOpcoesFrete] = useState<OpcaoFrete[]>([]);
+  const [freteSelecionado, setFreteSelecionado] = useState<OpcaoFrete | null>(null);
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.option.preco * item.quantidade, 0),
+    [items],
+  );
+  const total = subtotal + (freteSelecionado?.preco || 0);
+
+  const itensFrete = useMemo(
+    () => items.map(({ perfume, option, quantidade }) => ({
+      perfumeId: perfume.id,
+      ml: option.ml,
+      quantidade,
+    })),
     [items],
   );
 
@@ -80,6 +94,49 @@ export function CheckoutSheet({
       }
     });
   }, []);
+
+  useEffect(() => {
+    if (!visible) return;
+    const cep = form.endereco.cep.replace(/\D/g, '');
+    if (cep.length !== 8 || itensFrete.length === 0) {
+      setOpcoesFrete([]);
+      setFreteSelecionado(null);
+      setFreteError('');
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      setFreteLoading(true);
+      setFreteError('');
+      cotarFrete({ cepDestino: cep, itens: itensFrete })
+        .then(({ opcoes }) => {
+          if (cancelled) return;
+          setOpcoesFrete(opcoes);
+          setFreteSelecionado((current) => (
+            opcoes.find((item) => item.serviceId === current?.serviceId)
+            || opcoes[0]
+            || null
+          ));
+        })
+        .catch((cause) => {
+          if (cancelled) return;
+          setOpcoesFrete([]);
+          setFreteSelecionado(null);
+          setFreteError(
+            cause instanceof ApiError
+              ? cause.message
+              : 'Não foi possível calcular a entrega.',
+          );
+        })
+        .finally(() => {
+          if (!cancelled) setFreteLoading(false);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [form.endereco.cep, itensFrete, visible]);
 
   const setAddress = (key: keyof CustomerForm['endereco'], value: string) => {
     setForm((current) => ({
@@ -128,7 +185,8 @@ export function CheckoutSheet({
     form.endereco.numero.trim() &&
     form.endereco.bairro.trim() &&
     form.endereco.cidade.trim() &&
-    form.endereco.estado.trim().length === 2
+    form.endereco.estado.trim().length === 2 &&
+    freteSelecionado
   );
 
   const submit = async () => {
@@ -149,6 +207,9 @@ export function CheckoutSheet({
           ...form.endereco,
           cep: form.endereco.cep.replace(/\D/g, ''),
           estado: form.endereco.estado.trim().toUpperCase(),
+        },
+        freteEscolhido: {
+          serviceId: freteSelecionado!.serviceId,
         },
       };
       const order = await createCompra(payload);
@@ -221,11 +282,93 @@ export function CheckoutSheet({
           <View style={{ flex: 1 }}><Field label="Número"><TInput value={form.endereco.numero} onChangeText={(value) => setAddress('numero', value)} /></Field></View>
           <View style={{ flex: 2 }}><Field label="Complemento"><TInput value={form.endereco.complemento} onChangeText={(value) => setAddress('complemento', value)} /></Field></View>
         </View>
+
         <Field label="Bairro"><TInput value={form.endereco.bairro} onChangeText={(value) => setAddress('bairro', value)} /></Field>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <View style={{ flex: 3 }}><Field label="Cidade"><TInput value={form.endereco.cidade} onChangeText={(value) => setAddress('cidade', value)} /></Field></View>
           <View style={{ flex: 1 }}><Field label="UF"><TInput maxLength={2} autoCapitalize="characters" value={form.endereco.estado} onChangeText={(value) => setAddress('estado', value)} /></Field></View>
         </View>
+
+        <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1, marginVertical: SPACING.md }}>
+          ENTREGA
+        </Text>
+        {freteLoading && (
+          <View style={{
+            padding: SPACING.md,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            backgroundColor: COLORS.surface,
+            marginBottom: SPACING.sm,
+          }}>
+            <Text style={{ color: COLORS.muted }}>Calculando preço e prazo de entrega…</Text>
+          </View>
+        )}
+        {!freteLoading && opcoesFrete.map((opcao) => {
+          const active = freteSelecionado?.serviceId === opcao.serviceId;
+          return (
+            <Pressable
+              key={opcao.serviceId}
+              onPress={() => setFreteSelecionado(opcao)}
+              style={{
+                padding: SPACING.md,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: active ? COLORS.gold : COLORS.border,
+                backgroundColor: active ? COLORS.surfaceRaised : COLORS.surface,
+                marginBottom: SPACING.sm,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+              }}
+            >
+              <View style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: active ? COLORS.gold : COLORS.ink,
+              }}>
+                <Feather name={active ? 'check' : 'truck'} size={17} color={active ? COLORS.ink : COLORS.gold} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '600' }}>
+                  {opcao.transportadora} · {opcao.servico}
+                </Text>
+                <Text style={{ color: COLORS.muted, fontSize: 12, marginTop: 3 }}>
+                  Prazo estimado: {opcao.prazoDias} {opcao.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
+                </Text>
+              </View>
+              <Text style={{ color: COLORS.gold, fontSize: 15, fontWeight: '600' }}>
+                {brl(opcao.preco)}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {!!freteError && (
+          <View style={{
+            padding: SPACING.md,
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: COLORS.rust,
+            backgroundColor: COLORS.surface,
+            marginBottom: SPACING.sm,
+          }}>
+            <Text style={{ color: COLORS.rust, fontSize: 12 }}>{freteError}</Text>
+          </View>
+        )}
+        {!!freteSelecionado && (
+          <View style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            paddingVertical: SPACING.sm,
+            marginBottom: SPACING.sm,
+          }}>
+            <Text style={{ color: COLORS.muted }}>Entrega</Text>
+            <Text style={{ color: COLORS.bone }}>{brl(freteSelecionado.preco)}</Text>
+          </View>
+        )}
         <Field label="Observações (opcional)"><TInput multiline style={{ minHeight: 72, textAlignVertical: 'top' }} value={form.observacoes} onChangeText={(observacoes) => setForm({ ...form, observacoes })} /></Field>
 
         <Field label="Forma de pagamento">
@@ -256,7 +399,7 @@ export function CheckoutSheet({
         {!!error && <Text style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <SecondaryButton label="Continuar comprando" onPress={onClose} />
-          <PrimaryButton label={loading ? 'Finalizando…' : `Finalizar · ${brl(subtotal)}`} onPress={submit} disabled={!complete || loading} />
+          <PrimaryButton label={loading ? 'Finalizando…' : `Finalizar · ${brl(total)}`} onPress={submit} disabled={!complete || loading || freteLoading} />
         </View>
       </View>
     </BottomSheet>

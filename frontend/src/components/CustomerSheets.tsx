@@ -329,6 +329,22 @@ export function OrdersSheet({
                 <Text style={styles.orderItemMeta}>{item.ml}ml · {brl(item.subtotal || item.precoUnitario)}</Text>
               </View>
             ))}
+            {!!order.entrega && (
+              <View style={styles.deliveryCard}>
+                <View style={styles.deliveryIcon}>
+                  <Feather name="truck" size={16} color={COLORS.gold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.bodyText}>
+                    {order.entrega.transportadora} · {order.entrega.servico}
+                  </Text>
+                  <Text style={styles.orderItemMeta}>
+                    {brl(order.entrega.preco)} · previsão de {order.entrega.prazoDias}{' '}
+                    {order.entrega.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
+                  </Text>
+                </View>
+              </View>
+            )}
             <View style={styles.orderTotal}>
               <Text style={styles.detailMeta}>Total</Text>
               <Text style={styles.resultName}>{brl(order.total)}</Text>
@@ -396,6 +412,8 @@ const styles = StyleSheet.create({
   statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   orderItem: { paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   orderItemMeta: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  deliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, backgroundColor: COLORS.ink, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
+  deliveryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface },
   orderTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.md },
   timeline: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   timelineDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },

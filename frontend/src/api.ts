@@ -8,6 +8,8 @@ import type {
   Opiniao,
   Pedido,
   Perfume,
+  OpcaoFrete,
+  ConfiguracaoFrete,
   Sugestao,
 } from './types';
 
@@ -102,6 +104,22 @@ export const buscarCep = (cep: string) => request<{
   cidade: string;
   estado: string;
 }>(`/cep/${cep}`);
+export const cotarFrete = (data: {
+  cepDestino: string;
+  itens: { perfumeId: string; ml: number; quantidade: number }[];
+}) => request<{ opcoes: OpcaoFrete[] }>('/frete/cotar', {
+  method: 'POST',
+  body: JSON.stringify(data),
+});
+export const getConfiguracaoFrete = () =>
+  request<ConfiguracaoFrete>('/frete/configuracao', {}, true);
+export const updateConfiguracaoFrete = (data: Pick<ConfiguracaoFrete, 'taxaEmbalagem' | 'cepOrigem'>) =>
+  request<ConfiguracaoFrete>('/frete/configuracao', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  }, true);
+export const autorizarMelhorEnvio = () =>
+  request<{ url: string }>('/integracoes/melhor-envio/autorizar', { method: 'POST' }, true);
 
 // Pedidos
 export const listPedidos = () => request<Pedido[]>('/pedidos', {}, true);
