@@ -330,6 +330,14 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
     });
   };
 
+  const removeOrderCode = (code: string) => {
+    setOrderCodes((current) => {
+      const next = current.filter((saved) => saved !== code);
+      storage.setItem(ordersKeyRef.current, JSON.stringify(next));
+      return next;
+    });
+  };
+
   const openOrders = async () => {
     await syncOrdersStorage();
     setOrdersOpen(true);
@@ -584,6 +592,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         onClose={() => setOrdersOpen(false)}
         onRebuy={rebuy}
         onAddCode={addOrderCode}
+        onRemoveCode={removeOrderCode}
       />
 
       <BottomSheet visible={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrar fragrâncias" compact testID="filters-sheet">

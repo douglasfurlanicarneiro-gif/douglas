@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Linking, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { acompanharPedido, cancelarPedidoCliente } from '../api';
@@ -9,6 +9,84 @@ import { BottomSheet } from './BottomSheet';
 import { Chip, PrimaryButton, SecondaryButton, TInput } from './atoms';
 
 const SUPPORT_WHATSAPP = (process.env.EXPO_PUBLIC_WHATSAPP_NUMBER || '').replace(/\D/g, '');
+const CUSTOMER_ORDER_ACTION_WIDTH = 104;
+
+function CustomerOrderSwipe({
+  enabled,
+  children,
+  onRequestRemove,
+  testID,
+}: {
+  enabled: boolean;
+  children: React.ReactNode;
+  onRequestRemove: () => void;
+  testID: string;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const openRef = useRef(false);
+  const dragStartRef = useRef(0);
+
+  const animateTo = useCallback((open: boolean) => {
+    openRef.current = open;
+    Animated.spring(translateX, {
+      toValue: open ? -CUSTOMER_ORDER_ACTION_WIDTH : 0,
+      useNativeDriver: true,
+      friction: 9,
+      tension: 75,
+    }).start();
+  }, [translateX]);
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, gesture) => (
+      enabled
+      && Math.abs(gesture.dx) > 8
+      && Math.abs(gesture.dx) > Math.abs(gesture.dy)
+    ),
+    onPanResponderGrant: () => {
+      dragStartRef.current = openRef.current ? -CUSTOMER_ORDER_ACTION_WIDTH : 0;
+    },
+    onPanResponderMove: (_, gesture) => {
+      const nextPosition = Math.max(
+        -CUSTOMER_ORDER_ACTION_WIDTH,
+        Math.min(0, dragStartRef.current + gesture.dx),
+      );
+      translateX.setValue(nextPosition);
+    },
+    onPanResponderRelease: (_, gesture) => {
+      const finalPosition = dragStartRef.current + gesture.dx;
+      animateTo(finalPosition < -(CUSTOMER_ORDER_ACTION_WIDTH / 2) || gesture.vx < -0.35);
+    },
+    onPanResponderTerminate: () => animateTo(openRef.current),
+  }), [animateTo, enabled, translateX]);
+
+  return (
+    <View style={styles.customerSwipeWrap} testID={testID}>
+      {enabled && (
+        <View style={styles.customerSwipeActions}>
+          <Pressable
+            onPress={() => {
+              animateTo(false);
+              onRequestRemove();
+            }}
+            style={({ pressed }) => [styles.customerSwipeRemove, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Remover pedido cancelado da lista"
+            testID={`${testID}-remover`}
+          >
+            <Feather name="trash-2" size={18} color={COLORS.bone} />
+            <Text style={styles.customerSwipeRemoveText}>Remover</Text>
+          </Pressable>
+        </View>
+      )}
+      <Animated.View
+        style={{ transform: [{ translateX }] }}
+        {...panResponder.panHandlers}
+      >
+        {children}
+      </Animated.View>
+    </View>
+  );
+}
 
 export function PerfumeDetailSheet({
   perfume,
@@ -174,12 +252,14 @@ export function OrdersSheet({
   onClose,
   onRebuy,
   onAddCode,
+  onRemoveCode,
 }: {
   visible: boolean;
   codes: string[];
   onClose: () => void;
   onRebuy: (order: Acompanhamento) => void;
   onAddCode: (code: string) => void;
+  onRemoveCode: (code: string) => void;
 }) {
   const [orders, setOrders] = useState<Acompanhamento[]>([]);
   const [loading, setLoading] = useState(false);
@@ -190,6 +270,7 @@ export function OrdersSheet({
   const [cancelConfirmCode, setCancelConfirmCode] = useState<string | null>(null);
   const [cancellingCode, setCancellingCode] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState('');
+  const [removeConfirmCode, setRemoveConfirmCode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible || !codes.length) return;
@@ -301,6 +382,12 @@ export function OrdersSheet({
     }
   };
 
+  const removeOrderFromDevice = (code: string) => {
+    setOrders((current) => current.filter((order) => order.codigoAcompanhamento !== code));
+    onRemoveCode(code);
+    setRemoveConfirmCode(null);
+  };
+
   return (
     <BottomSheet
       visible={visible}
@@ -334,7 +421,13 @@ export function OrdersSheet({
       {!loading && orders.map((order) => {
         const status = STATUS.find((item) => item.id === order.status) || STATUS[0];
         return (
-          <View key={order.codigoAcompanhamento} style={styles.orderCard}>
+          <CustomerOrderSwipe
+            key={order.codigoAcompanhamento}
+            enabled={order.status === 'cancelado'}
+            onRequestRemove={() => setRemoveConfirmCode(order.codigoAcompanhamento)}
+            testID={`cancelled-order-${order.codigoAcompanhamento}`}
+          >
+            <View style={styles.orderCard}>
             <View style={styles.orderHeader}>
               <View>
                 <Text style={styles.eyebrow}>PEDIDO Nº {String(order.seq || 0).padStart(3, '0')}</Text>
@@ -444,7 +537,38 @@ export function OrdersSheet({
                 </View>
               </View>
             )}
-          </View>
+            {order.status === 'cancelado' && removeConfirmCode !== order.codigoAcompanhamento && (
+              <View style={styles.removeOrderHint}>
+                <Feather name="chevrons-left" size={14} color={COLORS.muted} />
+                <Text style={styles.removeOrderHintText}>Deslize para remover deste aparelho</Text>
+              </View>
+            )}
+            {order.status === 'cancelado' && removeConfirmCode === order.codigoAcompanhamento && (
+              <View style={styles.removeConfirm}>
+                <View style={styles.cancelConfirmTitleRow}>
+                  <Feather name="smartphone" size={17} color={COLORS.gold} />
+                  <Text style={styles.cancelConfirmTitle}>Remover deste aparelho?</Text>
+                </View>
+                <Text style={styles.cancelConfirmText}>
+                  Ele sairá desta lista, mas continuará guardado com segurança no Painel de Controle.
+                </Text>
+                <View style={styles.cancelConfirmActions}>
+                  <SecondaryButton
+                    label="Manter na lista"
+                    onPress={() => setRemoveConfirmCode(null)}
+                  />
+                  <Pressable
+                    onPress={() => removeOrderFromDevice(order.codigoAcompanhamento)}
+                    style={({ pressed }) => [styles.removeConfirmButton, pressed && { opacity: 0.85 }]}
+                    testID={`order-remove-confirm-${order.codigoAcompanhamento}`}
+                  >
+                    <Text style={styles.removeConfirmButtonText}>Remover</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+            </View>
+          </CustomerOrderSwipe>
         );
       })}
     </BottomSheet>
@@ -479,7 +603,11 @@ const styles = StyleSheet.create({
   resultNumberText: { color: COLORS.ink, fontWeight: '700' },
   resultName: { color: COLORS.bone, fontSize: 14, fontWeight: '600' },
   resultMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
-  orderCard: { backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md, marginBottom: SPACING.md },
+  orderCard: { backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md },
+  customerSwipeWrap: { position: 'relative', overflow: 'hidden', borderRadius: RADIUS.lg, marginBottom: SPACING.md },
+  customerSwipeActions: { ...StyleSheet.absoluteFillObject, alignItems: 'flex-end', justifyContent: 'stretch', borderRadius: RADIUS.lg, overflow: 'hidden' },
+  customerSwipeRemove: { width: CUSTOMER_ORDER_ACTION_WIDTH, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.rust },
+  customerSwipeRemoveText: { color: COLORS.bone, fontSize: 11, fontWeight: '700' },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
   orderDate: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
@@ -504,6 +632,11 @@ const styles = StyleSheet.create({
   cancelConfirmActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.md },
   cancelConfirmButton: { flex: 1, minHeight: 45, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
   cancelConfirmButtonText: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
+  removeOrderHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 34, marginTop: SPACING.sm },
+  removeOrderHintText: { color: COLORS.muted, fontSize: 10 },
+  removeConfirm: { marginTop: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
+  removeConfirmButton: { flex: 1, minHeight: 45, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
+  removeConfirmButtonText: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
   emptyOrdersContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACING.lg },
   emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg, transform: [{ translateY: -30 }] },
   emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
