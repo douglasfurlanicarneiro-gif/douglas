@@ -27,6 +27,15 @@ const ORDERS_KEY_PREFIX = 'customer-orders-v';
 const ORDERS_INITIAL_VERSION = 2;
 const CART_KEY = 'customer-cart-v1';
 type SavedCartLine = { perfumeId: string; ml: number; quantidade: number };
+const PRODUCT_CARD_COLORS = {
+  background: '#F3EDE3',
+  imageBackground: '#EAE0D2',
+  border: '#DDCDB5',
+  ink: '#251F18',
+  text: '#43392D',
+  muted: '#756A5B',
+  gold: '#A97D38',
+};
 const normalize = (value: string) => value
   .normalize('NFD')
   .replace(/[\u0300-\u036f]/g, '')
@@ -63,7 +72,7 @@ function VitrineCard({
   return (
     <View style={styles.card} testID={`vitrine-card-${item.id}`}>
       <Pressable onPress={onToggleFavorite} style={styles.cardFavorite} hitSlop={8}>
-        <Feather name="heart" size={18} color={favorite ? COLORS.wine : COLORS.gold} />
+        <Feather name="heart" size={18} color={favorite ? COLORS.wine : PRODUCT_CARD_COLORS.gold} />
       </Pressable>
       <View style={styles.productTop}>
         <Pressable style={styles.imageFrame} onPress={onDetails}>
@@ -71,7 +80,7 @@ function VitrineCard({
             <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="cover" transition={180} />
           ) : (
             <View style={styles.imagePlaceholder}>
-              <Feather name="image" size={25} color={COLORS.muted} />
+              <Feather name="image" size={25} color={PRODUCT_CARD_COLORS.muted} />
               <Text style={styles.imagePlaceholderText}>Adicionar foto</Text>
             </View>
           )}
@@ -947,37 +956,49 @@ const styles = StyleSheet.create({
   contactActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   contactActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
   contactActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
-  card: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: 12, padding: SPACING.md, overflow: 'hidden' },
-  cardFavorite: { position: 'absolute', right: 10, top: 9, zIndex: 4, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.ink + 'DD' },
+  card: {
+    backgroundColor: PRODUCT_CARD_COLORS.background,
+    borderWidth: 1,
+    borderColor: PRODUCT_CARD_COLORS.border,
+    borderRadius: RADIUS.lg,
+    marginBottom: 14,
+    padding: SPACING.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 4,
+  },
+  cardFavorite: { position: 'absolute', right: 10, top: 9, zIndex: 4, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF9EF', borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productTop: { flexDirection: 'row', gap: SPACING.md },
-  imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: COLORS.ink, borderWidth: 1, borderColor: COLORS.border },
+  imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  imagePlaceholderText: { color: COLORS.muted, fontSize: 9 },
+  imagePlaceholderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9 },
   productInfo: { flex: 1, minWidth: 0, paddingTop: 2 },
-  cardTitle: { color: COLORS.bone, fontSize: 17, lineHeight: 21, fontWeight: '700' },
-  occasionLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, marginTop: 9 },
-  cardSub: { color: COLORS.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
-  familySummary: { color: COLORS.bone, fontSize: 10, lineHeight: 14, marginTop: 6 },
+  cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: 17, lineHeight: 21, fontWeight: '700' },
+  occasionLabel: { color: PRODUCT_CARD_COLORS.gold, fontSize: 9, letterSpacing: 1.1, marginTop: 9 },
+  cardSub: { color: PRODUCT_CARD_COLORS.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
+  familySummary: { color: PRODUCT_CARD_COLORS.text, fontSize: 10, lineHeight: 14, marginTop: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 5 },
-  metaText: { color: COLORS.muted, fontSize: 9 },
+  metaText: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9 },
   availabilityDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: SPACING.md },
   sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', backgroundColor: COLORS.ink },
   sizeButtonDisabled: { borderColor: COLORS.border, opacity: 0.65 },
   sizeButtonText: { color: COLORS.gold, fontSize: 12, lineHeight: 15, fontWeight: '700' },
   sizePrice: { color: COLORS.bone, fontSize: 9, lineHeight: 12, marginTop: 1 },
-  notes: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: SPACING.md, paddingTop: 10, gap: 6 },
+  notes: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10, gap: 6 },
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  noteLabel: { width: 58, color: COLORS.muted, fontSize: 9, lineHeight: 15, letterSpacing: 0.8 },
-  noteValue: { flex: 1, color: COLORS.bone, fontSize: 11, lineHeight: 15, fontStyle: 'italic' },
-  notesEmpty: { borderTopWidth: 1, borderTopColor: COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
-  notesEmptyText: { color: COLORS.muted, fontSize: 10, fontStyle: 'italic' },
+  noteLabel: { width: 58, color: PRODUCT_CARD_COLORS.muted, fontSize: 9, lineHeight: 15, letterSpacing: 0.8 },
+  noteValue: { flex: 1, color: PRODUCT_CARD_COLORS.text, fontSize: 11, lineHeight: 15, fontStyle: 'italic' },
+  notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
+  notesEmptyText: { color: PRODUCT_CARD_COLORS.muted, fontSize: 10, fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
   reviewButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
-  reviewText: { color: COLORS.gold, fontSize: 10 },
+  reviewText: { color: PRODUCT_CARD_COLORS.gold, fontSize: 10 },
   detailsButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
-  detailsText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
+  detailsText: { color: PRODUCT_CARD_COLORS.gold, fontSize: 10, fontWeight: '600' },
   fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: COLORS.surface, borderTopWidth: 1, borderTopColor: COLORS.border },
   navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
