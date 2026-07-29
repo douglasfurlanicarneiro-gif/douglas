@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   },
   stage: {
     position: 'relative',
-    top: '-8%',
+    top: '-10%',
     width: '88%',
     maxWidth: 520,
     aspectRatio: 1,
