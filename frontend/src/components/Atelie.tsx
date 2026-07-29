@@ -596,6 +596,19 @@ function PedidoForm({ perfumes, initial, onSave, onCancel }: any) {
           ))}
         </View>
       </Field>
+      {pedidoRecebido && initial?.pagamento?.metodo === 'pix' && f.status === 'pendente' && (
+        <Pressable
+          onPress={() => onSave({ ...f, status: 'pagamento_confirmado', total })}
+          style={styles.confirmPaymentButton}
+          testID="confirm-manual-payment"
+        >
+          <Feather name="check-circle" size={17} color={COLORS.ink} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.confirmPaymentTitle}>Confirmar pagamento recebido</Text>
+            <Text style={styles.confirmPaymentHint}>Use após conferir o Pix no PicPay</Text>
+          </View>
+        </Pressable>
+      )}
       <Field label="Observações"><TInput value={f.observacoes} onChangeText={(v) => set('observacoes', v)} multiline style={{ minHeight: 70, textAlignVertical: 'top' }} /></Field>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.md }}>
         <Text style={{ color: COLORS.muted, fontSize: 13 }}>Total</Text>
@@ -866,7 +879,7 @@ export function Atelie({ onSair }: { onSair: () => void }) {
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SPACING.lg }}>
             <View style={{ width: '48%' }}><StatCard label="Contratipos" value={perfumes.length} icon="droplet" /></View>
             <View style={{ width: '48%' }}><StatCard label="Estoque baixo" value={estoqueBaixo} icon="alert-triangle" alert={estoqueBaixo > 0} /></View>
-            <View style={{ width: '48%' }}><StatCard label="Pedidos pendentes" value={pendentes} icon="clipboard" /></View>
+            <View style={{ width: '48%' }}><StatCard label="Aguardando pagamento" value={pendentes} icon="clipboard" /></View>
             <View style={{ width: '48%' }}><StatCard label="Nota média" value={notaMedia} icon="star" /></View>
           </View>
           {metricas && (
@@ -1452,6 +1465,9 @@ const styles = StyleSheet.create({
   orderChoiceValue: { color: COLORS.gold, fontSize: 15, fontWeight: '600' },
   orderQuantity: { minWidth: 76, alignItems: 'center', paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: COLORS.border },
   orderQuantityValue: { color: COLORS.bone, fontSize: 17, fontWeight: '600' },
+  confirmPaymentButton: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
+  confirmPaymentTitle: { color: COLORS.ink, fontSize: 13, fontWeight: '700' },
+  confirmPaymentHint: { color: COLORS.ink, opacity: 0.72, fontSize: 10, marginTop: 2 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.ink },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },

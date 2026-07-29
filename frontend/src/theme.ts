@@ -19,7 +19,7 @@ export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 export const RADIUS = { sm: 6, md: 12, lg: 20, pill: 999 };
 
 export const STATUS = [
-  { id: 'pendente', label: 'Pendente', color: '#C7A25C' },
+  { id: 'pendente', label: 'Aguardando pagamento', color: '#C7A25C' },
   { id: 'pagamento_confirmado', label: 'Pagamento confirmado', color: '#A98A56' },
   { id: 'preparando', label: 'Preparando', color: '#8C3A4A' },
   { id: 'pronto', label: 'Pronto', color: '#9A7554' },

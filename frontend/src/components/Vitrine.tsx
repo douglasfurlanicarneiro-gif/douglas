@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicat
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import * as Clipboard from 'expo-clipboard';
+import QRCode from 'react-native-qrcode-svg';
 import { COLORS, SPACING, RADIUS, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Chip, Stars } from './atoms';
@@ -155,6 +157,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [orderCodes, setOrderCodes] = useState<string[]>([]);
   const [successOrder, setSuccessOrder] = useState<Compra | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
   const cartRestored = useRef(false);
   const ordersKeyRef = useRef(`${ORDERS_KEY_PREFIX}${ORDERS_INITIAL_VERSION}`);
 
@@ -542,6 +545,7 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
           setCartOpen(false);
           saveOrderCode(order);
           setSuccessOrder(order);
+          setPixCopied(false);
           setOrderSuccess(message);
           load();
         }}
@@ -629,17 +633,56 @@ export function Vitrine({ onAtelieClick }: { onAtelieClick: () => void }) {
         <PrimaryButton label="Entendi" onPress={() => setInfo(null)} testID="info-ok" />
       </BottomSheet>
 
-      <BottomSheet visible={!!orderSuccess} onClose={() => setOrderSuccess(null)} title="Pedido confirmado" compact testID="order-success-sheet">
+      <BottomSheet visible={!!orderSuccess} onClose={() => setOrderSuccess(null)} title="Pedido recebido" compact testID="order-success-sheet">
         <View style={styles.successContent}>
           <View style={styles.successIcon}>
             <Feather name="check" size={30} color={COLORS.ink} />
           </View>
-          <Text style={styles.successEyebrow}>OBRIGADO PELA SUA COMPRA</Text>
-          <Text style={styles.successTitle}>Seu pedido foi recebido!</Text>
+          <Text style={styles.successEyebrow}>
+            {successOrder?.pagamento?.pixCopiaECola ? 'PEDIDO REGISTRADO' : 'OBRIGADO PELA SUA COMPRA'}
+          </Text>
+          <Text style={styles.successTitle}>
+            {successOrder?.pagamento?.pixCopiaECola ? 'Agora, conclua o pagamento' : 'Seu pedido foi recebido!'}
+          </Text>
           {!!successOrder?.seq && (
             <Text style={styles.successOrderNumber}>PEDIDO Nº {padSeq(successOrder.seq)}</Text>
           )}
           <Text style={styles.successText}>A L’Essence Furlani agradece por fazer parte deste momento.</Text>
+          {!!successOrder?.pagamento?.pixCopiaECola && (
+            <View style={styles.pixCard}>
+              <View style={styles.pixHeading}>
+                <View>
+                  <Text style={styles.pixEyebrow}>PIX · {successOrder.pagamento.instituicao || 'PicPay'}</Text>
+                  <Text style={styles.pixValue}>{brl(successOrder.pagamento.valor || successOrder.total || 0)}</Text>
+                </View>
+                <View style={styles.pixPendingPill}>
+                  <View style={styles.pixPendingDot} />
+                  <Text style={styles.pixPendingText}>Aguardando</Text>
+                </View>
+              </View>
+              <View style={styles.qrFrame}>
+                <QRCode
+                  value={successOrder.pagamento.pixCopiaECola}
+                  size={176}
+                  color="#15130F"
+                  backgroundColor="#FFFFFF"
+                />
+              </View>
+              <Text style={styles.pixHint}>Escaneie o QR Code ou copie o código para pagar pelo aplicativo do seu banco.</Text>
+              <Pressable
+                onPress={async () => {
+                  await Clipboard.setStringAsync(successOrder.pagamento?.pixCopiaECola || '');
+                  setPixCopied(true);
+                }}
+                style={({ pressed }) => [styles.copyPixButton, pressed && { opacity: 0.82 }]}
+                testID="copy-pix-code"
+              >
+                <Feather name={pixCopied ? 'check' : 'copy'} size={16} color={COLORS.ink} />
+                <Text style={styles.copyPixText}>{pixCopied ? 'Código Pix copiado' : 'Copiar código Pix'}</Text>
+              </Pressable>
+              <Text style={styles.manualConfirmation}>A confirmação será feita manualmente após o recebimento.</Text>
+            </View>
+          )}
           <View style={styles.successNextStep}>
             <Feather name="message-circle" size={18} color={COLORS.gold} />
             <Text style={styles.successNextText}>{orderSuccess}</Text>
@@ -780,6 +823,18 @@ const styles = StyleSheet.create({
   successOrderNumber: { color: COLORS.gold, fontSize: 11, letterSpacing: 1.2, marginTop: 7 },
   successText: { color: COLORS.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7, marginBottom: SPACING.lg, maxWidth: 330 },
   successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.ink, marginBottom: SPACING.lg },
+  pixCard: { width: '100%', padding: SPACING.lg, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.ink, marginBottom: SPACING.md },
+  pixHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
+  pixEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.2 },
+  pixValue: { color: COLORS.bone, fontSize: 22, fontWeight: '700', marginTop: 2 },
+  pixPendingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: COLORS.gold + '66', borderRadius: RADIUS.pill, paddingHorizontal: 9, paddingVertical: 5 },
+  pixPendingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gold },
+  pixPendingText: { color: COLORS.gold, fontSize: 10 },
+  qrFrame: { alignSelf: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: RADIUS.md, marginBottom: SPACING.md },
+  pixHint: { color: COLORS.muted, fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: SPACING.md },
+  copyPixButton: { minHeight: 46, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  copyPixText: { color: COLORS.ink, fontSize: 14, fontWeight: '700' },
+  manualConfirmation: { color: COLORS.muted, fontSize: 10, textAlign: 'center', marginTop: 10 },
   successNextText: { flex: 1, color: COLORS.bone, fontSize: 12, lineHeight: 18 },
   trackingCodeCard: { width: '100%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.gold + '0C', marginBottom: SPACING.lg },
   trackingCodeLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, textAlign: 'center' },

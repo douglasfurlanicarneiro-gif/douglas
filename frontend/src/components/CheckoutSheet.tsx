@@ -153,9 +153,11 @@ export function CheckoutSheet({
       };
       const order = await createCompra(payload);
       await storage.setItem(CUSTOMER_KEY, JSON.stringify(form));
-      const paymentMessage = order.pagamento?.status === 'gateway_nao_configurado'
-        ? 'Nossa equipe entrará em contato pelo WhatsApp para combinar o pagamento e os próximos passos.'
-        : 'Em breve você receberá pelo WhatsApp a confirmação do pedido e os próximos passos.';
+      const paymentMessage = order.pagamento?.pixCopiaECola
+        ? 'Pague pelo QR Code ou Pix Copia e Cola. Assim que você concluir, confirmaremos o recebimento e iniciaremos o preparo.'
+        : order.pagamento?.status === 'gateway_nao_configurado'
+          ? 'Nossa equipe entrará em contato pelo WhatsApp para combinar o pagamento e os próximos passos.'
+          : 'Em breve você receberá pelo WhatsApp a confirmação do pedido e os próximos passos.';
       onSuccess(order, paymentMessage);
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Não foi possível finalizar o pedido.');

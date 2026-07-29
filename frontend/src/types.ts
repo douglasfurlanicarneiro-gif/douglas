@@ -65,6 +65,18 @@ export type StatusHistoryItem = {
   data: string;
 };
 
+export type PaymentDetails = {
+  metodo: string;
+  status: string;
+  referencia: string;
+  valor?: number;
+  cobrancaId?: string;
+  pixCopiaECola?: string;
+  recebedor?: string;
+  instituicao?: string;
+  observacao?: string;
+};
+
 export type Pedido = {
   id: string;
   seq: number;
@@ -77,6 +89,7 @@ export type Pedido = {
   criadoEm: string;
   codigoAcompanhamento?: string;
   historicoStatus?: StatusHistoryItem[];
+  pagamento?: PaymentDetails;
 };
 
 export type Opiniao = {
@@ -122,12 +135,7 @@ export type Compra = {
   status: string;
   observacoes: string;
   formaPagamento?: 'pix' | 'cartao';
-  pagamento?: {
-    metodo: string;
-    status: string;
-    referencia: string;
-    cobrancaId?: string;
-  };
+  pagamento?: PaymentDetails;
   data: string;
   criadoEm?: string;
   codigoAcompanhamento?: string;
