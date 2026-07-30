@@ -180,6 +180,18 @@ export function PerfumeDetailSheet({
           <Text style={styles.eyebrow}>FRAGRÂNCIA Nº {String(perfume.seq || 0).padStart(3, '0')}</Text>
           <Text style={styles.detailTitle}>{perfume.nome}</Text>
           <Text style={styles.perfumeMeta}>{familiasDoPerfume(perfume).join(' · ')} · {nomeConcentracao(perfume.concentracao)}</Text>
+          <View style={styles.availabilityPill}>
+            <View style={[
+              styles.availabilityDot,
+              { backgroundColor: perfume.prontaEntrega ? COLORS.sage : COLORS.gold },
+            ]} />
+            <Text style={[
+              styles.availabilityText,
+              { color: perfume.prontaEntrega ? COLORS.sage : COLORS.gold },
+            ]}>
+              {perfume.prontaEntrega ? 'Pronta entrega' : 'Sob encomenda'}
+            </Text>
+          </View>
 
           <View style={styles.occasionBox}>
             <Text style={[styles.sectionLabel, styles.detailSectionLabel]}>CLIMA & OCASIÃO</Text>
@@ -258,7 +270,7 @@ export function QuizSheet({
       pontos:
         (familia && familiasDoPerfume(perfume).includes(familia) ? 4 : 0)
         + (ocasiao && perfume.ocasioes?.includes(ocasiao) ? 3 : 0)
-        + (perfume.disponivel ? 1 : 0),
+        + (perfume.prontaEntrega ? 1 : 0),
     }))
     .sort((a, b) => b.pontos - a.pontos || a.perfume.nome.localeCompare(b.perfume.nome))
     .slice(0, 3), [familia, ocasiao, perfumes]);
@@ -659,6 +671,9 @@ const styles = StyleSheet.create({
   eyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.5 },
   detailTitle: { color: '#251F18', fontSize: 25, fontWeight: '700', marginTop: 4 },
   perfumeMeta: { color: '#746858', fontSize: 13, marginTop: 3 },
+  availabilityPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 9, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#C5AF8F', backgroundColor: '#FFF9F0' },
+  availabilityDot: { width: 6, height: 6, borderRadius: 3 },
+  availabilityText: { fontSize: 10, fontWeight: '700' },
   detailMeta: { color: COLORS.muted, fontSize: 13, marginTop: 3 },
   occasionBox: { backgroundColor: '#EADFCF', borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C5AF8F', padding: SPACING.md, marginVertical: SPACING.lg },
   sectionLabel: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.3, marginBottom: 8 },

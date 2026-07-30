@@ -20,6 +20,7 @@ export type Perfume = {
   estoqueMinimoMl: number;
   publicavel: boolean;
   disponivel?: boolean;
+  prontaEntrega?: boolean;
   estoqueAtualMl?: number;
 };
 

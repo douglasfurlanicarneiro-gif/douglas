@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
+from availability import ensure_initial_ready_delivery
 from database import get_db
 from routers import (
     acompanhamento,
@@ -76,6 +77,13 @@ async def _criar_indices():
 async def lifespan(_: FastAPI):
     await _seed_admin()
     await _criar_indices()
+    disponibilidade = await ensure_initial_ready_delivery(get_db())
+    logger.info(
+        "Pronta entrega configurada: %s item(ns), %s não encontrado(s), %s ambíguo(s).",
+        disponibilidade.get("prontaEntrega", 0),
+        len(disponibilidade.get("naoEncontrados", [])),
+        len(disponibilidade.get("ambiguos", [])),
+    )
     yield
 
 

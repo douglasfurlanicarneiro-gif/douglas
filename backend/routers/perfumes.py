@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
 from database import get_db
+from availability import apply_ready_delivery
 from security import require_atelie_auth
 from utils import next_seq, serialize
 
@@ -129,6 +130,7 @@ class PerfumeIn(BaseModel):
     precos: List[Preco] = Field(default_factory=list, max_length=30)
     estoqueMinimoMl: int = Field(default=0, ge=0, le=1_000_000)
     publicavel: bool = False
+    prontaEntrega: bool = False
 
     @model_validator(mode="after")
     def validar_publicacao(self):
@@ -191,6 +193,10 @@ class BulkImportPayload(BaseModel):
     nomes: List[str]
 
 
+class ProntaEntregaPayload(BaseModel):
+    nomes: List[str] = Field(min_length=1, max_length=500)
+
+
 class AplicarPrecosPayload(BaseModel):
     precos: List[Preco] = Field(min_length=1, max_length=3)
     tamanhos: List[int] = Field(default_factory=list, max_length=3)
@@ -221,6 +227,7 @@ async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_ateli
             "notasFundo": "",
             "precos": [],
             "estoqueMinimoMl": 0,
+            "prontaEntrega": False,
             # Trava de segurança (auditoria A6): item importado em massa nunca
             # entra publicável por padrão — sem preço/estoque revisados, não
             # pode aparecer na vitrine pública até alguém editar e confirmar.
@@ -229,6 +236,16 @@ async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_ateli
         })
         adicionados += 1
     return {"adicionados": adicionados}
+
+
+@router.post("/pronta-entrega")
+async def definir_pronta_entrega(
+    payload: ProntaEntregaPayload,
+    _: str = Depends(require_atelie_auth),
+):
+    """Marca a lista informada como pronta entrega e o restante como sob encomenda."""
+    db = get_db()
+    return await apply_ready_delivery(db, payload.nomes)
 
 
 @router.post("/aplicar-precos")

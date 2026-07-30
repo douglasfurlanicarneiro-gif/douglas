@@ -43,6 +43,7 @@ async def obter_vitrine():
         # Estoque baixo gera alerta interno, mas não bloqueia tamanhos na
         # vitrine. A disponibilidade comercial continua sob controle manual.
         item["disponivel"] = True
+        item["prontaEntrega"] = bool(item.get("prontaEntrega", False))
         item["estoqueAtualMl"] = max(qtd, 0)
         item["statusEstoque"] = "sob_consulta" if qtd <= 0 else "envio_imediato"
 
@@ -64,6 +65,7 @@ async def publicar_vitrine(_: str = Depends(require_atelie_auth)):
         item = serialize(p)
         qtd = estoque_map.get(item["id"], 0)
         item["disponivel"] = True
+        item["prontaEntrega"] = bool(item.get("prontaEntrega", False))
         item["estoqueAtualMl"] = max(qtd, 0)
         item["statusEstoque"] = "sob_consulta" if qtd <= 0 else "envio_imediato"
         itens.append(item)

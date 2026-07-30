@@ -22,6 +22,7 @@ import {
 import type { Acompanhamento, Compra, ConfiguracoesLojaPublicas, Perfume } from '../types';
 
 type VitrineItem = Perfume;
+type AvailabilityFilter = 'pronta' | 'encomenda' | 'todas';
 const FAVORITES_KEY = 'favorite-perfumes-v1';
 const ORDERS_KEY_PREFIX = 'customer-orders-v';
 const ORDERS_INITIAL_VERSION = 2;
@@ -107,9 +108,9 @@ function VitrineCard({
           {!!familiasResumo && <Text style={styles.familySummary} numberOfLines={2}>{familiasResumo}</Text>}
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>{nomeConcentracao(item.concentracao)}</Text>
-            <View style={[styles.availabilityDot, { backgroundColor: item.disponivel ? COLORS.sage : COLORS.rust }]} />
-            <Text style={[styles.metaText, { color: item.disponivel ? COLORS.sage : COLORS.rust }]}>
-              {item.disponivel ? 'Disponível' : 'Em falta'}
+            <View style={[styles.availabilityDot, { backgroundColor: item.prontaEntrega ? COLORS.sage : PRODUCT_CARD_COLORS.gold }]} />
+            <Text style={[styles.metaText, { color: item.prontaEntrega ? COLORS.sage : PRODUCT_CARD_COLORS.gold }]}>
+              {item.prontaEntrega ? 'Pronta entrega' : 'Sob encomenda'}
             </Text>
           </View>
         </View>
@@ -189,6 +190,7 @@ export function Vitrine({
   const [search, setSearch] = useState('');
   const [familiaAtiva, setFamiliaAtiva] = useState('Todas');
   const [ocasiaoAtiva, setOcasiaoAtiva] = useState('Todas');
+  const [disponibilidadeAtiva, setDisponibilidadeAtiva] = useState<AvailabilityFilter>('pronta');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
@@ -340,8 +342,10 @@ export function Vitrine({
     const okFam = familiaAtiva === 'Todas'
       || (familiaAtiva === 'Favoritos' ? favorites.has(i.id) : familiasDoPerfume(i).includes(familiaAtiva));
     const okOcasiao = ocasiaoAtiva === 'Todas' || i.ocasioes?.includes(ocasiaoAtiva);
-    return okBusca && okFam && okOcasiao;
-  }), [itens, search, familiaAtiva, ocasiaoAtiva, favorites]);
+    const okDisponibilidade = disponibilidadeAtiva === 'todas'
+      || (disponibilidadeAtiva === 'pronta' ? i.prontaEntrega === true : i.prontaEntrega !== true);
+    return okBusca && okFam && okOcasiao && okDisponibilidade;
+  }), [itens, search, familiaAtiva, ocasiaoAtiva, disponibilidadeAtiva, favorites]);
 
   const toggleFavorite = (id: string) => {
     setFavorites((current) => {
@@ -366,7 +370,8 @@ export function Vitrine({
 
   const cartCount = cart.reduce((total, item) => total + item.quantidade, 0);
   const filtrosAtivos = (familiaAtiva !== 'Todas' && familiaAtiva !== 'Favoritos' ? 1 : 0)
-    + (ocasiaoAtiva !== 'Todas' ? 1 : 0);
+    + (ocasiaoAtiva !== 'Todas' ? 1 : 0)
+    + (disponibilidadeAtiva === 'encomenda' ? 1 : 0);
 
   const saveOrderCode = (order: Compra) => {
     if (!order.codigoAcompanhamento) return;
@@ -535,14 +540,45 @@ export function Vitrine({
                 </Pressable>
                 <View style={styles.quickFilters}>
                   <Pressable
-                    onPress={() => { setFamiliaAtiva('Todas'); setOcasiaoAtiva('Todas'); }}
-                    style={[styles.quickFilterButton, familiaAtiva === 'Todas' && ocasiaoAtiva === 'Todas' && styles.quickFilterButtonActive]}
-                    testID="filter-all"
+                    onPress={() => {
+                      setFamiliaAtiva('Todas');
+                      setOcasiaoAtiva('Todas');
+                      setDisponibilidadeAtiva('pronta');
+                    }}
+                    style={[
+                      styles.quickFilterButton,
+                      familiaAtiva === 'Todas'
+                        && ocasiaoAtiva === 'Todas'
+                        && disponibilidadeAtiva === 'pronta'
+                        && styles.quickFilterButtonActive,
+                    ]}
+                    testID="filter-ready-delivery"
                   >
-                    <Text style={[styles.quickFilterText, familiaAtiva === 'Todas' && ocasiaoAtiva === 'Todas' && styles.quickFilterTextActive]}>Todas</Text>
+                    <Feather
+                      name="package"
+                      size={13}
+                      color={
+                        disponibilidadeAtiva === 'pronta'
+                          && familiaAtiva === 'Todas'
+                          && ocasiaoAtiva === 'Todas'
+                          ? COLORS.ink
+                          : COLORS.gold
+                      }
+                    />
+                    <Text style={[
+                      styles.quickFilterText,
+                      disponibilidadeAtiva === 'pronta'
+                        && familiaAtiva === 'Todas'
+                        && ocasiaoAtiva === 'Todas'
+                        && styles.quickFilterTextActive,
+                    ]}>Pronta entrega</Text>
                   </Pressable>
                   <Pressable
-                    onPress={() => { setFamiliaAtiva('Favoritos'); setOcasiaoAtiva('Todas'); }}
+                    onPress={() => {
+                      setFamiliaAtiva('Favoritos');
+                      setOcasiaoAtiva('Todas');
+                      setDisponibilidadeAtiva('todas');
+                    }}
                     style={[styles.quickFilterButton, styles.quickFilterGrow, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
                     testID="filter-favorites"
                   >
@@ -582,7 +618,11 @@ export function Vitrine({
             <View style={{ paddingHorizontal: SPACING.lg }}>
               <View style={styles.storefrontEmpty}>
                 <Text style={styles.storefrontEmptyTitle}>Nenhuma fragrância encontrada</Text>
-                <Text style={styles.storefrontEmptyText}>Ajuste os filtros para descobrir outras opções.</Text>
+                <Text style={styles.storefrontEmptyText}>
+                  {disponibilidadeAtiva === 'pronta'
+                    ? 'Esta fragrância pode estar sob encomenda. Abra os filtros para ver todo o catálogo.'
+                    : 'Ajuste os filtros para descobrir outras opções.'}
+                </Text>
               </View>
             </View>
           )
@@ -687,6 +727,21 @@ export function Vitrine({
 
       <BottomSheet visible={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrar fragrâncias" compact testID="filters-sheet">
         <View>
+          <Text style={styles.filterSheetLabel}>DISPONIBILIDADE</Text>
+          <View style={styles.filterSheetChips}>
+            {([
+              { id: 'pronta', label: 'Pronta entrega' },
+              { id: 'encomenda', label: 'Sob encomenda' },
+              { id: 'todas', label: 'Todo o catálogo' },
+            ] as { id: AvailabilityFilter; label: string }[]).map((item) => (
+              <Chip
+                key={item.id}
+                label={item.label}
+                active={disponibilidadeAtiva === item.id}
+                onPress={() => setDisponibilidadeAtiva(item.id)}
+              />
+            ))}
+          </View>
           <Text style={styles.filterSheetLabel}>FAMÍLIA OLFATIVA</Text>
           <View style={styles.filterSheetChips}>
             {familias.filter((item) => item !== 'Favoritos').map((item) => (
@@ -712,7 +767,11 @@ export function Vitrine({
           <View style={styles.filterSheetActions}>
             <SecondaryButton
               label="Limpar"
-              onPress={() => { setFamiliaAtiva('Todas'); setOcasiaoAtiva('Todas'); }}
+              onPress={() => {
+                setFamiliaAtiva('Todas');
+                setOcasiaoAtiva('Todas');
+                setDisponibilidadeAtiva('todas');
+              }}
             />
             <PrimaryButton label="Aplicar filtros" onPress={() => setFiltersOpen(false)} />
           </View>

@@ -372,7 +372,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
   } : {
     nome: '', imagemUrl: '', ocasioes: [], familia: FAMILIAS[0], familias: [FAMILIAS[0]], concentracao: CONCENTRACOES[0],
     notasSaida: '', notasCoracao: '', notasFundo: '',
-    precos: [{ ml: 30, preco: 0 }], estoqueMinimoMl: 100, publicavel: false,
+    precos: [{ ml: 30, preco: 0 }], estoqueMinimoMl: 100, publicavel: false, prontaEntrega: false,
   });
   const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
   const toggleOcasiao = (value: string) => setF((s: any) => {
@@ -467,6 +467,17 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
       <Field label="Estoque mínimo de alerta (ml)">
         <TInput keyboardType="numeric" value={String(f.estoqueMinimoMl)} onChangeText={(v) => set('estoqueMinimoMl', Number(v) || 0)} />
       </Field>
+      <Pressable onPress={() => set('prontaEntrega', !f.prontaEntrega)} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, marginBottom: SPACING.md }}>
+        <View style={{ flex: 1, paddingRight: SPACING.md }}>
+          <Text style={{ color: COLORS.bone, fontSize: 14 }}>Pronta entrega</Text>
+          <Text style={{ color: COLORS.muted, fontSize: 10, marginTop: 2 }}>
+            Desative para mostrar este perfume como Sob encomenda.
+          </Text>
+        </View>
+        <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: f.prontaEntrega ? COLORS.gold : COLORS.border, justifyContent: 'center', paddingHorizontal: 2, alignItems: f.prontaEntrega ? 'flex-end' : 'flex-start' }}>
+          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.bone }} />
+        </View>
+      </Pressable>
       <Pressable onPress={() => set('publicavel', !f.publicavel)} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, marginBottom: SPACING.md }}>
         <Text style={{ color: COLORS.bone, fontSize: 14 }}>Mostrar na vitrine pública</Text>
         <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: f.publicavel ? COLORS.gold : COLORS.border, justifyContent: 'center', paddingHorizontal: 2, alignItems: f.publicavel ? 'flex-end' : 'flex-start' }}>
@@ -1213,6 +1224,14 @@ export function Atelie({
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                     <View style={styles.tag}><Text style={{ color: COLORS.gold, fontSize: 10 }}>{familiasDoPerfume(p).join(' · ')}</Text></View>
                     <View style={styles.tag}><Text style={{ color: COLORS.muted, fontSize: 10 }}>{nomeConcentracao(p.concentracao)}</Text></View>
+                    <View style={styles.tag}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.prontaEntrega ? COLORS.sage : COLORS.gold }} />
+                        <Text style={{ color: p.prontaEntrega ? COLORS.sage : COLORS.gold, fontSize: 10 }}>
+                          {p.prontaEntrega ? 'Pronta entrega' : 'Sob encomenda'}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                     {p.precos.map((pr: any, i: number) => (
