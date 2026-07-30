@@ -130,7 +130,9 @@ function VitrineCard({
               ]}
             >
               <Text style={[styles.sizeButtonText, !item.disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>{pr.ml} ml</Text>
-              <Text style={[styles.sizePrice, !item.disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>{brl(pr.preco)}</Text>
+              <Text style={[styles.sizePrice, !item.disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>
+                {item.prontaEntrega ? brl(pr.preco) : 'Solicitar'}
+              </Text>
             </Pressable>
           ))}
       </View>
@@ -283,7 +285,12 @@ export function Vitrine({
     });
   }, [syncOrdersStorage]);
 
-  const itens = useMemo(() => snapshot?.itens || [], [snapshot?.itens]);
+  const itens = useMemo(
+    () => [...(snapshot?.itens || [])].sort((a, b) => (
+      a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
+    )),
+    [snapshot?.itens],
+  );
 
   useEffect(() => {
     if (!itens.length || cartRestored.current) return;

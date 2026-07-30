@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import unicodedata
 
 from fastapi import APIRouter, Depends
 
@@ -26,6 +27,15 @@ _PIPELINE_ESTOQUE = [
 ]
 
 
+def _alphabetical_name(item: dict) -> str:
+    name = str(item.get("nome", ""))
+    return "".join(
+        character
+        for character in unicodedata.normalize("NFD", name)
+        if unicodedata.category(character) != "Mn"
+    ).casefold()
+
+
 @router.get("")
 async def obter_vitrine():
     db = get_db()
@@ -47,6 +57,7 @@ async def obter_vitrine():
         item["estoqueAtualMl"] = max(qtd, 0)
         item["statusEstoque"] = "sob_consulta" if qtd <= 0 else "envio_imediato"
 
+    itens.sort(key=_alphabetical_name)
     return {"atualizadoEm": snapshot.get("atualizadoEm"), "itens": itens}
 
 
@@ -54,7 +65,7 @@ async def obter_vitrine():
 async def publicar_vitrine(_: str = Depends(require_atelie_auth)):
     db = get_db()
 
-    perfumes = await db.perfumes.find({"publicavel": True}).sort("seq", 1).to_list(2000)
+    perfumes = await db.perfumes.find({"publicavel": True}).to_list(2000)
 
     estoque_map: dict[str, int] = {}
     async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
@@ -70,6 +81,7 @@ async def publicar_vitrine(_: str = Depends(require_atelie_auth)):
         item["statusEstoque"] = "sob_consulta" if qtd <= 0 else "envio_imediato"
         itens.append(item)
 
+    itens.sort(key=_alphabetical_name)
     atualizado_em = datetime.now(timezone.utc).isoformat()
     await db.vitrine.update_one(
         {"_id": "snapshot"},

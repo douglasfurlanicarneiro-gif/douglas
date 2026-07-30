@@ -79,10 +79,13 @@ async def lifespan(_: FastAPI):
     await _criar_indices()
     disponibilidade = await ensure_initial_ready_delivery(get_db())
     logger.info(
-        "Pronta entrega configurada: %s item(ns), %s não encontrado(s), %s ambíguo(s).",
+        "Pronta entrega configurada: %s item(ns), %s não encontrado(s), %s ambíguo(s). "
+        "Estoque zerado em %s item(ns) sob encomenda (%s ml).",
         disponibilidade.get("prontaEntrega", 0),
         len(disponibilidade.get("naoEncontrados", [])),
         len(disponibilidade.get("ambiguos", [])),
+        disponibilidade.get("estoquesZerados", 0),
+        disponibilidade.get("quantidadeZeradaMl", 0),
     )
     yield
 

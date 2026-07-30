@@ -177,7 +177,6 @@ export function PerfumeDetailSheet({
               )}
             </Pressable>
           </View>
-          <Text style={styles.eyebrow}>FRAGRÂNCIA Nº {String(perfume.seq || 0).padStart(3, '0')}</Text>
           <Text style={styles.detailTitle}>{perfume.nome}</Text>
           <Text style={styles.perfumeMeta}>{familiasDoPerfume(perfume).join(' · ')} · {nomeConcentracao(perfume.concentracao)}</Text>
           <View style={styles.availabilityPill}>
@@ -219,7 +218,9 @@ export function PerfumeDetailSheet({
                 ]}
               >
                 <Text style={styles.sizeText}>{opcao.ml} ml</Text>
-                <Text style={styles.sizePrice}>{brl(opcao.preco)}</Text>
+                <Text style={styles.sizePrice}>
+                  {perfume.prontaEntrega ? brl(opcao.preco) : 'Solicitar'}
+                </Text>
               </Pressable>
             ))}
           </View>

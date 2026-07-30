@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from datetime import datetime, timezone
 
 INITIAL_READY_DELIVERY_NAMES = [
     "Armani Code Profumo Giorgio Armani Masculino",
@@ -27,8 +28,24 @@ INITIAL_READY_DELIVERY_NAMES = [
 ]
 
 _MIGRATION_ID = "pronta_entrega_inicial"
-_MIGRATION_VERSION = 1
+_MIGRATION_VERSION = 2
 _QUALIFIERS = {"masculino", "feminino", "compartilhavel"}
+_STOCK_PIPELINE = [
+    {
+        "$group": {
+            "_id": "$perfumeId",
+            "total": {
+                "$sum": {
+                    "$cond": [
+                        {"$eq": ["$tipo", "entrada"]},
+                        "$quantidadeMl",
+                        {"$multiply": ["$quantidadeMl", -1]},
+                    ]
+                }
+            },
+        }
+    },
+]
 
 
 def name_signature(name: str) -> str:
@@ -100,6 +117,41 @@ async def apply_ready_delivery(db, names: list[str]) -> dict:
     }
 
 
+async def zero_made_to_order_stock(db) -> dict:
+    perfumes = await db.perfumes.find(
+        {"prontaEntrega": {"$ne": True}},
+        {"_id": 1},
+    ).to_list(5000)
+    perfume_ids = {str(perfume["_id"]) for perfume in perfumes}
+
+    movimentos = []
+    quantidade_zerada_ml = 0
+    agora = datetime.now(timezone.utc).isoformat()
+    async for linha in db.movimentos.aggregate(_STOCK_PIPELINE):
+        perfume_id = str(linha.get("_id", ""))
+        saldo_atual = int(linha.get("total", 0))
+        if perfume_id not in perfume_ids or saldo_atual <= 0:
+            continue
+        movimentos.append({
+            "perfumeId": perfume_id,
+            "tipo": "saida",
+            "quantidadeMl": saldo_atual,
+            "motivo": "Ajuste de estoque para Sob encomenda",
+            "categoria": "ajuste-negativo",
+            "origem": "ajuste-sob-encomenda-v2",
+            "data": agora,
+        })
+        quantidade_zerada_ml += saldo_atual
+
+    if movimentos:
+        await db.movimentos.insert_many(movimentos)
+
+    return {
+        "estoquesZerados": len(movimentos),
+        "quantidadeZeradaMl": quantidade_zerada_ml,
+    }
+
+
 async def ensure_initial_ready_delivery(db) -> dict:
     control = await db.configuracoes.find_one({"_id": _MIGRATION_ID})
     if control and control.get("versao", 0) >= _MIGRATION_VERSION:
@@ -111,6 +163,7 @@ async def ensure_initial_ready_delivery(db) -> dict:
         }
 
     result = await apply_ready_delivery(db, INITIAL_READY_DELIVERY_NAMES)
+    stock_result = await zero_made_to_order_stock(db)
     await db.configuracoes.update_one(
         {"_id": _MIGRATION_ID},
         {
@@ -119,8 +172,10 @@ async def ensure_initial_ready_delivery(db) -> dict:
                 "prontaEntrega": result["prontaEntrega"],
                 "naoEncontrados": result["naoEncontrados"],
                 "ambiguos": result["ambiguos"],
+                "estoquesZerados": stock_result["estoquesZerados"],
+                "quantidadeZeradaMl": stock_result["quantidadeZeradaMl"],
             }
         },
         upsert=True,
     )
-    return {**result, "jaEstavaAtualizado": False}
+    return {**result, **stock_result, "jaEstavaAtualizado": False}
