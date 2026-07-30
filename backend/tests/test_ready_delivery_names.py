@@ -6,12 +6,14 @@ try:
         name_signature,
         zero_made_to_order_stock,
     )
+    from routers.vitrine import _alphabetical_name
 except ModuleNotFoundError:
     from backend.availability import (
         INITIAL_READY_DELIVERY_NAMES,
         name_signature,
         zero_made_to_order_stock,
     )
+    from backend.routers.vitrine import _alphabetical_name
 
 
 def test_initial_ready_delivery_list_has_22_unique_items():
@@ -30,6 +32,18 @@ def test_name_signature_ignores_order_accents_and_audience_qualifiers():
     assert name_signature("Vanilla | 28 Kayali Fragrances") == name_signature(
         "Vanilla 28 Kayali Fragrances Compartilhável"
     )
+
+
+def test_alphabetical_name_tolerates_legacy_mojibake():
+    items = [
+        {"nome": "Pr 1 MilhÃ£o Elixir"},
+        {"nome": "Pr 1 Milhao Prive"},
+    ]
+
+    assert [item["nome"] for item in sorted(items, key=_alphabetical_name)] == [
+        "Pr 1 MilhÃ£o Elixir",
+        "Pr 1 Milhao Prive",
+    ]
 
 
 class _ListCursor:

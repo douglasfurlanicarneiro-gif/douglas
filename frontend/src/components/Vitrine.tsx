@@ -285,12 +285,7 @@ export function Vitrine({
     });
   }, [syncOrdersStorage]);
 
-  const itens = useMemo(
-    () => [...(snapshot?.itens || [])].sort((a, b) => (
-      a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })
-    )),
-    [snapshot?.itens],
-  );
+  const itens = useMemo(() => [...(snapshot?.itens || [])], [snapshot?.itens]);
 
   useEffect(() => {
     if (!itens.length || cartRestored.current) return;

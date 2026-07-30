@@ -29,6 +29,12 @@ _PIPELINE_ESTOQUE = [
 
 def _alphabetical_name(item: dict) -> str:
     name = str(item.get("nome", ""))
+    try:
+        repaired_name = name.encode("cp1252").decode("utf-8")
+        if repaired_name.count("Ã") + repaired_name.count("Â") < name.count("Ã") + name.count("Â"):
+            name = repaired_name
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
     return "".join(
         character
         for character in unicodedata.normalize("NFD", name)
