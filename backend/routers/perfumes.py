@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import List
 
 from bson import ObjectId
@@ -245,7 +246,19 @@ async def definir_pronta_entrega(
 ):
     """Marca a lista informada como pronta entrega e o restante como sob encomenda."""
     db = get_db()
-    return await apply_ready_delivery(db, payload.nomes)
+    result = await apply_ready_delivery(db, payload.nomes)
+    await db.operacoes_sistema.insert_one({
+        "tipo": "atualizar_disponibilidade",
+        "titulo": "Disponibilidade do catálogo atualizada",
+        "detalhes": (
+            f"{result['prontaEntrega']} perfume(s) em pronta entrega e "
+            f"{result['sobEncomenda']} sob encomenda."
+        ),
+        "perfumesAfetados": result["prontaEntrega"] + result["sobEncomenda"],
+        "quantidadeMl": 0,
+        "data": datetime.now(timezone.utc).isoformat(),
+    })
+    return result
 
 
 @router.post("/aplicar-precos")

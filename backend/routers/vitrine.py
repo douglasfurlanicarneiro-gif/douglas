@@ -94,4 +94,12 @@ async def publicar_vitrine(_: str = Depends(require_atelie_auth)):
         {"$set": {"atualizadoEm": atualizado_em, "itens": itens}},
         upsert=True,
     )
+    await db.operacoes_sistema.insert_one({
+        "tipo": "publicar_vitrine",
+        "titulo": "Vitrine publicada",
+        "detalhes": f"{len(itens)} perfume(s) publicados em ordem alfabética.",
+        "perfumesAfetados": len(itens),
+        "quantidadeMl": 0,
+        "data": atualizado_em,
+    })
     return {"atualizadoEm": atualizado_em, "itensPublicados": len(itens)}

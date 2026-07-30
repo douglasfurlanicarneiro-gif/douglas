@@ -11,7 +11,9 @@ import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
   listPerfumes, createPerfume, updatePerfume, deletePerfume, bulkImport, padronizarTamanhos,
-  listMovimentos, createMovimento, completarEstoque, getEstoqueMap, getEstoqueResumo,
+  listMovimentos, createMovimento, getEstoqueMap, getEstoqueResumo,
+  atualizarDisponibilidadeCatalogo,
+  getCatalogoEstoqueResumo, completarEstoqueProntaEntrega, zerarEstoqueSobEncomenda,
   listPedidos, createPedido, updatePedido, deletePedido,
   listOpinioes, deleteOpiniao,
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
@@ -20,10 +22,11 @@ import {
   aplicarPrecos, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
-import type { Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
+import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts } from '../storeConfig';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
+  | { type: 'availability' }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
   | { type: 'info'; label: string };
 
@@ -358,6 +361,121 @@ function ConfirmSheetContent({
           <Text style={{ color: sheet.danger ? '#FFF9F0' : COLORS.ink, fontWeight: '600' }}>
             {!ready ? 'Aguarde…' : (sheet.confirmLabel || (sheet.danger ? 'Sim, excluir' : 'Confirmar'))}
           </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function AvailabilityManager({
+  perfumes,
+  onSave,
+  onCancel,
+}: {
+  perfumes: Perfume[];
+  onSave: (ids: string[]) => void;
+  onCancel: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [selected, setSelected] = useState(
+    () => new Set(perfumes.filter((perfume) => perfume.prontaEntrega).map((perfume) => perfume.id)),
+  );
+  const ordered = useMemo(
+    () => [...perfumes].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
+    [perfumes],
+  );
+  const filtered = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase('pt-BR');
+    if (!term) return ordered;
+    return ordered.filter((perfume) => perfume.nome.toLocaleLowerCase('pt-BR').includes(term));
+  }, [ordered, query]);
+
+  const toggle = (id: string) => {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectVisible = () => {
+    setSelected((current) => new Set([...current, ...filtered.map((perfume) => perfume.id)]));
+  };
+
+  const clearVisible = () => {
+    const visibleIds = new Set(filtered.map((perfume) => perfume.id));
+    setSelected((current) => new Set([...current].filter((id) => !visibleIds.has(id))));
+  };
+
+  const save = () => {
+    const ids = perfumes
+      .filter((perfume) => selected.has(perfume.id))
+      .map((perfume) => perfume.id);
+    onSave(ids);
+  };
+
+  return (
+    <View>
+      <View style={styles.availabilitySummary}>
+        <View>
+          <Text style={styles.availabilityCount}>{selected.size}</Text>
+          <Text style={styles.availabilityCountLabel}>Pronta entrega</Text>
+        </View>
+        <View style={styles.availabilitySummaryDivider} />
+        <View>
+          <Text style={styles.availabilityCount}>{Math.max(0, perfumes.length - selected.size)}</Text>
+          <Text style={styles.availabilityCountLabel}>Sob encomenda</Text>
+        </View>
+      </View>
+      <TInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Buscar perfume…"
+        testID="availability-search"
+      />
+      <View style={styles.availabilityTools}>
+        <Pressable onPress={selectVisible} style={styles.availabilityToolButton}>
+          <Text style={styles.availabilityToolText}>Marcar exibidos</Text>
+        </Pressable>
+        <Pressable onPress={clearVisible} style={styles.availabilityToolButton}>
+          <Text style={styles.availabilityToolText}>Desmarcar exibidos</Text>
+        </Pressable>
+      </View>
+      <View style={styles.availabilityList}>
+        {filtered.map((perfume) => {
+          const checked = selected.has(perfume.id);
+          return (
+            <Pressable
+              key={perfume.id}
+              onPress={() => toggle(perfume.id)}
+              style={({ pressed }) => [
+                styles.availabilityRow,
+                checked && styles.availabilityRowChecked,
+                pressed && { opacity: 0.8 },
+              ]}
+              testID={`availability-${perfume.id}`}
+            >
+              <View style={[styles.availabilityCheck, checked && styles.availabilityCheckActive]}>
+                {checked && <Feather name="check" size={13} color={COLORS.ink} />}
+              </View>
+              <Text style={styles.availabilityName}>{perfume.nome}</Text>
+              <Text style={[styles.availabilityState, checked && { color: COLORS.sage }]}>
+                {checked ? 'Pronta' : 'Encomenda'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <View style={styles.availabilityFooter}>
+        <SecondaryButton label="Cancelar" onPress={onCancel} />
+        <Pressable
+          onPress={save}
+          disabled={selected.size === 0}
+          style={[styles.confirmAction, selected.size === 0 && styles.confirmActionDisabled]}
+          testID="availability-save"
+        >
+          <Text style={{ color: COLORS.ink, fontWeight: '700' }}>Revisar e salvar</Text>
         </Pressable>
       </View>
     </View>
@@ -759,6 +877,7 @@ export function Atelie({
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [compras, setCompras] = useState<Compra[]>([]);
   const [estoqueResumo, setEstoqueResumo] = useState<EstoqueResumo>({});
+  const [catalogoEstoque, setCatalogoEstoque] = useState<CatalogoEstoqueResumo | null>(null);
   const [sheet, setSheet] = useState<SheetType>(null);
   const [search, setSearch] = useState('');
   const [publicando, setPublicando] = useState(false);
@@ -797,7 +916,7 @@ export function Atelie({
 
   const load = useCallback(async () => {
     try {
-      const [p, m, pe, o, s, c, e, metrics, shipping, store] = await Promise.all([
+      const [p, m, pe, o, s, c, e, metrics, shipping, store, catalogStock] = await Promise.all([
         listPerfumes(), listMovimentos(), listPedidos(), listOpinioes(), listSugestoes(), listCompras(),
         getEstoqueResumo().catch(async () => {
           const mapa = await getEstoqueMap();
@@ -809,10 +928,12 @@ export function Atelie({
         getMetricas().catch(() => null),
         getConfiguracaoFrete().catch(() => null),
         getConfiguracoesLoja().catch(() => null),
+        getCatalogoEstoqueResumo().catch(() => null),
       ]);
       setPerfumes(p); setMovimentos(m); setPedidos(pe); setOpinioes(o); setSugestoes(s); setCompras(c); setEstoqueResumo(e);
       setMetricas(metrics);
       setFreteConfig(shipping);
+      setCatalogoEstoque(catalogStock);
       if (store) setStoreConfig(store);
       if (shipping) {
         setFreteFeeInput(shipping.taxaEmbalagem.toFixed(2).replace('.', ','));
@@ -1007,13 +1128,61 @@ export function Atelie({
     load();
   };
   const doMov = async (data: any) => { await createMovimento(data); setSheet(null); load(); };
-  const doCompletarEstoque = async () => {
-    const r = await completarEstoque(1000);
+  const doCompletarProntaEntrega = async () => {
+    try {
+      const result = await completarEstoqueProntaEntrega(1000);
+      setSheet({
+        type: 'info',
+        label: (
+          `${result.perfumesAtualizados} perfume(s) de pronta entrega atualizados. `
+          + `${result.quantidadeAdicionadaMl.toLocaleString('pt-BR')}ml adicionados no total.`
+        ),
+      });
+      await load();
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível atualizar o estoque de pronta entrega.' });
+    }
+  };
+  const doZerarSobEncomenda = async () => {
+    try {
+      const result = await zerarEstoqueSobEncomenda();
+      setSheet({
+        type: 'info',
+        label: (
+          `${result.perfumesAtualizados} perfume(s) sob encomenda ajustados. `
+          + `${result.quantidadeRetiradaMl.toLocaleString('pt-BR')}ml retirados do saldo.`
+        ),
+      });
+      await load();
+    } catch {
+      setSheet({ type: 'info', label: 'Não foi possível zerar o estoque dos itens sob encomenda.' });
+    }
+  };
+  const requestSaveAvailability = (ids: string[]) => {
     setSheet({
-      type: 'info',
-      label: `${r.perfumesAtualizados} perfume(s) atualizados. Todos os ${r.perfumesConsiderados} itens da vitrine agora possuem pelo menos ${r.estoqueAlvoMl}ml.`,
+      type: 'confirm',
+      label: (
+        `Confirmar ${ids.length} perfume(s) em pronta entrega e `
+        + `${Math.max(0, perfumes.length - ids.length)} sob encomenda?`
+      ),
+      onConfirm: async () => {
+        try {
+          const result = await atualizarDisponibilidadeCatalogo(ids);
+          await publishVitrine();
+          setSheet({
+            type: 'info',
+            label: (
+              `Disponibilidade salva: ${result.prontaEntrega} em pronta entrega e `
+              + `${result.sobEncomenda} sob encomenda. A vitrine já foi atualizada.`
+            ),
+          });
+          await load();
+        } catch {
+          setSheet({ type: 'info', label: 'Não foi possível atualizar a disponibilidade do catálogo.' });
+        }
+      },
+      confirmLabel: 'Salvar disponibilidade',
     });
-    load();
   };
   const pedidoPayload = (data: any) => ({
     cliente: data.cliente,
@@ -1062,7 +1231,11 @@ export function Atelie({
   const doDelOpiniao = async (id: string) => { await deleteOpiniao(id); setSheet(null); load(); };
   const doPublish = async () => {
     setPublicando(true);
-    try { await publishVitrine(); setSheet({ type: 'info', label: 'Vitrine publicada! Quem abrir o app vê a nova versão.' }); }
+    try {
+      await publishVitrine();
+      setSheet({ type: 'info', label: 'Vitrine publicada! Quem abrir o app vê a nova versão.' });
+      await load();
+    }
     catch { setSheet({ type: 'info', label: 'Erro ao publicar. Tente de novo.' }); }
     finally { setPublicando(false); }
   };
@@ -1117,6 +1290,7 @@ export function Atelie({
     sheet.type === 'perfume' ? (sheet.data ? 'Editar contratipo' : 'Novo contratipo') :
     sheet.type === 'movimento' ? 'Lançar estoque' :
     sheet.type === 'pedido' ? (sheet.data ? 'Editar pedido' : 'Novo pedido') :
+    sheet.type === 'availability' ? 'Gerenciar pronta entrega' :
     sheet.type === 'confirm' ? (sheet.danger ? 'Confirmar exclusão' : 'Confirmar') : 'Aviso';
 
   const openCreate = () => {
@@ -1279,18 +1453,6 @@ export function Atelie({
               Pedidos pendentes ou com pagamento confirmado ficam reservados. A baixa ocorre quando o pedido entra em preparação.
             </Text>
           </View>
-          <Pressable
-            onPress={() => setSheet({
-              type: 'confirm',
-              label: 'Completar o estoque de todos os perfumes da vitrine para 1.000ml? Itens que já possuem 1.000ml ou mais não serão alterados.',
-              onConfirm: doCompletarEstoque,
-              confirmLabel: 'Completar estoque',
-            })}
-            style={styles.actionBtn}
-            testID="completar-estoque-btn"
-          >
-            <Text style={{ color: COLORS.gold, fontSize: 12 }}>Completar todos para 1.000ml</Text>
-          </Pressable>
           {perfumes.length === 0 && <EmptyState text="Cadastre um contratipo antes." />}
           {perfumes.map((p) => {
             const resumo = resumoDe(p.id);
@@ -1531,6 +1693,18 @@ export function Atelie({
       const setStoreField = <K extends keyof ConfiguracoesLoja,>(key: K, value: ConfiguracoesLoja[K]) => {
         setStoreConfig((current) => ({ ...current, [key]: value }));
       };
+      const prontaEntrega = perfumes.filter((perfume) => perfume.prontaEntrega);
+      const sobEncomenda = perfumes.filter((perfume) => !perfume.prontaEntrega);
+      const prontaParaCompletar = prontaEntrega.filter((perfume) => resumoDe(perfume.id).saldoAtualMl < 1000);
+      const quantidadeParaCompletar = prontaParaCompletar.reduce(
+        (total, perfume) => total + Math.max(0, 1000 - resumoDe(perfume.id).saldoAtualMl),
+        0,
+      );
+      const sobComSaldo = sobEncomenda.filter((perfume) => resumoDe(perfume.id).saldoAtualMl > 0);
+      const quantidadeSobEncomenda = sobComSaldo.reduce(
+        (total, perfume) => total + Math.max(0, resumoDe(perfume.id).saldoAtualMl),
+        0,
+      );
       return (
         <View style={styles.systemPage}>
           <View style={styles.systemHero}>
@@ -1541,6 +1715,119 @@ export function Atelie({
               <Text style={styles.systemIntro}>Configurações globais, integrações e manutenção da {storePreview.nomeLoja}.</Text>
             </View>
           </View>
+
+          <SystemCard icon="layers" title="Catálogo e Estoque" subtitle="Disponibilidade, ajustes em massa, publicação e histórico.">
+            <View style={styles.catalogStatsGrid}>
+              <View style={styles.catalogStat}>
+                <Text style={styles.catalogStatValue}>
+                  {catalogoEstoque?.prontaEntrega ?? prontaEntrega.length}
+                </Text>
+                <Text style={styles.catalogStatLabel}>Pronta entrega</Text>
+                <Text style={styles.catalogStatMeta}>
+                  {(catalogoEstoque?.estoqueProntaEntregaMl ?? prontaEntrega.reduce(
+                    (total, perfume) => total + Math.max(0, resumoDe(perfume.id).saldoAtualMl),
+                    0,
+                  )).toLocaleString('pt-BR')}ml
+                </Text>
+              </View>
+              <View style={styles.catalogStat}>
+                <Text style={styles.catalogStatValue}>
+                  {catalogoEstoque?.sobEncomenda ?? sobEncomenda.length}
+                </Text>
+                <Text style={styles.catalogStatLabel}>Sob encomenda</Text>
+                <Text style={styles.catalogStatMeta}>
+                  {(catalogoEstoque?.estoqueSobEncomendaMl ?? quantidadeSobEncomenda).toLocaleString('pt-BR')}ml
+                </Text>
+              </View>
+            </View>
+            <View style={styles.alphabeticalStatus}>
+              <View style={styles.alphabeticalIcon}>
+                <Feather name="check" size={13} color={COLORS.sage} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.alphabeticalTitle}>Ordem alfabética automática</Text>
+                <Text style={styles.alphabeticalHint}>A vitrine permanece organizada de A a Z em todas as publicações.</Text>
+              </View>
+              <Text style={styles.systemSuccessBadge}>ATIVO</Text>
+            </View>
+            <SystemAction
+              icon="check-square"
+              title="Gerenciar pronta entrega"
+              subtitle="Escolha quais perfumes estão disponíveis imediatamente."
+              onPress={() => setSheet({ type: 'availability' })}
+            />
+            <SystemAction
+              icon="arrow-up-circle"
+              title="Completar pronta entrega até 1.000ml"
+              subtitle={prontaParaCompletar.length
+                ? `${prontaParaCompletar.length} item(ns) receberão ${quantidadeParaCompletar.toLocaleString('pt-BR')}ml.`
+                : 'Todos os itens de pronta entrega já possuem pelo menos 1.000ml.'}
+              disabled={prontaParaCompletar.length === 0}
+              badge={prontaParaCompletar.length === 0 ? 'EM DIA' : undefined}
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: (
+                  `Adicionar ${quantidadeParaCompletar.toLocaleString('pt-BR')}ml em `
+                  + `${prontaParaCompletar.length} perfume(s) de pronta entrega? `
+                  + 'Nenhum item sob encomenda será alterado.'
+                ),
+                onConfirm: doCompletarProntaEntrega,
+                confirmLabel: 'Completar estoque',
+              })}
+            />
+            <SystemAction
+              icon="arrow-down-circle"
+              title="Zerar estoque sob encomenda"
+              subtitle={sobComSaldo.length
+                ? `${sobComSaldo.length} item(ns) terão ${quantidadeSobEncomenda.toLocaleString('pt-BR')}ml retirados.`
+                : 'Todos os itens sob encomenda já estão com saldo zero.'}
+              danger={sobComSaldo.length > 0}
+              disabled={sobComSaldo.length === 0}
+              badge={sobComSaldo.length === 0 ? 'ZERADO' : undefined}
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: (
+                  `Retirar ${quantidadeSobEncomenda.toLocaleString('pt-BR')}ml e zerar `
+                  + `${sobComSaldo.length} perfume(s) sob encomenda?`
+                ),
+                onConfirm: doZerarSobEncomenda,
+                confirmLabel: 'Zerar sob encomenda',
+                danger: true,
+                safetyText: 'O histórico das movimentações será preservado e esta retirada ficará registrada no Sistema.',
+              })}
+            />
+            <SystemAction
+              icon="share-2"
+              title="Publicar alterações na vitrine"
+              subtitle="Atualiza imediatamente o catálogo exibido aos clientes."
+              onPress={() => setSheet({
+                type: 'confirm',
+                label: `Publicar ${perfumes.filter((perfume) => perfume.publicavel !== false).length} perfume(s) na vitrine?`,
+                onConfirm: doPublish,
+                confirmLabel: 'Publicar vitrine',
+              })}
+            />
+            <Text style={[styles.systemFieldLabel, { marginTop: SPACING.md }]}>HISTÓRICO DE OPERAÇÕES</Text>
+            {!catalogoEstoque?.historico.length && (
+              <Text style={styles.catalogHistoryEmpty}>Nenhuma operação manual registrada ainda.</Text>
+            )}
+            {catalogoEstoque?.historico.slice(0, 6).map((operacao) => (
+              <View key={operacao.id} style={styles.catalogHistoryRow}>
+                <View style={styles.catalogHistoryIcon}>
+                  <Feather
+                    name={operacao.quantidadeMl > 0 ? 'activity' : 'check-circle'}
+                    size={13}
+                    color={COLORS.gold}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.catalogHistoryTitle}>{operacao.titulo}</Text>
+                  <Text style={styles.catalogHistoryDetails}>{operacao.detalhes}</Text>
+                  <Text style={styles.catalogHistoryDate}>{fmtDate(operacao.data)}</Text>
+                </View>
+              </View>
+            ))}
+          </SystemCard>
 
           <SystemCard icon="dollar-sign" title="Preços" subtitle="Defina os valores e aplique em todo o catálogo.">
             <View style={styles.systemFieldGrid}>
@@ -1815,6 +2102,13 @@ export function Atelie({
             onDelete={requestDeletePedido}
           />
         )}
+        {sheet?.type === 'availability' && (
+          <AvailabilityManager
+            perfumes={perfumes}
+            onSave={requestSaveAvailability}
+            onCancel={() => setSheet(null)}
+          />
+        )}
         {sheet?.type === 'confirm' && (
           <ConfirmSheetContent sheet={sheet} onCancel={() => setSheet(null)} />
         )}
@@ -1868,6 +2162,37 @@ const styles = StyleSheet.create({
   systemCardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   systemCardTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700' },
   systemCardSubtitle: { color: COLORS.muted, fontSize: 10, lineHeight: 14, marginTop: 2 },
+  catalogStatsGrid: { flexDirection: 'row', gap: 8, marginBottom: SPACING.sm },
+  catalogStat: { flex: 1, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  catalogStatValue: { color: COLORS.bone, fontSize: 22, fontWeight: '700' },
+  catalogStatLabel: { color: COLORS.muted, fontSize: 10, marginTop: 1 },
+  catalogStatMeta: { color: COLORS.gold, fontSize: 10, fontWeight: '600', marginTop: 6 },
+  alphabeticalStatus: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 10, marginBottom: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.sage + '66', backgroundColor: COLORS.surface },
+  alphabeticalIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.sage + '22', borderWidth: 1, borderColor: COLORS.sage + '55' },
+  alphabeticalTitle: { color: COLORS.bone, fontSize: 11, fontWeight: '600' },
+  alphabeticalHint: { color: COLORS.muted, fontSize: 9, lineHeight: 12, marginTop: 2 },
+  systemSuccessBadge: { color: COLORS.sage, fontSize: 8, letterSpacing: 0.6, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.sage + '77' },
+  catalogHistoryEmpty: { color: COLORS.muted, fontSize: 10, lineHeight: 15, paddingVertical: 8 },
+  catalogHistoryRow: { flexDirection: 'row', gap: 9, paddingVertical: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
+  catalogHistoryIcon: { width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  catalogHistoryTitle: { color: COLORS.bone, fontSize: 11, fontWeight: '600' },
+  catalogHistoryDetails: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
+  catalogHistoryDate: { color: COLORS.gold, fontSize: 8, marginTop: 3 },
+  availabilitySummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
+  availabilitySummaryDivider: { width: 1, height: 42, backgroundColor: COLORS.border },
+  availabilityCount: { color: COLORS.bone, fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  availabilityCountLabel: { color: COLORS.muted, fontSize: 9, textAlign: 'center', marginTop: 2 },
+  availabilityTools: { flexDirection: 'row', gap: 7, marginVertical: SPACING.sm },
+  availabilityToolButton: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 34, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  availabilityToolText: { color: COLORS.gold, fontSize: 9, fontWeight: '600' },
+  availabilityList: { borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, overflow: 'hidden' },
+  availabilityRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: COLORS.surface },
+  availabilityRowChecked: { backgroundColor: COLORS.gold + '12' },
+  availabilityCheck: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
+  availabilityCheckActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
+  availabilityName: { flex: 1, color: COLORS.bone, fontSize: 11 },
+  availabilityState: { color: COLORS.muted, fontSize: 8, textTransform: 'uppercase' },
+  availabilityFooter: { flexDirection: 'row', gap: 8, marginTop: SPACING.md },
   storePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 104, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   storePreviewVisual: { width: 74, height: 74, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   storePreviewLogo: { width: '100%', height: '100%' },

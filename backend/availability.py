@@ -117,6 +117,45 @@ async def apply_ready_delivery(db, names: list[str]) -> dict:
     }
 
 
+async def apply_ready_delivery_by_ids(db, ids: list[str]) -> dict:
+    """Atualiza a disponibilidade por ids exatos, sem depender do nome."""
+    perfumes = await db.perfumes.find({}, {"_id": 1}).to_list(5000)
+    perfumes_por_id = {str(perfume["_id"]): perfume["_id"] for perfume in perfumes}
+    ids_unicos = list(dict.fromkeys(str(item).strip() for item in ids if str(item).strip()))
+    encontrados = [item_id for item_id in ids_unicos if item_id in perfumes_por_id]
+    nao_encontrados = [item_id for item_id in ids_unicos if item_id not in perfumes_por_id]
+    object_ids = [perfumes_por_id[item_id] for item_id in encontrados]
+
+    await db.perfumes.update_many({}, {"$set": {"prontaEntrega": False}})
+    if object_ids:
+        await db.perfumes.update_many(
+            {"_id": {"$in": object_ids}},
+            {"$set": {"prontaEntrega": True}},
+        )
+
+    snapshot = await db.vitrine.find_one({"_id": "snapshot"})
+    if snapshot:
+        ids_encontrados = set(encontrados)
+        items = [
+            {
+                **item,
+                "prontaEntrega": str(item.get("id", "")) in ids_encontrados,
+            }
+            for item in snapshot.get("itens", [])
+        ]
+        await db.vitrine.update_one(
+            {"_id": "snapshot"},
+            {"$set": {"itens": items}},
+        )
+
+    return {
+        "prontaEntrega": len(encontrados),
+        "sobEncomenda": max(0, len(perfumes) - len(encontrados)),
+        "encontrados": encontrados,
+        "naoEncontrados": nao_encontrados,
+    }
+
+
 async def zero_made_to_order_stock(db) -> dict:
     perfumes = await db.perfumes.find(
         {"prontaEntrega": {"$ne": True}},

@@ -20,6 +20,7 @@ from routers import (
     acompanhamento,
     admin,
     auth,
+    catalogo_estoque,
     cep,
     clientes,
     compras,
@@ -71,6 +72,7 @@ async def _criar_indices():
     )
     await db.movimentos.create_index("perfumeId")
     await db.movimentos.create_index("origem")
+    await db.operacoes_sistema.create_index("data")
 
 
 @asynccontextmanager
@@ -100,6 +102,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router)
+app.include_router(catalogo_estoque.router)
 app.include_router(cep.router)
 app.include_router(perfumes.router)
 app.include_router(movimentos.router)

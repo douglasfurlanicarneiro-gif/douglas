@@ -12,6 +12,7 @@ import type {
   ConfiguracaoFrete,
   ConfiguracoesLoja,
   ConfiguracoesLojaPublicas,
+  CatalogoEstoqueResumo,
   Sugestao,
 } from './types';
 
@@ -140,6 +141,31 @@ export const completarEstoque = (quantidadeMl = 1000) => request<{
 export const getEstoqueMap = () => request<Record<string, number>>('/estoque');
 export const getEstoqueResumo = () =>
   request<import('./types').EstoqueResumo>('/estoque/resumo', {}, true);
+export const getCatalogoEstoqueResumo = () =>
+  request<CatalogoEstoqueResumo>('/admin/catalogo-estoque/resumo', {}, true);
+export const atualizarDisponibilidadeCatalogo = (ids: string[]) => request<{
+  prontaEntrega: number;
+  sobEncomenda: number;
+  encontrados: string[];
+  naoEncontrados: string[];
+}>('/admin/catalogo-estoque/disponibilidade', {
+  method: 'PUT',
+  body: JSON.stringify({ ids }),
+}, true);
+export const zerarEstoqueSobEncomenda = () => request<{
+  perfumesConsiderados: number;
+  perfumesAtualizados: number;
+  quantidadeRetiradaMl: number;
+}>('/admin/catalogo-estoque/zerar-sob-encomenda', { method: 'POST' }, true);
+export const completarEstoqueProntaEntrega = (quantidadeMl = 1000) => request<{
+  perfumesConsiderados: number;
+  perfumesAtualizados: number;
+  quantidadeAdicionadaMl: number;
+  estoqueAlvoMl: number;
+}>('/admin/catalogo-estoque/completar-pronta-entrega', {
+  method: 'POST',
+  body: JSON.stringify({ quantidadeMl }),
+}, true);
 export const buscarCep = (cep: string) => request<{
   cep: string;
   endereco: string;

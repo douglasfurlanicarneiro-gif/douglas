@@ -43,6 +43,26 @@ export type EstoqueResumoItem = {
 
 export type EstoqueResumo = Record<string, EstoqueResumoItem>;
 
+export type OperacaoSistema = {
+  id: string;
+  tipo: string;
+  titulo: string;
+  detalhes: string;
+  perfumesAfetados: number;
+  quantidadeMl: number;
+  data: string;
+};
+
+export type CatalogoEstoqueResumo = {
+  totalPerfumes: number;
+  prontaEntrega: number;
+  sobEncomenda: number;
+  estoqueProntaEntregaMl: number;
+  estoqueSobEncomendaMl: number;
+  sobEncomendaComSaldo: number;
+  historico: OperacaoSistema[];
+};
+
 export type OrderStatus =
   | 'pendente'
   | 'pagamento_confirmado'

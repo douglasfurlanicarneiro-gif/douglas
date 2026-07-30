@@ -71,6 +71,7 @@ async def baixar_backup(_: str = Depends(require_atelie_auth)):
         "opinioes",
         "sugestoes",
         "compras",
+        "operacoes_sistema",
     )
     conteudo = {
         "aplicacao": "L'Essence Furlani",
