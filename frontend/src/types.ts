@@ -109,6 +109,8 @@ export type Pedido = {
   subtotal?: number;
   frete?: number;
   entrega?: OpcaoFrete | null;
+  subtotalTabela?: number;
+  ajusteManual?: number;
   total: number;
   criadoEm: string;
   codigoAcompanhamento?: string;

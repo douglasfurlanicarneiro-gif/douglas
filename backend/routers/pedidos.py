@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Literal
+from typing import List, Literal, Optional
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -18,6 +18,8 @@ class ItemPedido(BaseModel):
     perfumeId: str
     ml: int = Field(gt=0, le=1000)
     quantidade: int = Field(gt=0, le=100)
+    precoUnitario: Optional[float] = Field(default=None, ge=0)
+    subtotal: Optional[float] = Field(default=None, ge=0)
 
 
 class PedidoIn(BaseModel):
@@ -34,6 +36,8 @@ class PedidoIn(BaseModel):
     ] = "pendente"
     observacoes: str = Field(default="", max_length=1000)
     itens: List[ItemPedido] = Field(min_length=1, max_length=100)
+    subtotalTabela: Optional[float] = Field(default=None, ge=0)
+    ajusteManual: float = 0
     total: float = Field(default=0, ge=0)
 
 

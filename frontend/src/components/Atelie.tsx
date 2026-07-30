@@ -682,6 +682,10 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
 function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
   const [f, setF] = useState<any>(initial || { cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [] });
   const pedidoRecebido = Boolean(initial?.id);
+  const [valorPersonalizado, setValorPersonalizado] = useState(Boolean(initial?.id || initial?.ajusteManual));
+  const [valorFinalInput, setValorFinalInput] = useState(
+    initial?.total != null ? Number(initial.total).toFixed(2).replace('.', ',') : '',
+  );
   const [searchingIdx, setSearchingIdx] = useState<number | null>(null);
   const [q, setQ] = useState('');
   const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
@@ -694,11 +698,37 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
   const setItem = (i: number, k: string, v: any) => setF((s: any) => ({ ...s, itens: s.itens.map((it: any, idx: number) => idx === i ? { ...it, [k]: v } : it) }));
   const rmItem = (i: number) => setF((s: any) => ({ ...s, itens: s.itens.filter((_: any, idx: number) => idx !== i) }));
   const precoDo = (it: any) => {
+    if (it.precoUnitario != null && Number.isFinite(Number(it.precoUnitario))) {
+      return Number(it.precoUnitario);
+    }
     const p = perfumes.find((pf: any) => pf.id === it.perfumeId);
     return p?.precos.find((pr: any) => pr.ml === Number(it.ml))?.preco || 0;
   };
   const totalProdutos = f.itens.reduce((s: number, it: any) => s + precoDo(it) * it.quantidade, 0);
-  const total = totalProdutos + Number(f.frete || 0);
+  const totalCalculado = Math.round((totalProdutos + Number(f.frete || 0)) * 100) / 100;
+  const valorDigitado = Number(valorFinalInput.replace(',', '.'));
+  const valorDigitadoValido = valorFinalInput.trim().length > 0
+    && Number.isFinite(valorDigitado)
+    && valorDigitado >= 0;
+  const total = valorPersonalizado && valorDigitadoValido
+    ? Math.round(valorDigitado * 100) / 100
+    : totalCalculado;
+  const ajusteManual = Math.round((total - totalCalculado) * 100) / 100;
+  const pedidoParaSalvar = (status = f.status) => ({
+    ...f,
+    status,
+    itens: f.itens.map((it: any) => {
+      const precoUnitario = precoDo(it);
+      return {
+        ...it,
+        precoUnitario,
+        subtotal: Math.round(precoUnitario * it.quantidade * 100) / 100,
+      };
+    }),
+    subtotalTabela: Math.round(totalProdutos * 100) / 100,
+    ajusteManual,
+    total,
+  });
   const filtrados = perfumes.filter((p: any) => p.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
   return (
     <View>
@@ -812,7 +842,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
       </Field>
       {pedidoRecebido && initial?.pagamento?.metodo === 'pix' && f.status === 'pendente' && (
         <Pressable
-          onPress={() => onSave({ ...f, status: 'pagamento_confirmado', total })}
+          onPress={() => onSave(pedidoParaSalvar('pagamento_confirmado'))}
           style={styles.confirmPaymentButton}
           testID="confirm-manual-payment"
         >
@@ -824,17 +854,76 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
         </Pressable>
       )}
       <Field label="Observações"><TInput value={f.observacoes} onChangeText={(v) => set('observacoes', v)} multiline style={{ minHeight: 70, textAlignVertical: 'top' }} /></Field>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.md }}>
-        <Text style={{ color: COLORS.muted, fontSize: 13 }}>Total</Text>
-        <Text style={{ color: COLORS.bone, fontSize: 16 }}>{brl(total)}</Text>
+      <View style={styles.manualValueCard}>
+        <View style={styles.manualValueHeading}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.manualValueEyebrow}>VALOR DO PEDIDO</Text>
+            <Text style={styles.manualValueTitle}>Valor final combinado</Text>
+          </View>
+          {valorPersonalizado && (
+            <Pressable
+              onPress={() => {
+                setValorPersonalizado(false);
+                setValorFinalInput('');
+              }}
+              hitSlop={8}
+              testID="pedido-restaurar-valor"
+            >
+              <Text style={styles.manualValueReset}>Usar valor calculado</Text>
+            </Pressable>
+          )}
+        </View>
+        <Text style={styles.manualValueHint}>
+          Informe aqui o total negociado com o cliente, inclusive quando houver desconto.
+        </Text>
+        <View style={styles.manualValueInputRow}>
+          <Text style={styles.manualValueCurrency}>R$</Text>
+          <TInput
+            keyboardType="decimal-pad"
+            value={valorPersonalizado ? valorFinalInput : totalCalculado.toFixed(2).replace('.', ',')}
+            onChangeText={(value) => {
+              setValorFinalInput(value);
+              setValorPersonalizado(true);
+            }}
+            placeholder="0,00"
+            style={styles.manualValueInput}
+            testID="pedido-valor-final"
+          />
+        </View>
+        <View style={styles.manualValueSummary}>
+          <Text style={styles.manualValueSummaryLabel}>Valor calculado</Text>
+          <Text style={styles.manualValueSummaryValue}>{brl(totalCalculado)}</Text>
+        </View>
+        {valorPersonalizado && valorDigitadoValido && Math.abs(ajusteManual) >= 0.01 && (
+          <View style={styles.manualValueSummary}>
+            <Text style={[styles.manualValueSummaryLabel, { color: ajusteManual < 0 ? COLORS.sage : COLORS.rust }]}>
+              {ajusteManual < 0 ? 'Desconto aplicado' : 'Acréscimo aplicado'}
+            </Text>
+            <Text style={[styles.manualValueSummaryValue, { color: ajusteManual < 0 ? COLORS.sage : COLORS.rust }]}>
+              {brl(Math.abs(ajusteManual))}
+            </Text>
+          </View>
+        )}
+        {valorPersonalizado && !valorDigitadoValido && (
+          <Text style={styles.manualValueError}>Informe um valor final válido.</Text>
+        )}
+        <View style={styles.manualValueTotal}>
+          <Text style={styles.manualValueTotalLabel}>Total final</Text>
+          <Text style={styles.manualValueTotalAmount}>{brl(total)}</Text>
+        </View>
       </View>
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <PrimaryButton label="Salvar pedido" onPress={() => f.cliente.trim() && f.itens.length > 0 && onSave({ ...f, total })} disabled={!f.cliente.trim() || f.itens.length === 0} testID="pedido-save" />
+        <PrimaryButton
+          label="Salvar pedido"
+          onPress={() => f.cliente.trim() && f.itens.length > 0 && onSave(pedidoParaSalvar())}
+          disabled={!f.cliente.trim() || f.itens.length === 0 || (valorPersonalizado && !valorDigitadoValido)}
+          testID="pedido-save"
+        />
       </View>
       {pedidoRecebido && initial?.status !== 'cancelado' && (
         <Pressable
-          onPress={() => onSave({ ...f, status: 'cancelado', total })}
+          onPress={() => onSave(pedidoParaSalvar('cancelado'))}
           style={styles.cancelAdminOrderButton}
           testID="pedido-cancelar"
         >
@@ -1197,7 +1286,11 @@ export function Atelie({
       perfumeId: item.perfumeId,
       ml: Number(item.ml),
       quantidade: Number(item.quantidade) || 1,
+      precoUnitario: item.precoUnitario == null ? undefined : Number(item.precoUnitario),
+      subtotal: item.subtotal == null ? undefined : Number(item.subtotal),
     })),
+    subtotalTabela: data.subtotalTabela == null ? undefined : Number(data.subtotalTabela),
+    ajusteManual: Number(data.ajusteManual) || 0,
     total: Number(data.total) || 0,
   });
   const persistPedido = async (data: any) => {
@@ -2226,6 +2319,22 @@ const styles = StyleSheet.create({
   orderDeliveryIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
   orderDeliveryTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '600' },
   orderDeliveryMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  manualValueCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '88', backgroundColor: COLORS.surfaceRaised },
+  manualValueHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 5 },
+  manualValueEyebrow: { color: COLORS.gold, fontSize: 8, fontWeight: '700', letterSpacing: 1.2 },
+  manualValueTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700', marginTop: 2 },
+  manualValueReset: { color: COLORS.gold, fontSize: 10, fontWeight: '600', textDecorationLine: 'underline' },
+  manualValueHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginBottom: 10 },
+  manualValueInputRow: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#FFF9F0', overflow: 'hidden' },
+  manualValueCurrency: { color: COLORS.gold, fontSize: 15, fontWeight: '700', paddingLeft: 12 },
+  manualValueInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent', color: COLORS.bone, fontSize: 18, fontWeight: '700' },
+  manualValueSummary: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 8 },
+  manualValueSummaryLabel: { color: COLORS.muted, fontSize: 11 },
+  manualValueSummaryValue: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
+  manualValueError: { color: COLORS.rust, fontSize: 10, marginTop: 7 },
+  manualValueTotal: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, paddingTop: 9, marginTop: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
+  manualValueTotalLabel: { color: COLORS.bone, fontSize: 12, fontWeight: '600' },
+  manualValueTotalAmount: { color: COLORS.gold, fontSize: 19, fontWeight: '800' },
   sectionLabel: { color: COLORS.muted, fontSize: 11, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
   stockSummary: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.md },
