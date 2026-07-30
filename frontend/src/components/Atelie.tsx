@@ -19,7 +19,7 @@ import {
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
   downloadBackup, getMetricas, resetAllOrders,
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
-  aplicarPrecos, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
+  aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
@@ -985,14 +985,18 @@ export function Atelie({
     setSavingPrices(true);
     try {
       const result = await aplicarPrecos({ precos: prices, tamanhos: sizes });
-      await publishVitrine();
       setSheet({
         type: 'info',
         label: `Preços atualizados em ${result.atualizados} perfume(s) e publicados na vitrine.`,
       });
       await load();
-    } catch {
-      setSheet({ type: 'info', label: 'Não foi possível aplicar os preços.' });
+    } catch (error) {
+      setSheet({
+        type: 'info',
+        label: error instanceof ApiError
+          ? `Não foi possível aplicar os preços: ${error.message}`
+          : 'Não foi possível aplicar os preços. Tente novamente.',
+      });
     } finally {
       setSavingPrices(false);
     }

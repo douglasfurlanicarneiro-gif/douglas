@@ -122,7 +122,12 @@ export const padronizarTamanhos = () => request<{
 export const aplicarPrecos = (data: {
   precos: { ml: number; preco: number }[];
   tamanhos: number[];
-}) => request<{ atualizados: number; tamanhos: number[] }>('/perfumes/aplicar-precos', {
+}) => request<{
+  atualizados: number;
+  tamanhos: number[];
+  itensPublicados: number;
+  atualizadoEm: string;
+}>('/perfumes/aplicar-precos', {
   method: 'POST',
   body: JSON.stringify(data),
 }, true);

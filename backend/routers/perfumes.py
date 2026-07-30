@@ -5,9 +5,11 @@ from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
+from pymongo import UpdateOne
 
 from database import get_db
 from availability import apply_ready_delivery
+from routers.vitrine import publicar_snapshot
 from security import require_atelie_auth
 from utils import next_seq, serialize
 
@@ -203,6 +205,24 @@ class AplicarPrecosPayload(BaseModel):
     tamanhos: List[int] = Field(default_factory=list, max_length=3)
 
 
+def _novos_precos(
+    precos_atuais: list[dict],
+    precos_informados: dict[int, float],
+    tamanhos: set[int],
+) -> list[dict]:
+    atuais = {
+        int(item.get("ml", 0)): float(item.get("preco", 0))
+        for item in (precos_atuais or [])
+        if item.get("ml")
+    }
+    for ml in tamanhos:
+        atuais[ml] = float(precos_informados[ml])
+    return [
+        {"ml": ml, "preco": preco}
+        for ml, preco in sorted(atuais.items())
+    ]
+
+
 @router.post("/bulk-import")
 async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_atelie_auth)):
     db = get_db()
@@ -270,28 +290,41 @@ async def aplicar_precos(payload: AplicarPrecosPayload, _: str = Depends(require
     if not tamanhos or not tamanhos.issubset(precos_informados.keys()):
         raise HTTPException(status_code=400, detail="Informe um preço para cada tamanho selecionado.")
 
-    atualizados = 0
-    async for perfume in db.perfumes.find():
-        atuais = {
-            int(item.get("ml", 0)): float(item.get("preco", 0))
-            for item in perfume.get("precos", [])
-            if item.get("ml")
-        }
-        for ml in tamanhos:
-            atuais[ml] = float(precos_informados[ml])
-        novos = [
-            {"ml": ml, "preco": preco}
-            for ml, preco in sorted(atuais.items())
-        ]
-        await db.perfumes.update_one(
+    perfumes = await db.perfumes.find({}, {"_id": 1, "precos": 1}).to_list(5000)
+    operacoes = [
+        UpdateOne(
             {"_id": perfume["_id"]},
-            {"$set": {"precos": novos}},
+            {"$set": {
+                "precos": _novos_precos(
+                    perfume.get("precos", []),
+                    precos_informados,
+                    tamanhos,
+                ),
+            }},
         )
-        atualizados += 1
+        for perfume in perfumes
+    ]
+    if operacoes:
+        await db.perfumes.bulk_write(operacoes, ordered=False)
+
+    publicacao = await publicar_snapshot(db, registrar_operacao=False)
+    atualizado_em = datetime.now(timezone.utc).isoformat()
+    await db.operacoes_sistema.insert_one({
+        "tipo": "aplicar_precos",
+        "titulo": "Preços do catálogo atualizados",
+        "detalhes": (
+            f"{len(perfumes)} perfume(s) atualizados nos tamanhos "
+            f"{', '.join(f'{ml}ml' for ml in sorted(tamanhos))} e vitrine publicada."
+        ),
+        "perfumesAfetados": len(perfumes),
+        "quantidadeMl": 0,
+        "data": atualizado_em,
+    })
 
     return {
-        "atualizados": atualizados,
+        "atualizados": len(perfumes),
         "tamanhos": sorted(tamanhos),
+        **publicacao,
     }
 
 
