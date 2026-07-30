@@ -7,14 +7,15 @@ Variáveis de ambiente necessárias (ver config.py):
     MONGO_URL, DB_NAME, JWT_SECRET, ATELIE_ADMIN_USER, ATELIE_ADMIN_PASSWORD,
     CORS_ORIGINS (opcional, default "*")
 """
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
 from availability import ensure_initial_ready_delivery
+from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
 from database import get_db
 from routers import (
     acompanhamento,
@@ -37,11 +38,13 @@ from security import hash_password
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("atelie")
 
+# O bootstrap acessa o MongoDB e pode levar alguns segundos quando o cluster
+# está acordando. Ele não deve impedir o Uvicorn de abrir a porta no Render.
+_BOOTSTRAP_TIMEOUT_SECONDS = 120
+
 
 async def _seed_admin():
-    """Cria o usuário administrador do Ateliê na primeira inicialização,
-    lendo ATELIE_ADMIN_USER/ATELIE_ADMIN_PASSWORD do ambiente. A senha nunca
-    é guardada em texto puro — só o hash bcrypt."""
+    """Cria o usuário administrador na primeira inicialização."""
     if not ATELIE_ADMIN_USER or not ATELIE_ADMIN_PASSWORD:
         logger.warning(
             "ATELIE_ADMIN_USER/ATELIE_ADMIN_PASSWORD não configurados — "
@@ -75,11 +78,33 @@ async def _criar_indices():
     await db.operacoes_sistema.create_index("data")
 
 
-@asynccontextmanager
-async def lifespan(_: FastAPI):
-    await _seed_admin()
-    await _criar_indices()
-    disponibilidade = await ensure_initial_ready_delivery(get_db())
+async def _bootstrap_database() -> None:
+    """Executa as preparações do banco sem bloquear a abertura da API.
+
+    Antes, essas operações aconteciam antes do ``yield`` do lifespan. Se o
+    MongoDB demorasse para responder, o Uvicorn não abria a porta e o Render
+    encerrava o deploy com ``no open ports detected``.
+    """
+    try:
+        async with asyncio.timeout(_BOOTSTRAP_TIMEOUT_SECONDS):
+            await _seed_admin()
+            await _criar_indices()
+            disponibilidade = await ensure_initial_ready_delivery(get_db())
+    except TimeoutError:
+        logger.error(
+            "Bootstrap do banco excedeu %ss. A API continuará disponível e "
+            "uma nova tentativa ocorrerá no próximo reinício.",
+            _BOOTSTRAP_TIMEOUT_SECONDS,
+        )
+        return
+    except Exception:
+        # O erro fica registrado nos logs, mas não derruba o servidor web.
+        logger.exception(
+            "Não foi possível concluir o bootstrap do banco. "
+            "A API foi iniciada mesmo assim."
+        )
+        return
+
     logger.info(
         "Pronta entrega configurada: %s item(ns), %s não encontrado(s), %s ambíguo(s). "
         "Estoque zerado em %s item(ns) sob encomenda (%s ml).",
@@ -89,7 +114,22 @@ async def lifespan(_: FastAPI):
         disponibilidade.get("estoquesZerados", 0),
         disponibilidade.get("quantidadeZeradaMl", 0),
     )
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Agenda o bootstrap e libera imediatamente a inicialização do Uvicorn.
+    # Assim o Render detecta a porta mesmo se o MongoDB estiver lento.
+    bootstrap_task = asyncio.create_task(
+        _bootstrap_database(),
+        name="bootstrap-database",
+    )
     yield
+
+    if not bootstrap_task.done():
+        bootstrap_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await bootstrap_task
 
 
 app = FastAPI(title="L’Essence Furlani API", lifespan=lifespan)
@@ -120,3 +160,9 @@ app.include_router(admin.router)
 @app.get("/")
 async def raiz():
     return {"status": "ok", "servico": "L’Essence Furlani API"}
+
+
+@app.get("/health")
+async def health():
+    """Health check leve, sem depender do MongoDB."""
+    return {"status": "ok"}

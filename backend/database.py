@@ -18,7 +18,12 @@ def get_client() -> AsyncIOMotorClient:
                 "MONGO_URL não configurado. Defina essa variável de ambiente "
                 "(no Render: Environment) apontando para o cluster MongoDB."
             )
-        _client = AsyncIOMotorClient(MONGO_URL)
+        _client = AsyncIOMotorClient(
+            MONGO_URL,
+            serverSelectionTimeoutMS=10_000,
+            connectTimeoutMS=10_000,
+            socketTimeoutMS=20_000,
+        )
     return _client
 
 
