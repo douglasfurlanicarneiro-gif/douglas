@@ -1004,25 +1004,46 @@ export function Atelie({
     .toUpperCase();
 
   const load = useCallback(async () => {
+    const optional = async <T,>(label: string, promise: Promise<T>): Promise<T | null> => {
+      try {
+        return await promise;
+      } catch (error) {
+        console.error(`[painel] Falha ao carregar ${label}`, error);
+        return null;
+      }
+    };
+
     try {
-      const [p, m, pe, o, s, c, e, metrics, shipping, store, catalogStock] = await Promise.all([
-        listPerfumes(), listMovimentos(), listPedidos(), listOpinioes(), listSugestoes(), listCompras(),
-        getEstoqueResumo().catch(async () => {
+      const estoque = getEstoqueResumo().catch(async () => {
           const mapa = await getEstoqueMap();
           return Object.fromEntries(Object.entries(mapa).map(([id, saldoAtualMl]) => [
             id,
             { saldoAtualMl, reservadoMl: 0, disponivelMl: saldoAtualMl },
           ]));
-        }),
-        getMetricas().catch(() => null),
-        getConfiguracaoFrete().catch(() => null),
-        getConfiguracoesLoja().catch(() => null),
-        getCatalogoEstoqueResumo().catch(() => null),
+        });
+      const [p, m, pe, o, s, c, e, metrics, shipping, store, catalogStock] = await Promise.all([
+        optional('catálogo', listPerfumes()),
+        optional('movimentos', listMovimentos()),
+        optional('pedidos', listPedidos()),
+        optional('opiniões', listOpinioes()),
+        optional('sugestões', listSugestoes()),
+        optional('compras', listCompras()),
+        optional('estoque', estoque),
+        optional('métricas', getMetricas()),
+        optional('frete', getConfiguracaoFrete()),
+        optional('configurações', getConfiguracoesLoja()),
+        optional('resumo do catálogo', getCatalogoEstoqueResumo()),
       ]);
-      setPerfumes(p); setMovimentos(m); setPedidos(pe); setOpinioes(o); setSugestoes(s); setCompras(c); setEstoqueResumo(e);
-      setMetricas(metrics);
-      setFreteConfig(shipping);
-      setCatalogoEstoque(catalogStock);
+      if (p) setPerfumes(p);
+      if (m) setMovimentos(m);
+      if (pe) setPedidos(pe);
+      if (o) setOpinioes(o);
+      if (s) setSugestoes(s);
+      if (c) setCompras(c);
+      if (e) setEstoqueResumo(e);
+      if (metrics) setMetricas(metrics);
+      if (shipping) setFreteConfig(shipping);
+      if (catalogStock) setCatalogoEstoque(catalogStock);
       if (store) setStoreConfig(store);
       if (shipping) {
         setFreteFeeInput(shipping.taxaEmbalagem.toFixed(2).replace('.', ','));

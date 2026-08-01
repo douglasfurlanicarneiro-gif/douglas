@@ -27,6 +27,7 @@ const FAVORITES_KEY = 'favorite-perfumes-v1';
 const ORDERS_KEY_PREFIX = 'customer-orders-v';
 const ORDERS_INITIAL_VERSION = 2;
 const CART_KEY = 'customer-cart-v1';
+const VITRINE_CACHE_KEY = 'storefront-snapshot-v1';
 type SavedCartLine = { perfumeId: string; ml: number; quantidade: number };
 const PRODUCT_CARD_COLORS = {
   background: '#F3EDE3',
@@ -186,6 +187,8 @@ export function Vitrine({
   const supportNumber = whatsappNumber(currentStore.whatsapp);
   const instagramUrl = instagramLink(currentStore.instagram);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [usingCache, setUsingCache] = useState(false);
   const [storeLogoFailed, setStoreLogoFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [snapshot, setSnapshot] = useState<{ atualizadoEm: string | null; itens: VitrineItem[] } | null>(null);
@@ -227,6 +230,7 @@ export function Vitrine({
 
   const load = useCallback(async () => {
     try {
+      setLoadError(false);
       const [r] = await Promise.all([
         getVitrine(),
         onRefreshStoreConfig
@@ -234,12 +238,32 @@ export function Vitrine({
           : Promise.resolve(undefined),
       ]);
       setSnapshot(r);
+      setUsingCache(false);
+      storage.setItem(VITRINE_CACHE_KEY, JSON.stringify(r));
     } catch {
-      setSnapshot({ atualizadoEm: null, itens: [] });
+      setLoadError(true);
     } finally { setLoading(false); setRefreshing(false); }
   }, [onRefreshStoreConfig]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const start = async () => {
+      const cached = await storage.getItem(VITRINE_CACHE_KEY, '');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as { atualizadoEm: string | null; itens: VitrineItem[] };
+          if (Array.isArray(parsed.itens) && parsed.itens.length > 0) {
+            setSnapshot(parsed);
+            setUsingCache(true);
+            setLoading(false);
+          }
+        } catch {
+          storage.removeItem(VITRINE_CACHE_KEY);
+        }
+      }
+      await load();
+    };
+    start();
+  }, [load]);
   useEffect(() => setStoreLogoFailed(false), [currentStore.logoUrl]);
 
   const syncOrdersStorage = useCallback(async (loadSaved = false) => {
@@ -466,7 +490,10 @@ export function Vitrine({
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={COLORS.gold} />
-          <Text style={{ color: COLORS.gold, marginTop: 12 }}>Preparando as fragrâncias…</Text>
+          <Text style={{ color: COLORS.gold, marginTop: 12 }}>Conectando à vitrine…</Text>
+          <Text style={{ color: COLORS.muted, marginTop: 6, textAlign: 'center', paddingHorizontal: 32 }}>
+            No primeiro acesso, o servidor gratuito pode levar alguns instantes para acordar.
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -517,6 +544,20 @@ export function Vitrine({
               {(!currentStore.logoUrl || storeLogoFailed) && <Text style={styles.h1}>{brand.title}</Text>}
               <Text style={styles.subtitle}>PERFUMARIA AUTORAL</Text>
             </View>
+            {usingCache && (
+              <View style={{ marginHorizontal: SPACING.lg, marginBottom: SPACING.md, padding: 12, borderRadius: RADIUS.md, backgroundColor: STOREFRONT_COLORS.surfaceRaised }}>
+                <Text style={{ color: STOREFRONT_COLORS.ink, fontSize: 12, textAlign: 'center' }}>
+                  {loadError ? 'Mostrando a última vitrine salva.' : 'Atualizando a vitrine em segundo plano…'}
+                </Text>
+                {loadError && (
+                  <Pressable onPress={() => { setRefreshing(true); load(); }} testID="vitrine-retry-cached">
+                    <Text style={{ color: COLORS.gold, fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 6 }}>
+                      Tentar atualizar novamente
+                    </Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
             {!showEmpty && (
               <View style={{ paddingHorizontal: SPACING.lg }}>
                 <View style={styles.searchBox}>
@@ -613,8 +654,23 @@ export function Vitrine({
         ListEmptyComponent={
           showEmpty ? (
             <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
-              <Text style={[styles.h1, { fontSize: 22, marginTop: 32 }]}>Vitrine em preparação</Text>
-              <Text style={{ color: COLORS.muted, marginTop: 6, textAlign: 'center' }}>Volte em breve para conferir a coleção.</Text>
+              <Text style={[styles.h1, { fontSize: 22, marginTop: 32 }]}>
+                {loadError ? 'Não foi possível conectar' : 'Vitrine em preparação'}
+              </Text>
+              <Text style={{ color: COLORS.muted, marginTop: 6, textAlign: 'center' }}>
+                {loadError
+                  ? 'O servidor gratuito pode estar acordando. Aguarde um momento e tente novamente.'
+                  : 'Volte em breve para conferir a coleção.'}
+              </Text>
+              {loadError && (
+                <Pressable
+                  onPress={() => { setLoading(true); load(); }}
+                  style={{ marginTop: SPACING.md, paddingHorizontal: 18, paddingVertical: 11, borderRadius: RADIUS.pill, backgroundColor: COLORS.gold }}
+                  testID="vitrine-retry"
+                >
+                  <Text style={{ color: COLORS.ink, fontWeight: '700' }}>Tentar novamente</Text>
+                </Pressable>
+              )}
             </View>
           ) : (
             <View style={{ paddingHorizontal: SPACING.lg }}>

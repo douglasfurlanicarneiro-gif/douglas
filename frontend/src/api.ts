@@ -25,6 +25,13 @@ export const API = `${BASE}/api`;
 
 const TOKEN_KEY = 'atelie-token-v1';
 const REQUEST_TIMEOUT_MS = 15000;
+const READ_REQUEST_TIMEOUT_MS = 65000;
+const COLD_START_TIMEOUT_MS = 65000;
+
+type VitrineResponse = {
+  atualizadoEm: string | null;
+  itens: Perfume[];
+};
 
 export class ApiError extends Error {
   constructor(
@@ -66,7 +73,12 @@ export async function saveToken(token: string) { await storage.secureSet(TOKEN_K
 export async function getToken(): Promise<string | null> { return storage.secureGet(TOKEN_KEY, null); }
 export async function clearToken() { await storage.secureRemove(TOKEN_KEY); }
 
-async function request<T>(path: string, opts: RequestInit = {}, needsAuth = false): Promise<T> {
+async function request<T>(
+  path: string,
+  opts: RequestInit = {},
+  needsAuth = false,
+  timeoutMs?: number,
+): Promise<T> {
   const headers = new Headers(opts.headers);
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (needsAuth) {
@@ -75,7 +87,9 @@ async function request<T>(path: string, opts: RequestInit = {}, needsAuth = fals
     headers.set('x-atelie-token', t);
   }
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const effectiveTimeout = timeoutMs
+    ?? ((!opts.method || opts.method === 'GET') ? READ_REQUEST_TIMEOUT_MS : REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
   try {
     const response = await fetch(`${API}${path}`, { ...opts, headers, signal: controller.signal });
     const body = await response.json().catch(() => null);
@@ -207,7 +221,18 @@ export const createOpiniao = (data: Omit<Opiniao, 'id' | 'data'>) => request<Opi
 export const deleteOpiniao = (id: string) => request<{ status: string }>(`/opinioes/${id}`, { method: 'DELETE' }, true);
 
 // Vitrine
-export const getVitrine = () => request<{ atualizadoEm: string | null; itens: Perfume[] }>('/vitrine');
+export async function getVitrine(): Promise<VitrineResponse> {
+  try {
+    return await request<VitrineResponse>('/vitrine', {}, false, COLD_START_TIMEOUT_MS);
+  } catch (error) {
+    if (!(error instanceof ApiError) || ![0, 408, 502, 503, 504].includes(error.status)) {
+      throw error;
+    }
+    // O plano gratuito do Render pode estar terminando de acordar. Uma segunda
+    // tentativa curta evita obrigar o cliente a fechar e abrir o aplicativo.
+    return request<VitrineResponse>('/vitrine', {}, false, 20000);
+  }
+}
 export const publishVitrine = () => request<{ atualizadoEm: string; itensPublicados: number }>('/vitrine/publish', { method: 'POST' }, true);
 
 // Sugestões
