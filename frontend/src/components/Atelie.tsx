@@ -11,7 +11,7 @@ import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
   listPerfumes, createPerfume, updatePerfume, deletePerfume, bulkImport, padronizarTamanhos,
-  listMovimentos, createMovimento, getEstoqueMap, getEstoqueResumo,
+  listMovimentos, createMovimento, getEstoqueMap, getEstoqueResumo, conferirEstoque,
   atualizarDisponibilidadeCatalogo,
   getCatalogoEstoqueResumo, completarEstoqueProntaEntrega, zerarEstoqueSobEncomenda,
   listPedidos, createPedido, updatePedido, deletePedido,
@@ -25,7 +25,7 @@ import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts } from '../storeConfig';
 
-type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'pedido'; data?: Pedido }
+type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'availability' }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
   | { type: 'info'; label: string };
@@ -679,6 +679,94 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
   );
 }
 
+function StockCountForm({ perfumes, resumo, initial, onSave, onCancel }: {
+  perfumes: Perfume[];
+  resumo: EstoqueResumo;
+  initial?: Perfume;
+  onSave: (data: { perfumeId: string; quantidadeFisicaMl: number; saldoEsperadoMl: number; motivo: string }) => void;
+  onCancel: () => void;
+}) {
+  const [search, setSearch] = useState(initial?.nome || '');
+  const [perfumeId, setPerfumeId] = useState(initial?.id || perfumes[0]?.id || '');
+  const selected = perfumes.find((perfume) => perfume.id === perfumeId);
+  const current = resumo[perfumeId] || { saldoAtualMl: 0, reservadoMl: 0, disponivelMl: 0 };
+  const [quantity, setQuantity] = useState(String(current.saldoAtualMl));
+  const [reason, setReason] = useState('Conferência física');
+  const found = Number(quantity);
+  const valid = Number.isInteger(found) && found >= 0;
+  const difference = valid ? found - current.saldoAtualMl : 0;
+  const availableAfter = valid ? found - current.reservadoMl : current.disponivelMl;
+  const filtered = perfumes
+    .filter((perfume) => perfume.nome.toLowerCase().includes(search.trim().toLowerCase()))
+    .slice(0, 20);
+
+  const selectPerfume = (perfume: Perfume) => {
+    const item = resumo[perfume.id] || { saldoAtualMl: 0, reservadoMl: 0, disponivelMl: 0 };
+    setPerfumeId(perfume.id);
+    setSearch(perfume.nome);
+    setQuantity(String(item.saldoAtualMl));
+  };
+
+  return (
+    <View>
+      <Field label="Buscar essência">
+        <TInput value={search} onChangeText={setSearch} placeholder="Digite o nome do perfume" testID="stock-count-search" />
+      </Field>
+      {(!selected || search.trim().toLowerCase() !== selected.nome.toLowerCase()) && (
+        <ScrollView style={styles.stockCountResults} keyboardShouldPersistTaps="handled">
+          {filtered.map((perfume) => (
+            <Pressable key={perfume.id} onPress={() => selectPerfume(perfume)} style={styles.stockCountResultRow}>
+              <Text style={styles.stockCountResultName}>Nº{padSeq(perfume.seq)} · {perfume.nome}</Text>
+              <Text style={styles.stockCountResultBalance}>{(resumo[perfume.id]?.saldoAtualMl || 0)}ml</Text>
+            </Pressable>
+          ))}
+          {filtered.length === 0 && <Text style={styles.stockCountEmpty}>Nenhuma essência encontrada.</Text>}
+        </ScrollView>
+      )}
+
+      {!!selected && (
+        <>
+          <View style={styles.stockCountSelected}>
+            <Text style={styles.stockCountEyebrow}>ESSÊNCIA SELECIONADA</Text>
+            <Text style={styles.stockCountTitle}>{selected.nome}</Text>
+            <View style={styles.stockCountSummaryRow}>
+              <View style={styles.stockCountSummaryItem}><Text style={styles.stockCountValue}>{current.saldoAtualMl}ml</Text><Text style={styles.stockCountLabel}>Físico registrado</Text></View>
+              <View style={styles.stockCountSummaryItem}><Text style={styles.stockCountValue}>{current.reservadoMl}ml</Text><Text style={styles.stockCountLabel}>Reservado</Text></View>
+              <View style={styles.stockCountSummaryItem}><Text style={styles.stockCountValue}>{current.disponivelMl}ml</Text><Text style={styles.stockCountLabel}>Disponível</Text></View>
+            </View>
+          </View>
+          <Field label="Quantidade física encontrada (ml)">
+            <TInput keyboardType="numeric" value={quantity} onChangeText={setQuantity} placeholder="0" testID="stock-count-quantity" />
+          </Field>
+          <View style={[styles.stockCountPreview, availableAfter < 0 && { borderColor: COLORS.rust + '88' }]}>
+            <Feather name={difference >= 0 ? 'arrow-up-circle' : 'arrow-down-circle'} size={19} color={difference === 0 ? COLORS.muted : difference > 0 ? COLORS.sage : COLORS.rust} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.stockCountPreviewTitle}>
+                {!valid ? 'Informe uma quantidade válida' : difference === 0 ? 'Nenhum ajuste necessário' : `${difference > 0 ? 'Entrada' : 'Saída'} automática de ${Math.abs(difference)}ml`}
+              </Text>
+              <Text style={[styles.stockCountPreviewHint, availableAfter < 0 && { color: COLORS.rust }]}>
+                Após a conferência: {availableAfter}ml disponíveis{availableAfter < 0 ? ' · saldo insuficiente para as reservas' : ''}
+              </Text>
+            </View>
+          </View>
+          <Field label="Motivo ou observação">
+            <TInput value={reason} onChangeText={setReason} placeholder="Ex.: contagem mensal" />
+          </Field>
+        </>
+      )}
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
+        <SecondaryButton label="Cancelar" onPress={onCancel} />
+        <PrimaryButton
+          label="Confirmar contagem"
+          disabled={!selected || !valid}
+          onPress={() => selected && valid && onSave({ perfumeId: selected.id, quantidadeFisicaMl: found, saldoEsperadoMl: current.saldoAtualMl, motivo: reason })}
+          testID="stock-count-save"
+        />
+      </View>
+    </View>
+  );
+}
+
 function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
   const [f, setF] = useState<any>(initial || { cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [] });
   const pedidoRecebido = Boolean(initial?.id);
@@ -1282,6 +1370,24 @@ export function Atelie({
     load();
   };
   const doMov = async (data: any) => { await createMovimento(data); setSheet(null); load(); };
+  const doStockCount = async (data: { perfumeId: string; quantidadeFisicaMl: number; saldoEsperadoMl: number; motivo: string }) => {
+    try {
+      const result = await conferirEstoque(data);
+      const perfume = perfumes.find((item) => item.id === data.perfumeId);
+      setSheet({
+        type: 'info',
+        label: result.alterado
+          ? `${perfume?.nome || 'Estoque'} conferido: ${result.saldoAnteriorMl}ml → ${result.saldoAtualMl}ml. Ajuste de ${result.diferencaMl > 0 ? '+' : ''}${result.diferencaMl}ml registrado no histórico.`
+          : `${perfume?.nome || 'Estoque'} conferido. O saldo de ${result.saldoAtualMl}ml já estava correto e nenhum lançamento foi criado.`,
+      });
+      await load();
+    } catch (error) {
+      setSheet({
+        type: 'info',
+        label: error instanceof ApiError ? error.message : 'Não foi possível concluir a conferência do estoque.',
+      });
+    }
+  };
   const doCompletarProntaEntrega = async () => {
     try {
       const result = await completarEstoqueProntaEntrega(1000);
@@ -1447,6 +1553,7 @@ export function Atelie({
   const sheetTitle = !sheet ? '' :
     sheet.type === 'perfume' ? (sheet.data ? 'Editar contratipo' : 'Novo contratipo') :
     sheet.type === 'movimento' ? 'Lançar estoque' :
+    sheet.type === 'stock-count' ? 'Conferir estoque físico' :
     sheet.type === 'pedido' ? (sheet.data ? 'Editar pedido' : 'Novo pedido') :
     sheet.type === 'availability' ? 'Gerenciar pronta entrega' :
     sheet.type === 'confirm' ? (sheet.danger ? 'Confirmar exclusão' : 'Confirmar') : 'Aviso';
@@ -1640,6 +1747,10 @@ export function Atelie({
                     </Text>
                   </View>
                 )}
+                <Pressable onPress={() => setSheet({ type: 'stock-count', data: p })} style={styles.stockCountButton}>
+                  <Feather name="check-square" size={14} color={COLORS.gold} />
+                  <Text style={styles.stockCountButtonText}>Conferir quantidade física</Text>
+                </Pressable>
               </View>
             );
           })}
@@ -2266,10 +2377,10 @@ export function Atelie({
             <SystemAction icon="refresh-cw" title="Reimportar fornecedores" subtitle="Sincroniza novamente a Nova Essência." onPress={doImport} />
             <SystemAction
               icon="package"
-              title="Como funcionará Atualizar estoque"
-              subtitle="Confira o fluxo planejado para conferência e reposição."
-              badge="ENTENDA"
-              onPress={() => setSheet({ type: 'info', label: 'Atualizar estoque permitirá conferir os saldos atuais, informar a quantidade física encontrada e registrar automaticamente apenas a diferença como entrada ou saída, preservando todo o histórico.' })}
+              title="Atualizar estoque por contagem"
+              subtitle="Informe a quantidade física encontrada e registre somente a diferença."
+              badge="ATIVO"
+              onPress={() => setSheet({ type: 'stock-count' })}
             />
             <SystemAction
               icon="image"
@@ -2343,6 +2454,15 @@ export function Atelie({
       <BottomSheet visible={!!sheet} onClose={() => setSheet(null)} title={sheetTitle}>
         {sheet?.type === 'perfume' && <PerfumeForm initial={sheet.data} onSave={doSavePerfume} onCancel={() => setSheet(null)} />}
         {sheet?.type === 'movimento' && <MovimentoForm perfumes={perfumes} onSave={doMov} onCancel={() => setSheet(null)} />}
+        {sheet?.type === 'stock-count' && (
+          <StockCountForm
+            perfumes={perfumes}
+            resumo={estoqueResumo}
+            initial={sheet.data}
+            onSave={doStockCount}
+            onCancel={() => setSheet(null)}
+          />
+        )}
         {sheet?.type === 'pedido' && (
           <PedidoForm
             perfumes={perfumes}
@@ -2510,6 +2630,23 @@ const styles = StyleSheet.create({
   stockBreakdownText: { color: COLORS.muted, fontSize: 10 },
   stockAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7 },
   stockAlertText: { color: COLORS.rust, fontSize: 10, flex: 1 },
+  stockCountButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 9, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surfaceRaised },
+  stockCountButtonText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
+  stockCountResults: { maxHeight: 210, marginTop: -8, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
+  stockCountResultRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  stockCountResultName: { flex: 1, color: COLORS.bone, fontSize: 11 },
+  stockCountResultBalance: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
+  stockCountEmpty: { color: COLORS.muted, fontSize: 11, padding: SPACING.md, textAlign: 'center' },
+  stockCountSelected: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surfaceRaised },
+  stockCountEyebrow: { color: COLORS.gold, fontSize: 8, letterSpacing: 1.1 },
+  stockCountTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700', marginTop: 3, marginBottom: 10 },
+  stockCountSummaryRow: { flexDirection: 'row', gap: 7 },
+  stockCountSummaryItem: { flex: 1, padding: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  stockCountValue: { color: COLORS.gold, fontSize: 13, fontWeight: '700' },
+  stockCountLabel: { color: COLORS.muted, fontSize: 8, lineHeight: 11, marginTop: 2 },
+  stockCountPreview: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 11, marginTop: -6, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  stockCountPreviewTitle: { color: COLORS.bone, fontSize: 11, fontWeight: '600' },
+  stockCountPreviewHint: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
   swipeOrderHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm, paddingHorizontal: 2 },
   swipeOrderHintText: { color: COLORS.muted, fontSize: 11, flex: 1 },
   ordersManagement: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },

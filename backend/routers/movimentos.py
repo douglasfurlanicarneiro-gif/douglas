@@ -45,6 +45,20 @@ class CompletarEstoqueIn(BaseModel):
     somentePublicaveis: bool = True
 
 
+class ConferenciaEstoqueIn(BaseModel):
+    perfumeId: str
+    quantidadeFisicaMl: int = Field(ge=0, le=1_000_000)
+    saldoEsperadoMl: int | None = Field(default=None, ge=-1_000_000, le=1_000_000)
+    motivo: str = Field(default="Conferência física", max_length=200)
+
+
+def calcular_ajuste_contagem(saldo_atual: int, quantidade_fisica: int) -> tuple[str, int] | None:
+    diferenca = quantidade_fisica - saldo_atual
+    if diferenca == 0:
+        return None
+    return ("entrada" if diferenca > 0 else "saida", abs(diferenca))
+
+
 @router.get("/api/movimentos")
 async def listar_movimentos(_: str = Depends(require_atelie_auth)):
     db = get_db()
@@ -101,6 +115,67 @@ async def completar_estoque(payload: CompletarEstoqueIn, _: str = Depends(requir
         "perfumesConsiderados": len(perfumes),
         "perfumesAtualizados": len(movimentos),
         "estoqueAlvoMl": payload.quantidadeMl,
+    }
+
+
+@router.post("/api/estoque/conferir")
+async def conferir_estoque(payload: ConferenciaEstoqueIn, _: str = Depends(require_atelie_auth)):
+    """Registra somente a diferença entre o saldo atual e a contagem física."""
+    db = get_db()
+    try:
+        perfume_oid = ObjectId(payload.perfumeId)
+    except InvalidId as exc:
+        raise HTTPException(status_code=400, detail="Perfume inválido.") from exc
+    perfume = await db.perfumes.find_one({"_id": perfume_oid}, {"nome": 1})
+    if not perfume:
+        raise HTTPException(status_code=404, detail="Perfume não encontrado.")
+
+    saldo_atual = 0
+    pipeline = [
+        {"$match": {"perfumeId": payload.perfumeId}},
+        *_PIPELINE_ESTOQUE,
+    ]
+    async for linha in db.movimentos.aggregate(pipeline):
+        saldo_atual = int(linha["total"])
+
+    if payload.saldoEsperadoMl is not None and payload.saldoEsperadoMl != saldo_atual:
+        raise HTTPException(
+            status_code=409,
+            detail=f"O saldo mudou para {saldo_atual}ml. Atualize a tela e confira novamente.",
+        )
+
+    ajuste = calcular_ajuste_contagem(saldo_atual, payload.quantidadeFisicaMl)
+    if not ajuste:
+        return {
+            "alterado": False,
+            "saldoAnteriorMl": saldo_atual,
+            "saldoAtualMl": saldo_atual,
+            "diferencaMl": 0,
+            "movimento": None,
+        }
+
+    tipo, quantidade = ajuste
+    agora = datetime.now(timezone.utc).isoformat()
+    motivo = payload.motivo.strip() or "Conferência física"
+    doc = {
+        "perfumeId": payload.perfumeId,
+        "tipo": tipo,
+        "quantidadeMl": quantidade,
+        "motivo": motivo,
+        "categoria": "conferencia-inventario",
+        "origem": "conferencia-fisica",
+        "saldoAnteriorMl": saldo_atual,
+        "saldoEncontradoMl": payload.quantidadeFisicaMl,
+        "data": agora,
+    }
+    resultado = await db.movimentos.insert_one(doc)
+    novo = await db.movimentos.find_one({"_id": resultado.inserted_id})
+    return {
+        "alterado": True,
+        "saldoAnteriorMl": saldo_atual,
+        "saldoAtualMl": payload.quantidadeFisicaMl,
+        "diferencaMl": payload.quantidadeFisicaMl - saldo_atual,
+        "movimento": serialize(novo),
     }
 
 

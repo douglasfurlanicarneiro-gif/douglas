@@ -160,6 +160,21 @@ export const completarEstoque = (quantidadeMl = 1000) => request<{
 export const getEstoqueMap = () => request<Record<string, number>>('/estoque');
 export const getEstoqueResumo = () =>
   request<import('./types').EstoqueResumo>('/estoque/resumo', {}, true);
+export const conferirEstoque = (data: {
+  perfumeId: string;
+  quantidadeFisicaMl: number;
+  saldoEsperadoMl: number;
+  motivo: string;
+}) => request<{
+  alterado: boolean;
+  saldoAnteriorMl: number;
+  saldoAtualMl: number;
+  diferencaMl: number;
+  movimento: Movimento | null;
+}>('/estoque/conferir', {
+  method: 'POST',
+  body: JSON.stringify(data),
+}, true);
 export const getCatalogoEstoqueResumo = () =>
   request<CatalogoEstoqueResumo>('/admin/catalogo-estoque/resumo', {}, true);
 export const atualizarDisponibilidadeCatalogo = (ids: string[]) => request<{
