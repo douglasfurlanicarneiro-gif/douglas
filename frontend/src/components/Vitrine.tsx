@@ -239,7 +239,7 @@ function VitrineCard({
 function NoteRow({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.noteRow}>
-      <Text style={styles.noteLabel}>{label}</Text>
+      <Text style={styles.noteLabel} numberOfLines={1}>{label}</Text>
       <Text style={styles.noteValue}>{value}</Text>
     </View>
   );
@@ -1507,8 +1507,8 @@ const styles = StyleSheet.create({
   sizeButtonText: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.label, lineHeight: 15, fontWeight: '700' },
   sizePrice: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 12, marginTop: 1 },
   notes: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10, gap: 6 },
-  noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  noteLabel: { width: 58, color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, letterSpacing: 0.8 },
+  noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  noteLabel: { width: 72, flexShrink: 0, color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, letterSpacing: 0.8 },
   noteValue: { flex: 1, color: PRODUCT_CARD_COLORS.text, fontSize: FONT_SIZES.caption, lineHeight: 15, fontStyle: 'italic' },
   notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
   notesEmptyText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, fontStyle: 'italic' },

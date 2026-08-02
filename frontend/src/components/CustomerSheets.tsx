@@ -238,7 +238,7 @@ export function PerfumeDetailSheet({
 function Note({ label, value }: { label: string; value?: string }) {
   return (
     <View style={styles.noteRow}>
-      <Text style={styles.noteLabel}>{label}</Text>
+      <Text style={styles.noteLabel} numberOfLines={1}>{label}</Text>
       <Text style={styles.noteValue}>{value || 'Em atualização'}</Text>
     </View>
   );
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
   bodyText: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall },
   detailBodyText: { color: COLORS.bone },
   noteRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  noteLabel: { color: COLORS.muted, width: 70, fontSize: FONT_SIZES.caption },
+  noteLabel: { color: COLORS.muted, width: 72, flexShrink: 0, fontSize: FONT_SIZES.caption },
   noteValue: { color: COLORS.bone, flex: 1, fontSize: FONT_SIZES.bodySmall, fontStyle: 'italic' },
   sizeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   sizeButton: { minWidth: 94, flexGrow: 1, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: COLORS.gold, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
