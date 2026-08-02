@@ -1512,14 +1512,11 @@ export function Atelie({
     total: Number(data.total) || 0,
   });
   const offerWhatsAppStatusUpdate = (pedido: Pedido, previousStatus?: OrderStatus) => {
-    const previousIndex = previousStatus ? KANBAN_FLOW.indexOf(previousStatus) : -1;
-    const nextIndex = KANBAN_FLOW.indexOf(pedido.status);
     const phone = whatsappNumber(pedido.contato);
     const shouldOffer = Boolean(
       previousStatus
-      && nextIndex > previousIndex
+      && previousStatus !== pedido.status
       && WHATSAPP_NOTIFICATION_STATUSES.includes(pedido.status)
-      && phone.length >= 12,
     );
     if (!shouldOffer) return false;
 
@@ -1536,19 +1533,17 @@ export function Atelie({
     return true;
   };
   const openStatusWhatsApp = (data: Extract<NonNullable<SheetType>, { type: 'whatsapp' }>) => {
-    const encodedMessage = encodeURIComponent(data.message);
-    const appUrl = `whatsapp://send?phone=${data.phone}&text=${encodedMessage}`;
-    const webUrl = `https://wa.me/${data.phone}?text=${encodedMessage}`;
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      try {
-        window.location.assign(appUrl);
-      } catch {
-        window.location.assign(webUrl);
-      }
+    if (data.phone.length < 12) {
+      setSheet({ type: 'info', label: 'O status foi atualizado, mas este pedido não possui um WhatsApp válido. Abra o pedido e confira o campo Contato.' });
       return;
     }
-    Linking.openURL(appUrl)
-      .catch(() => Linking.openURL(webUrl))
+    const encodedMessage = encodeURIComponent(data.message);
+    const webUrl = `https://wa.me/${data.phone}?text=${encodedMessage}`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.assign(webUrl);
+      return;
+    }
+    Linking.openURL(webUrl)
       .catch(() => setSheet({ type: 'info', label: 'Não foi possível abrir o WhatsApp.' }));
   };
   const persistPedido = async (data: any, previous?: Pedido | null) => {
@@ -2593,14 +2588,21 @@ export function Atelie({
               </View>
             </View>
             <Text style={styles.whatsappStatusHint}>
-              A mensagem não será enviada automaticamente. Confira o texto e envie pelo WhatsApp.
+              {sheet.phone.length >= 12
+                ? 'A mensagem não será enviada automaticamente. Confira o texto e envie pelo WhatsApp.'
+                : 'O status foi salvo, mas o pedido não possui um WhatsApp válido. Confira o campo Contato do pedido.'}
             </Text>
             <View style={styles.whatsappMessagePreview}>
               <Text selectable style={styles.whatsappMessageText}>{sheet.message}</Text>
             </View>
             <View style={styles.whatsappStatusActions}>
-              <SecondaryButton label="Agora não" onPress={() => setSheet(null)} />
-              <PrimaryButton label="Abrir WhatsApp" onPress={() => openStatusWhatsApp(sheet)} testID="order-status-whatsapp" />
+              <SecondaryButton label={sheet.phone.length >= 12 ? 'Agora não' : 'Fechar'} onPress={() => setSheet(null)} />
+              <PrimaryButton
+                label={sheet.phone.length >= 12 ? 'Abrir WhatsApp' : 'WhatsApp não informado'}
+                onPress={() => openStatusWhatsApp(sheet)}
+                disabled={sheet.phone.length < 12}
+                testID="order-status-whatsapp"
+              />
             </View>
           </View>
         )}
