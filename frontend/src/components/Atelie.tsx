@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl, useWindowDimensions, Linking } from 'react-native';
+import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl, useWindowDimensions, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -23,11 +23,12 @@ import {
 } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
-import { publicStoreConfig, storeNameParts } from '../storeConfig';
+import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'availability' }
   | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
+  | { type: 'whatsapp'; phone: string; message: string; statusLabel: string }
   | { type: 'info'; label: string };
 
 type PedidoPainel = Pedido & {
@@ -52,6 +53,37 @@ const KANBAN_FLOW: OrderStatus[] = [
   'enviado',
   'entregue',
 ];
+
+const WHATSAPP_NOTIFICATION_STATUSES: OrderStatus[] = [
+  'pagamento_confirmado',
+  'preparando',
+  'pronto',
+  'enviado',
+  'entregue',
+];
+
+function statusWhatsAppMessage(pedido: Pedido, storeName: string, storefrontUrl: string) {
+  const updates: Partial<Record<OrderStatus, string>> = {
+    pagamento_confirmado: 'Recebemos a confirmação do seu pagamento.',
+    preparando: 'Seu pedido entrou em produção.',
+    pronto: pedido.entrega?.tipo === 'retirada'
+      ? 'Seu pedido está pronto para retirada. Vamos combinar o melhor horário.'
+      : 'Seu pedido está pronto e será enviado em breve.',
+    enviado: 'Seu pedido foi enviado.',
+    entregue: 'Seu pedido foi marcado como entregue. Esperamos que você aproveite seus perfumes!',
+  };
+  const lines = [
+    `Olá, ${pedido.cliente}!`,
+    `Seu pedido nº ${padSeq(pedido.seq)} da ${storeName} foi atualizado:`,
+    `*${updates[pedido.status] || 'Status atualizado.'}*`,
+  ];
+  if (pedido.codigoAcompanhamento) {
+    lines.push(`Código de acompanhamento: ${pedido.codigoAcompanhamento}.`);
+    lines.push('Para consultar, abra a vitrine e toque em “Pedidos”.');
+  }
+  lines.push(storefrontUrl);
+  return lines.join('\n');
+}
 
 function currentCatalogPrices(perfumes: Perfume[]) {
   const result = { 30: '50,00', 50: '80,00', 100: '120,00' };
@@ -1479,11 +1511,52 @@ export function Atelie({
     ajusteManual: Number(data.ajusteManual) || 0,
     total: Number(data.total) || 0,
   });
-  const persistPedido = async (data: any) => {
-    if (data.id) await updatePedido(data.id, pedidoPayload(data));
-    else await createPedido(pedidoPayload(data) as any);
-    setSheet(null);
+  const offerWhatsAppStatusUpdate = (pedido: Pedido, previousStatus?: OrderStatus) => {
+    const previousIndex = previousStatus ? KANBAN_FLOW.indexOf(previousStatus) : -1;
+    const nextIndex = KANBAN_FLOW.indexOf(pedido.status);
+    const phone = whatsappNumber(pedido.contato);
+    const shouldOffer = Boolean(
+      previousStatus
+      && nextIndex > previousIndex
+      && WHATSAPP_NOTIFICATION_STATUSES.includes(pedido.status)
+      && phone.length >= 12,
+    );
+    if (!shouldOffer) return false;
+
+    const statusLabel = STATUS.find((item) => item.id === pedido.status)?.label || 'Status atualizado';
+    const storefrontUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+      ? `${window.location.origin}/`
+      : 'https://lessence-furlani-vitrine.onrender.com/';
+    setSheet({
+      type: 'whatsapp',
+      phone,
+      statusLabel,
+      message: statusWhatsAppMessage(pedido, storePreview.nomeLoja, storefrontUrl),
+    });
+    return true;
+  };
+  const openStatusWhatsApp = (data: Extract<NonNullable<SheetType>, { type: 'whatsapp' }>) => {
+    const encodedMessage = encodeURIComponent(data.message);
+    const appUrl = `whatsapp://send?phone=${data.phone}&text=${encodedMessage}`;
+    const webUrl = `https://wa.me/${data.phone}?text=${encodedMessage}`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        window.location.assign(appUrl);
+      } catch {
+        window.location.assign(webUrl);
+      }
+      return;
+    }
+    Linking.openURL(appUrl)
+      .catch(() => Linking.openURL(webUrl))
+      .catch(() => setSheet({ type: 'info', label: 'Não foi possível abrir o WhatsApp.' }));
+  };
+  const persistPedido = async (data: any, previous?: Pedido | null) => {
+    const saved = data.id
+      ? await updatePedido(data.id, pedidoPayload(data))
+      : await createPedido(pedidoPayload(data) as any);
     await load();
+    if (!offerWhatsAppStatusUpdate(saved, previous?.status)) setSheet(null);
   };
   const doSavePedido = async (data: any) => {
     const anterior = data.id ? pedidos.find((pedido) => pedido.id === data.id) : null;
@@ -1491,14 +1564,14 @@ export function Atelie({
       setSheet({
         type: 'confirm',
         label: `Cancelar o pedido Nº ${padSeq(data.seq)} de ${data.cliente}? A reserva ou a baixa automática do estoque será liberada.`,
-        onConfirm: () => persistPedido(data),
+        onConfirm: () => persistPedido(data, anterior),
         confirmLabel: 'Cancelar pedido',
         danger: true,
         safetyText: 'O pedido sairá do fluxo ativo e a reserva ou baixa automática será liberada. O histórico continuará disponível.',
       });
       return;
     }
-    await persistPedido(data);
+    await persistPedido(data, anterior);
   };
   const doDelPedido = async (id: string) => { await deletePedido(id); setSheet(null); load(); };
   const requestDeletePedido = (pedido: Pedido) => {
@@ -1538,8 +1611,9 @@ export function Atelie({
     if (pedido.fonte !== 'pedidos' || pedido.status === status || movingOrderId) return;
     setMovingOrderId(pedido.id);
     try {
-      await updatePedido(pedido.id, pedidoPayload({ ...pedido, status }));
+      const saved = await updatePedido(pedido.id, pedidoPayload({ ...pedido, status }));
       await load();
+      offerWhatsAppStatusUpdate(saved, pedido.status);
     } catch {
       setSheet({ type: 'info', label: 'Não foi possível mover o pedido. Verifique a conexão e tente novamente.' });
     } finally {
@@ -1575,6 +1649,7 @@ export function Atelie({
     sheet.type === 'stock-count' ? 'Conferir estoque físico' :
     sheet.type === 'pedido' ? (sheet.data ? 'Editar pedido' : 'Novo pedido') :
     sheet.type === 'availability' ? 'Gerenciar pronta entrega' :
+    sheet.type === 'whatsapp' ? 'Avisar cliente' :
     sheet.type === 'confirm' ? (sheet.danger ? 'Confirmar exclusão' : 'Confirmar') : 'Aviso';
 
   const openCreate = () => {
@@ -2508,6 +2583,27 @@ export function Atelie({
         {sheet?.type === 'confirm' && (
           <ConfirmSheetContent sheet={sheet} onCancel={() => setSheet(null)} />
         )}
+        {sheet?.type === 'whatsapp' && (
+          <View>
+            <View style={styles.whatsappStatusNotice}>
+              <Feather name="check-circle" size={17} color={COLORS.sage} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.whatsappStatusTitle}>Status atualizado</Text>
+                <Text style={styles.whatsappStatusSubtitle}>{sheet.statusLabel}</Text>
+              </View>
+            </View>
+            <Text style={styles.whatsappStatusHint}>
+              A mensagem não será enviada automaticamente. Confira o texto e envie pelo WhatsApp.
+            </Text>
+            <View style={styles.whatsappMessagePreview}>
+              <Text selectable style={styles.whatsappMessageText}>{sheet.message}</Text>
+            </View>
+            <View style={styles.whatsappStatusActions}>
+              <SecondaryButton label="Agora não" onPress={() => setSheet(null)} />
+              <PrimaryButton label="Abrir WhatsApp" onPress={() => openStatusWhatsApp(sheet)} testID="order-status-whatsapp" />
+            </View>
+          </View>
+        )}
         {sheet?.type === 'info' && (
           <View>
             <Text style={{ color: COLORS.bone, marginBottom: SPACING.lg }}>{sheet.label}</Text>
@@ -2555,6 +2651,13 @@ const styles = StyleSheet.create({
   shippingConnectButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginTop: SPACING.sm },
   shippingConnectText: { color: COLORS.gold, fontSize: 12 },
   shippingEnvironment: { color: COLORS.muted, fontSize: 9, textAlign: 'center', marginTop: 8 },
+  whatsappStatusNotice: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.sage + '66', backgroundColor: COLORS.sage + '12' },
+  whatsappStatusTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '700' },
+  whatsappStatusSubtitle: { color: COLORS.sage, fontSize: 10, marginTop: 2 },
+  whatsappStatusHint: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginBottom: SPACING.sm },
+  whatsappMessagePreview: { padding: SPACING.md, marginBottom: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  whatsappMessageText: { color: COLORS.bone, fontSize: 12, lineHeight: 18 },
+  whatsappStatusActions: { flexDirection: 'row', gap: 8 },
   systemPage: { padding: SPACING.lg },
   systemBackButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 9, paddingHorizontal: 11, marginBottom: SPACING.md, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   systemBackText: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
