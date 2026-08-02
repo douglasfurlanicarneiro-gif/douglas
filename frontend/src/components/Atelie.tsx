@@ -53,6 +53,22 @@ const KANBAN_FLOW: OrderStatus[] = [
   'entregue',
 ];
 
+function currentCatalogPrices(perfumes: Perfume[]) {
+  const result = { 30: '50,00', 50: '80,00', 100: '120,00' };
+  for (const ml of [30, 50, 100] as const) {
+    const frequency = new Map<number, number>();
+    for (const perfume of perfumes) {
+      const price = perfume.precos?.find((item) => Number(item.ml) === ml)?.preco;
+      if (price == null || !Number.isFinite(Number(price))) continue;
+      const normalized = Math.round(Number(price) * 100) / 100;
+      frequency.set(normalized, (frequency.get(normalized) || 0) + 1);
+    }
+    const mostCommon = [...frequency.entries()].sort((first, second) => second[1] - first[1])[0]?.[0];
+    if (mostCommon != null) result[ml] = mostCommon.toFixed(2).replace('.', ',');
+  }
+  return result;
+}
+
 function StatCard({ label, value, icon, alert }: { label: string; value: string | number; icon: any; alert?: boolean }) {
   return (
     <View style={[styles.statCard, alert && { borderColor: COLORS.rust }]}>
@@ -1130,7 +1146,10 @@ export function Atelie({
         optional('configurações', getConfiguracoesLoja()),
         optional('resumo do catálogo', getCatalogoEstoqueResumo()),
       ]);
-      if (p) setPerfumes(p);
+      if (p) {
+        setPerfumes(p);
+        setPriceInputs(currentCatalogPrices(p));
+      }
       if (m) setMovimentos(m);
       if (pe) setPedidos(pe);
       if (o) setOpinioes(o);
@@ -2151,6 +2170,9 @@ export function Atelie({
           </SystemCard>
 
           <SystemCard icon="dollar-sign" title="Preços" subtitle="Defina os valores e aplique em todo o catálogo.">
+            <Text style={styles.systemPriceHint}>
+              Os campos abaixo carregam os preços mais usados atualmente no catálogo. Digitar um valor não altera a vitrine até você tocar em aplicar.
+            </Text>
             <View style={styles.systemFieldGrid}>
               {([30, 50, 100] as const).map((ml) => (
                 <View key={ml} style={styles.systemPriceField}>
@@ -2358,14 +2380,18 @@ export function Atelie({
               </View>
             </View>
             <Field label="Nome da loja"><TInput value={storeConfig.nomeLoja} onChangeText={(value) => setStoreField('nomeLoja', value)} testID="store-name-input" /></Field>
-            <Field label="Logo (endereço da imagem)"><TInput value={storeConfig.logoUrl} onChangeText={(value) => setStoreField('logoUrl', value)} autoCapitalize="none" testID="store-logo-input" /></Field>
+            <Field label="Logo no topo da vitrine (endereço da imagem)"><TInput value={storeConfig.logoUrl} onChangeText={(value) => setStoreField('logoUrl', value)} autoCapitalize="none" testID="store-logo-input" /></Field>
+            <Text style={styles.storeConfigHelp}>Este campo substitui o nome no topo da vitrine. O ícone instalado usa separadamente o logo claro oficial.</Text>
             <View style={styles.systemFieldGrid}>
               <View style={{ flex: 1 }}><Field label="WhatsApp"><TInput value={storeConfig.whatsapp} onChangeText={(value) => setStoreField('whatsapp', value)} keyboardType="phone-pad" /></Field></View>
               <View style={{ flex: 1 }}><Field label="Instagram"><TInput value={storeConfig.instagram} onChangeText={(value) => setStoreField('instagram', value)} autoCapitalize="none" /></Field></View>
             </View>
             <Field label="E-mail"><TInput value={storeConfig.email} onChangeText={(value) => setStoreField('email', value)} keyboardType="email-address" autoCapitalize="none" /></Field>
+            <Text style={styles.storeConfigHelp}>WhatsApp, Instagram e e-mail preenchidos aparecem em “Fale com a gente” para o cliente.</Text>
             <Field label="Chave Pix"><TInput value={storeConfig.pix} onChangeText={(value) => setStoreField('pix', value)} autoCapitalize="none" /></Field>
+            <Text style={styles.storeConfigHelp}>Usada para gerar o QR Code e o Pix Copia e Cola depois que o cliente confirma o pedido.</Text>
             <Field label="CNPJ (opcional)"><TInput value={storeConfig.cnpj} onChangeText={(value) => setStoreField('cnpj', value)} keyboardType="numeric" /></Field>
+            <Text style={styles.storeConfigHelp}>Fica armazenado para documentos e comprovantes futuros; ainda não é exibido na vitrine.</Text>
             <Pressable onPress={saveStoreConfig} disabled={savingStore} style={styles.systemPrimaryButton} testID="store-config-save">
               <Feather name="save" size={15} color={COLORS.ink} />
               <Text style={styles.systemPrimaryText}>{savingStore ? 'Salvando…' : 'Salvar configurações'}</Text>
@@ -2583,7 +2609,9 @@ const styles = StyleSheet.create({
   storePreviewHint: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 4 },
   systemFieldGrid: { flexDirection: 'row', gap: 8, marginBottom: SPACING.sm },
   systemPriceField: { flex: 1 },
+  systemPriceHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginBottom: SPACING.md },
   systemFieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.7, marginBottom: 5 },
+  storeConfigHelp: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: -8, marginBottom: SPACING.md },
   systemPrimaryButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, marginTop: SPACING.sm },
   systemPrimaryText: { color: COLORS.ink, fontSize: 12, fontWeight: '700' },
   systemMiniActions: { flexDirection: 'row', gap: 6, marginTop: 7 },

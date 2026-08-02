@@ -181,7 +181,13 @@ async def obter_metricas(_: str = Depends(require_atelie_auth)):
 @router.get("/configuracoes")
 async def obter_configuracoes(_: str = Depends(require_atelie_auth)):
     doc = await get_db().configuracoes.find_one({"_id": "loja"}) or {}
-    return ConfiguracoesLojaIn(**_configuracoes_completas(doc)).model_dump()
+    dados = _configuracoes_completas(doc)
+    dados["whatsapp"] = (
+        str(dados["whatsapp"]).strip()
+        or os.getenv("WHATSAPP_NUMBER", "").strip()
+    )
+    dados["pix"] = str(dados["pix"]).strip() or PIX_KEY
+    return ConfiguracoesLojaIn(**dados).model_dump()
 
 
 @router.get("/configuracoes/publicas")
