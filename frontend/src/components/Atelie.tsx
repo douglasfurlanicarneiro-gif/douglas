@@ -1083,6 +1083,10 @@ export function Atelie({
       setSheet({ type: 'info', label: 'Informe um CEP válido e valores de frete iguais ou maiores que zero.' });
       return;
     }
+    if (padraoDeadline > 0 && priorityDeadline > padraoDeadline) {
+      setSheet({ type: 'info', label: 'O prazo da Entrega Prioritária deve ser igual ou menor que o prazo da Entrega Padrão.' });
+      return;
+    }
     setSavingFrete(true);
     try {
       const updated = await updateConfiguracaoFrete({

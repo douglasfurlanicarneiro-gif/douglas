@@ -72,6 +72,7 @@ export function CheckoutSheet({
   const [freteError, setFreteError] = useState('');
   const [opcoesFrete, setOpcoesFrete] = useState<OpcaoFrete[]>([]);
   const [freteSelecionado, setFreteSelecionado] = useState<OpcaoFrete | null>(null);
+  const [freteRefresh, setFreteRefresh] = useState(0);
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.option.preco * item.quantidade, 0),
     [items],
@@ -138,6 +139,7 @@ export function CheckoutSheet({
       setFreteSelecionado(null);
       return;
     }
+    if (step !== 'entrega') return;
     const cep = form.endereco.cep.replace(/\D/g, '');
     if (cep.length !== 8 || itensFrete.length === 0) {
       setOpcoesFrete([]);
@@ -177,7 +179,7 @@ export function CheckoutSheet({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [form.endereco.cep, itensFrete, tipoEntrega, visible]);
+  }, [form.endereco.cep, freteRefresh, itensFrete, step, tipoEntrega, visible]);
 
   const setAddress = (key: keyof CustomerForm['endereco'], value: string) => {
     setForm((current) => ({
@@ -510,6 +512,23 @@ export function CheckoutSheet({
                   </View>
                 )}
                 {!freteLoading && displayedShippingOptions.map((opcao) => optionCard(opcao))}
+                {!freteLoading && displayedShippingOptions.length > 0 && (
+                  <Pressable
+                    onPress={() => setFreteRefresh((current) => current + 1)}
+                    style={{
+                      alignSelf: 'flex-end',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingVertical: 8,
+                      paddingHorizontal: 4,
+                      marginBottom: SPACING.sm,
+                    }}
+                  >
+                    <Feather name="refresh-cw" size={14} color={COLORS.gold} />
+                    <Text style={{ color: COLORS.gold, fontSize: 12, fontWeight: '600' }}>Atualizar valores do frete</Text>
+                  </Pressable>
+                )}
                 {!!freteError && (
                   <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: SPACING.sm }}>
                     <Text style={{ color: COLORS.rust, fontSize: 12 }}>{freteError}</Text>
