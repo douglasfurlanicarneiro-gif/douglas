@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS } from '../theme';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -134,7 +133,7 @@ export function LaunchIntro({
     >
       <View style={styles.stage}>
         <Animated.Image
-          source={require('../../assets/images/launch-logo-transparent.png')}
+          source={require('../../assets/images/splash-image-light.png')}
           resizeMode="contain"
           onLoad={handleLogoLoad}
           onError={handleLogoError}
@@ -200,7 +199,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 9999,
     elevation: 9999,
-    backgroundColor: COLORS.background,
+    backgroundColor: '#D5CCBB',
     alignItems: 'center',
     justifyContent: 'center',
   },

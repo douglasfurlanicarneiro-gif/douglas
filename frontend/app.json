@@ -4,8 +4,8 @@
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "backgroundColor": "#D8CBB9",
+    "icon": "./assets/images/icon-light.png",
+    "backgroundColor": "#D5CCBB",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -15,8 +15,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/images/adaptive-icon-light.png",
+        "backgroundColor": "#D5CCBB"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.emergent.contratipoapp.t1olda"
@@ -24,15 +24,15 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png",
-      "backgroundColor": "#D8CBB9",
-      "themeColor": "#D8CBB9",
+      "favicon": "./assets/images/favicon-light.png",
+      "backgroundColor": "#D5CCBB",
+      "themeColor": "#D5CCBB",
       "display": "standalone",
       "barStyle": "black-translucent",
       "splash": {
-        "backgroundColor": "#D8CBB9",
+        "backgroundColor": "#D5CCBB",
         "resizeMode": "contain",
-        "image": "./assets/images/splash-image.png"
+        "image": "./assets/images/splash-image-light.png"
       }
     },
     "plugins": [
@@ -40,10 +40,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-image.png",
+          "image": "./assets/images/splash-image-light.png",
           "imageWidth": 280,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#D5CCBB"
         }
       ]
     ],

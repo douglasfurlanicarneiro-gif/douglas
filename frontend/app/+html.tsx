@@ -4,7 +4,7 @@ import type { PropsWithChildren } from "react";
 
 export default function Root({ children }: PropsWithChildren) {
   return (
-    <html lang="pt-BR" style={{ height: "100%", backgroundColor: "#D8CBB9" }}>
+    <html lang="pt-BR" style={{ height: "100%", backgroundColor: "#D5CCBB" }}>
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
@@ -13,13 +13,14 @@ export default function Root({ children }: PropsWithChildren) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no"
         />
-        <meta name="theme-color" content="#D8CBB9" />
+        <meta name="theme-color" content="#D5CCBB" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="L’Essence Furlani" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-        <link rel="preload" as="image" href="/launch-logo-transparent.png" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/favicon-light.png?v=2" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-light.png?v=2" />
+        <link rel="preload" as="image" href="/launch-logo-light.png?v=2" />
         {/*
           Disable body scrolling on web to make ScrollView components work correctly.
           If you want to enable scrolling, remove `ScrollViewStyleReset` and
@@ -47,7 +48,7 @@ export default function Root({ children }: PropsWithChildren) {
                 display: flex;
                 align-items: center;
                 justify-content: center;
-                background: #D8CBB9;
+                background: #D5CCBB;
                 transition: opacity 180ms ease;
               }
               #brand-preloader img {
@@ -68,14 +69,14 @@ export default function Root({ children }: PropsWithChildren) {
         style={{
           margin: 0,
           height: "100%",
-          backgroundColor: "#D8CBB9",
+          backgroundColor: "#D5CCBB",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
         }}
       >
         <div id="brand-preloader" aria-hidden="true">
-          <img src="/launch-logo-transparent.png" alt="" />
+          <img src="/launch-logo-light.png?v=2" alt="" />
         </div>
         {children}
       </body>

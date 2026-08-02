@@ -87,12 +87,11 @@ export default function Index() {
     const mobileTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]');
     mobileTitle?.setAttribute('content', storeConfig.nomeLoja);
 
-    const iconUrl = storeConfig.logoUrl || '/apple-touch-icon.png';
     const appleIcon = document.querySelector('link[rel="apple-touch-icon"]');
-    appleIcon?.setAttribute('href', iconUrl);
+    appleIcon?.setAttribute('href', '/apple-touch-icon-light.png?v=2');
     const favicon = document.querySelector('link[rel="icon"]');
-    favicon?.setAttribute('href', storeConfig.logoUrl || '/favicon.png');
-  }, [storeConfig.logoUrl, storeConfig.nomeLoja]);
+    favicon?.setAttribute('href', '/favicon-light.png?v=2');
+  }, [storeConfig.nomeLoja]);
 
   return (
     <SafeAreaProvider>
