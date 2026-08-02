@@ -6,7 +6,7 @@ import { COLORS, RADIUS, SPACING } from '../theme';
 
 export const inputStyle: TextStyle = {
   width: '100%',
-  backgroundColor: '#FFF9F0',
+  backgroundColor: COLORS.surface,
   borderWidth: 1,
   borderColor: COLORS.border,
   borderRadius: 10,
@@ -36,10 +36,17 @@ export function PrimaryButton({ label, onPress, disabled, testID }: { label: str
       disabled={disabled}
       testID={testID}
       style={({ pressed }) => [
-        { backgroundColor: disabled ? COLORS.border : COLORS.gold, opacity: pressed ? 0.85 : 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center', flex: 1 },
+        { backgroundColor: disabled ? COLORS.border : COLORS.gold, opacity: pressed ? 0.85 : 1, borderRadius: 12, minHeight: 48, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', flex: 1 },
       ]}
     >
-      <Text style={{ color: COLORS.ink, fontWeight: '600', fontSize: 14 }}>{label}</Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
+        style={{ width: '100%', color: COLORS.ink, fontWeight: '600', fontSize: 14, textAlign: 'center' }}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -50,10 +57,17 @@ export function SecondaryButton({ label, onPress, testID }: { label: string; onP
       onPress={() => { void Haptics.selectionAsync(); onPress(); }}
       testID={testID}
       style={({ pressed }) => [
-        { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, opacity: pressed ? 0.85 : 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center', flex: 1 },
+        { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, opacity: pressed ? 0.85 : 1, borderRadius: 12, minHeight: 48, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', flex: 1 },
       ]}
     >
-      <Text style={{ color: COLORS.muted, fontSize: 14 }}>{label}</Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
+        style={{ width: '100%', color: COLORS.muted, fontSize: 14, textAlign: 'center' }}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }

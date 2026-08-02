@@ -98,22 +98,22 @@ const FAQ_ITEMS: { question: string; answer: string; icon: FeatherIconName }[] =
   },
 ];
 const PRODUCT_CARD_COLORS = {
-  background: '#F3EDE3',
-  imageBackground: '#EAE0D2',
-  border: '#DDCDB5',
-  ink: '#251F18',
-  text: '#43392D',
-  muted: '#756A5B',
-  gold: '#A97D38',
+  background: COLORS.surface,
+  imageBackground: COLORS.surfaceRaised,
+  border: COLORS.border,
+  ink: COLORS.bone,
+  text: COLORS.bone,
+  muted: COLORS.muted,
+  gold: COLORS.gold,
 };
 const STOREFRONT_COLORS = {
-  background: '#D8CBB9',
-  surface: '#F3ECE2',
-  surfaceRaised: '#EADFCF',
-  border: '#C5AF8F',
-  ink: '#251F18',
-  muted: '#746858',
-  gold: '#A97D38',
+  background: COLORS.background,
+  surface: COLORS.surface,
+  surfaceRaised: COLORS.surfaceRaised,
+  border: COLORS.border,
+  ink: COLORS.bone,
+  muted: COLORS.muted,
+  gold: COLORS.gold,
 };
 const normalize = (value: string) => value
   .normalize('NFD')
@@ -1211,6 +1211,7 @@ export function Vitrine({
             ? 'Pagamento pendente'
             : 'Pedido recebido'}
         compact
+        contentContainerStyle={styles.successSheetBody}
         testID="order-success-sheet"
       >
         <View style={styles.successContent}>
@@ -1221,7 +1222,7 @@ export function Vitrine({
             {pagamentoConfirmado
               ? 'PAGAMENTO APROVADO'
               : pagamentoAutomaticoPendente
-                ? 'PEDIDO CRIADO'
+                ? 'PAGAMENTO PENDENTE'
                 : manualPixCode
                   ? 'PEDIDO REGISTRADO'
                   : 'OBRIGADO PELA SUA COMPRA'}
@@ -1230,7 +1231,7 @@ export function Vitrine({
             {pagamentoConfirmado
               ? 'Tudo certo com seu pagamento!'
               : pagamentoAutomaticoPendente
-                ? 'Conclua o pagamento na InfinitePay'
+                ? 'Finalize seu pagamento'
                 : manualPixCode
                   ? 'Agora, conclua o pagamento'
                   : 'Seu pedido foi recebido!'}
@@ -1240,7 +1241,7 @@ export function Vitrine({
           )}
           <Text style={styles.successText}>
             {pagamentoAutomaticoPendente
-              ? 'Seu pedido está reservado e aguardando a confirmação do pagamento.'
+              ? 'Escolha Pix ou cartão na InfinitePay. A confirmação do pedido será automática.'
               : pagamentoConfirmado
                 ? `A ${currentStore.nomeLoja} já recebeu a confirmação e dará continuidade ao pedido.`
                 : `A ${currentStore.nomeLoja} agradece por fazer parte deste momento.`}
@@ -1261,8 +1262,8 @@ export function Vitrine({
                 <QRCode
                   value={manualPixCode}
                   size={176}
-                  color="#15130F"
-                  backgroundColor="#FFFFFF"
+                  color={COLORS.ink}
+                  backgroundColor={COLORS.white}
                 />
               </View>
               <Text style={styles.pixHint}>Escaneie o QR Code ou copie o código para pagar pelo aplicativo do seu banco.</Text>
@@ -1280,7 +1281,7 @@ export function Vitrine({
               <Text style={styles.manualConfirmation}>A confirmação será feita manualmente após o recebimento.</Text>
             </View>
           )}
-          {!manualPixCode && (
+          {!manualPixCode && !pagamentoAutomaticoPendente && !pagamentoConfirmado && (
             <View style={styles.successNextStep}>
               <Feather name="message-circle" size={18} color={COLORS.gold} />
               <Text style={styles.successNextText}>{orderSuccess}</Text>
@@ -1293,10 +1294,10 @@ export function Vitrine({
               testID="continue-infinitepay"
             >
               <Feather name="external-link" size={16} color={COLORS.ink} />
-              <Text style={styles.copyPixText}>Pagar com InfinitePay</Text>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.copyPixText}>Pagar na InfinitePay</Text>
             </Pressable>
           )}
-          {!!successOrder?.codigoAcompanhamento && (
+          {!!successOrder?.codigoAcompanhamento && !pagamentoAutomaticoPendente && !pagamentoConfirmado && (
             <View style={styles.trackingAccess}>
               <Pressable
                 onPress={() => setTrackingCodeOpen((open) => !open)}
@@ -1345,14 +1346,25 @@ export function Vitrine({
                 }}
               />
             )}
-            <PrimaryButton
-              label={pagamentoConfirmado ? 'Fechar agora' : 'Voltar à vitrine'}
-              onPress={() => {
-                setOrderSuccess(null);
-                setTrackingCodeOpen(false);
-              }}
-              testID="success-close"
-            />
+            {pagamentoAutomaticoPendente ? (
+              <SecondaryButton
+                label="Voltar à vitrine"
+                onPress={() => {
+                  setOrderSuccess(null);
+                  setTrackingCodeOpen(false);
+                }}
+                testID="success-close"
+              />
+            ) : (
+              <PrimaryButton
+                label={pagamentoConfirmado ? 'Fechar agora' : 'Voltar à vitrine'}
+                onPress={() => {
+                  setOrderSuccess(null);
+                  setTrackingCodeOpen(false);
+                }}
+                testID="success-close"
+              />
+            )}
           </View>
         </View>
       </BottomSheet>
@@ -1447,7 +1459,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 4,
   },
-  cardFavorite: { position: 'absolute', right: 10, top: 9, zIndex: 4, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF9EF', borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
+  cardFavorite: { position: 'absolute', right: 10, top: 9, zIndex: 4, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productTop: { flexDirection: 'row', gap: SPACING.md },
   imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productImage: { width: '100%', height: '100%' },
@@ -1462,8 +1474,8 @@ const styles = StyleSheet.create({
   metaText: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9 },
   availabilityDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: SPACING.md },
-  sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold, alignItems: 'center', backgroundColor: '#FFF9F0' },
-  sizeButtonPressed: { backgroundColor: '#EADFCF' },
+  sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold, alignItems: 'center', backgroundColor: COLORS.surface },
+  sizeButtonPressed: { backgroundColor: COLORS.surfaceRaised },
   sizeButtonDisabled: { borderColor: PRODUCT_CARD_COLORS.border, opacity: 0.65 },
   sizeButtonText: { color: PRODUCT_CARD_COLORS.ink, fontSize: 12, lineHeight: 15, fontWeight: '700' },
   sizePrice: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9, lineHeight: 12, marginTop: 1 },
@@ -1485,12 +1497,13 @@ const styles = StyleSheet.create({
   navText: { color: STOREFRONT_COLORS.muted, fontSize: 11, marginTop: 3 },
   cartBadge: { position: 'absolute', top: -7, right: -10, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   cartBadgeText: { color: COLORS.ink, fontSize: 9, fontWeight: '700' },
-  successContent: { alignItems: 'center', paddingTop: 4 },
-  successIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
+  successSheetBody: { paddingTop: SPACING.md, paddingBottom: SPACING.xl },
+  successContent: { alignItems: 'center', paddingTop: 0 },
+  successIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md },
   successEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.6, textAlign: 'center' },
-  successTitle: { color: COLORS.bone, fontSize: 21, fontWeight: '700', textAlign: 'center', marginTop: 6 },
+  successTitle: { color: COLORS.bone, fontSize: 20, lineHeight: 25, fontWeight: '700', textAlign: 'center', marginTop: 5 },
   successOrderNumber: { color: COLORS.gold, fontSize: 11, letterSpacing: 1.2, marginTop: 7 },
-  successText: { color: COLORS.muted, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 7, marginBottom: SPACING.lg, maxWidth: 330 },
+  successText: { width: '100%', color: COLORS.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7, marginBottom: SPACING.md },
   successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.lg },
   pixCard: { width: '100%', padding: SPACING.lg, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface, marginBottom: SPACING.md },
   pixHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
@@ -1499,10 +1512,10 @@ const styles = StyleSheet.create({
   pixPendingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: COLORS.gold + '66', borderRadius: RADIUS.pill, paddingHorizontal: 9, paddingVertical: 5 },
   pixPendingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gold },
   pixPendingText: { color: COLORS.gold, fontSize: 10 },
-  qrFrame: { alignSelf: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: RADIUS.md, marginBottom: SPACING.md },
+  qrFrame: { alignSelf: 'center', backgroundColor: COLORS.white, padding: 12, borderRadius: RADIUS.md, marginBottom: SPACING.md },
   pixHint: { color: COLORS.muted, fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: SPACING.md },
   copyPixButton: { minHeight: 46, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  paymentContinueButton: { width: '100%', paddingHorizontal: SPACING.md, marginBottom: SPACING.md },
+  paymentContinueButton: { width: '100%', minHeight: 50, paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
   copyPixText: { color: COLORS.ink, fontSize: 14, fontWeight: '700' },
   manualConfirmation: { color: COLORS.muted, fontSize: 10, textAlign: 'center', marginTop: 10 },
   successNextText: { flex: 1, color: COLORS.bone, fontSize: 12, lineHeight: 18 },

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { COLORS } from '../theme';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -182,14 +183,14 @@ export function LaunchIntro({
         ]}
       >
         <LinearGradient
-          colors={['rgba(140, 100, 43, 0)', 'rgba(140, 100, 43, 0.9)']}
+          colors={[COLORS.gold + '00', COLORS.gold + 'E6']}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={styles.captionLine}
         />
         <Text style={styles.caption} numberOfLines={1}>UMA EXPERIÊNCIA EM PERFUMARIA</Text>
         <LinearGradient
-          colors={['rgba(140, 100, 43, 0.9)', 'rgba(140, 100, 43, 0)']}
+          colors={[COLORS.gold + 'E6', COLORS.gold + '00']}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
           style={styles.captionLine}
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 9999,
     elevation: 9999,
-    backgroundColor: '#D5CCBB',
+    backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -248,7 +249,7 @@ const styles = StyleSheet.create({
     height: 1,
   },
   caption: {
-    color: '#8C642B',
+    color: COLORS.gold,
     fontSize: 12,
     lineHeight: 18,
     fontWeight: '700',

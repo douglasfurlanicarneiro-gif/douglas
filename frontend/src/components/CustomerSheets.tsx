@@ -129,7 +129,7 @@ function CustomerOrderSwipe({
             accessibilityLabel="Remover pedido cancelado da lista"
             testID={`${testID}-remover`}
           >
-            <Feather name="trash-2" size={18} color="#FFF9F0" />
+            <Feather name="trash-2" size={18} color={COLORS.inverse} />
             <Text style={styles.customerSwipeRemoveText}>Remover</Text>
           </Pressable>
         </View>
@@ -665,30 +665,30 @@ export function OrdersSheet({
 }
 
 const styles = StyleSheet.create({
-  detailHero: { height: 250, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: '#EAE0D2', borderWidth: 1, borderColor: '#C5AF8F', marginBottom: SPACING.lg },
+  detailHero: { height: 250, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.lg },
   detailImage: { width: '100%', height: '100%' },
   placeholder: { alignItems: 'center', justifyContent: 'center' },
-  heartButton: { position: 'absolute', right: 12, top: 12, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF9F0', borderWidth: 1, borderColor: '#C5AF8F' },
+  heartButton: { position: 'absolute', right: 12, top: 12, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   eyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.5 },
-  detailTitle: { color: '#251F18', fontSize: 25, fontWeight: '700', marginTop: 4 },
-  perfumeMeta: { color: '#746858', fontSize: 13, marginTop: 3 },
-  availabilityPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 9, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: '#C5AF8F', backgroundColor: '#FFF9F0' },
+  detailTitle: { color: COLORS.bone, fontSize: 25, fontWeight: '700', marginTop: 4 },
+  perfumeMeta: { color: COLORS.muted, fontSize: 13, marginTop: 3 },
+  availabilityPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 9, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   availabilityDot: { width: 6, height: 6, borderRadius: 3 },
   availabilityText: { fontSize: 10, fontWeight: '700' },
   detailMeta: { color: COLORS.muted, fontSize: 13, marginTop: 3 },
-  occasionBox: { backgroundColor: '#EADFCF', borderRadius: RADIUS.md, borderWidth: 1, borderColor: '#C5AF8F', padding: SPACING.md, marginVertical: SPACING.lg },
+  occasionBox: { backgroundColor: COLORS.surfaceRaised, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, padding: SPACING.md, marginVertical: SPACING.lg },
   sectionLabel: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.3, marginBottom: 8 },
-  detailSectionLabel: { color: '#A97D38' },
+  detailSectionLabel: { color: COLORS.gold },
   bodyText: { color: COLORS.bone, fontSize: 13 },
-  detailBodyText: { color: '#251F18' },
-  noteRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#D5C4AA' },
-  noteLabel: { color: '#746858', width: 70, fontSize: 11 },
-  noteValue: { color: '#43392D', flex: 1, fontSize: 13, fontStyle: 'italic' },
+  detailBodyText: { color: COLORS.bone },
+  noteRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  noteLabel: { color: COLORS.muted, width: 70, fontSize: 11 },
+  noteValue: { color: COLORS.bone, flex: 1, fontSize: 13, fontStyle: 'italic' },
   sizeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  sizeButton: { minWidth: 94, flexGrow: 1, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: '#A97D38', borderRadius: RADIUS.md, backgroundColor: '#FFF9F0' },
-  sizeButtonPressed: { backgroundColor: '#EADFCF' },
-  sizeText: { color: '#251F18', fontWeight: '700' },
-  sizePrice: { color: '#746858', fontSize: 11, marginTop: 2 },
+  sizeButton: { minWidth: 94, flexGrow: 1, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: COLORS.gold, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
+  sizeButtonPressed: { backgroundColor: COLORS.surfaceRaised },
+  sizeText: { color: COLORS.bone, fontWeight: '700' },
+  sizePrice: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
   quizLead: { color: COLORS.bone, fontSize: 15, lineHeight: 22, marginBottom: SPACING.xl },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   results: { marginTop: SPACING.xl, paddingTop: SPACING.lg, borderTopWidth: 1, borderTopColor: COLORS.border },
@@ -703,7 +703,7 @@ const styles = StyleSheet.create({
   customerSwipeWrap: { position: 'relative', overflow: 'hidden', borderRadius: RADIUS.lg, marginBottom: SPACING.md, userSelect: 'none' },
   customerSwipeActions: { ...StyleSheet.absoluteFillObject, alignItems: 'flex-end', justifyContent: 'stretch', borderRadius: RADIUS.lg, overflow: 'hidden' },
   customerSwipeRemove: { width: CUSTOMER_ORDER_ACTION_WIDTH, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.rust },
-  customerSwipeRemoveText: { color: '#FFF9F0', fontSize: 11, fontWeight: '700' },
+  customerSwipeRemoveText: { color: COLORS.inverse, fontSize: 11, fontWeight: '700' },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
   orderDate: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
   statusPill: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
@@ -727,12 +727,12 @@ const styles = StyleSheet.create({
   cancelError: { color: COLORS.rust, fontSize: 11, lineHeight: 16, marginTop: 7 },
   cancelConfirmActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.md },
   cancelConfirmButton: { flex: 1, minHeight: 45, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
-  cancelConfirmButtonText: { color: '#FFF9F0', fontSize: 12, fontWeight: '700' },
+  cancelConfirmButtonText: { color: COLORS.inverse, fontSize: 12, fontWeight: '700' },
   removeOrderHint: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 34, marginTop: SPACING.sm },
   removeOrderHintText: { color: COLORS.muted, fontSize: 10 },
   removeConfirm: { marginTop: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   removeConfirmButton: { flex: 1, minHeight: 45, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
-  removeConfirmButtonText: { color: '#FFF9F0', fontSize: 12, fontWeight: '700' },
+  removeConfirmButtonText: { color: COLORS.inverse, fontSize: 12, fontWeight: '700' },
   emptyOrdersContent: { flexGrow: 1, justifyContent: 'center', paddingBottom: SPACING.lg },
   emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg, transform: [{ translateY: -30 }] },
   emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },

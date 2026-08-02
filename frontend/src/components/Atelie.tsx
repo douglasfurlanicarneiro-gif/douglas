@@ -191,7 +191,7 @@ function SwipeablePedidoCard({
           accessibilityLabel="Excluir pedido"
           testID={`${testID}-excluir`}
         >
-          <Feather name="trash-2" size={18} color="#FFF9F0" />
+          <Feather name="trash-2" size={18} color={COLORS.inverse} />
           <Text style={styles.swipeOrderDeleteText}>Excluir</Text>
         </Pressable>
       </View>
@@ -406,7 +406,7 @@ function ConfirmSheetContent({
             !ready && styles.confirmActionDisabled,
           ]}
         >
-          <Text style={{ color: sheet.danger ? '#FFF9F0' : COLORS.ink, fontWeight: '600' }}>
+          <Text style={{ color: sheet.danger ? COLORS.inverse : COLORS.ink, fontWeight: '600' }}>
             {!ready ? 'Aguarde…' : (sheet.confirmLabel || (sheet.danger ? 'Sim, excluir' : 'Confirmar'))}
           </Text>
         </Pressable>
@@ -1073,7 +1073,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
           style={styles.deleteAdminOrderButton}
           testID="pedido-excluir-definitivamente"
         >
-          <Feather name="trash-2" size={16} color="#FFF9F0" />
+          <Feather name="trash-2" size={16} color={COLORS.inverse} />
           <View style={{ flex: 1 }}>
             <Text style={styles.deleteAdminOrderTitle}>Excluir definitivamente</Text>
             <Text style={styles.deleteAdminOrderHint}>Remove o pedido e seu histórico do painel.</Text>
@@ -2754,7 +2754,7 @@ const styles = StyleSheet.create({
   manualValueTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700', marginTop: 2 },
   manualValueReset: { color: COLORS.gold, fontSize: 10, fontWeight: '600', textDecorationLine: 'underline' },
   manualValueHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginBottom: 10 },
-  manualValueInputRow: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: '#FFF9F0', overflow: 'hidden' },
+  manualValueInputRow: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, overflow: 'hidden' },
   manualValueCurrency: { color: COLORS.gold, fontSize: 15, fontWeight: '700', paddingLeft: 12 },
   manualValueInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent', color: COLORS.bone, fontSize: 18, fontWeight: '700' },
   manualValueSummary: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 8 },
@@ -2841,7 +2841,7 @@ const styles = StyleSheet.create({
   swipeOrderDelete: { backgroundColor: COLORS.rust },
   swipeOrderActionPressed: { opacity: 0.82 },
   swipeOrderEditText: { color: COLORS.ink, fontSize: 11, fontWeight: '700' },
-  swipeOrderDeleteText: { color: '#FFF9F0', fontSize: 11, fontWeight: '700' },
+  swipeOrderDeleteText: { color: COLORS.inverse, fontSize: 11, fontWeight: '700' },
   swipeOrderFront: { backgroundColor: COLORS.surface },
   swipeOrderCard: { padding: SPACING.md, minHeight: 88, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, justifyContent: 'center' },
   deleteSafetyNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
@@ -2865,8 +2865,8 @@ const styles = StyleSheet.create({
   cancelAdminOrderButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '80' },
   cancelAdminOrderText: { color: COLORS.rust, fontSize: 12, fontWeight: '700' },
   deleteAdminOrderButton: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
-  deleteAdminOrderTitle: { color: '#FFF9F0', fontSize: 12, fontWeight: '700' },
-  deleteAdminOrderHint: { color: '#FFF9F0', opacity: 0.78, fontSize: 10, marginTop: 2 },
+  deleteAdminOrderTitle: { color: COLORS.inverse, fontSize: 12, fontWeight: '700' },
+  deleteAdminOrderHint: { color: COLORS.inverse, opacity: 0.78, fontSize: 10, marginTop: 2 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.surface },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },

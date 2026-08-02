@@ -14,6 +14,8 @@ export const COLORS = {
   topNote: '#C9A227',
   heartNote: '#C06E7E',
   baseNote: '#8A6438',
+  inverse: '#FFF9F0',
+  white: '#FFFFFF',
 };
 
 export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };

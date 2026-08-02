@@ -42,7 +42,7 @@ export function BottomSheet({
             <View style={[styles.header, tone === 'light' && styles.headerLight]}>
               <Text style={[styles.title, tone === 'light' && styles.titleLight]} numberOfLines={1}>{title}</Text>
               <Pressable onPress={onClose} hitSlop={12} testID="bottom-sheet-close">
-                <Feather name="x" size={20} color={tone === 'light' ? '#746858' : COLORS.muted} />
+                <Feather name="x" size={20} color={COLORS.muted} />
               </Pressable>
             </View>
             <ScrollView
@@ -67,12 +67,12 @@ const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(10,9,6,0.72)', justifyContent: 'flex-end' },
   avoider: { flex: 1, justifyContent: 'flex-end', minHeight: 0 },
   sheet: { backgroundColor: COLORS.surfaceRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '88%', maxHeight: '88%', minHeight: 0, overflow: 'hidden' },
-  sheetLight: { backgroundColor: '#F3ECE2' },
+  sheetLight: { backgroundColor: COLORS.surface },
   sheetCompact: { height: 'auto' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  headerLight: { borderBottomColor: '#C5AF8F' },
+  headerLight: { borderBottomColor: COLORS.border },
   title: { color: COLORS.bone, fontSize: 18, fontFamily: Platform.select({ default: undefined }), fontWeight: '500', flex: 1 },
-  titleLight: { color: '#251F18' },
+  titleLight: { color: COLORS.bone },
   body: { flex: 1, minHeight: 0 },
   bodyCompact: { flex: 0 },
   bodyContent: { padding: SPACING.lg, paddingBottom: 64 },
