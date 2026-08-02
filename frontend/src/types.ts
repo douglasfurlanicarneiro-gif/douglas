@@ -244,6 +244,7 @@ export type CheckoutPayload = {
   };
   formaPagamento: 'pix' | 'cartao';
   observacoes: string;
+  aceitePrazoEncomenda: boolean;
   tipoEntrega: 'entrega' | 'retirada';
   freteEscolhido?: {
     serviceId: number;

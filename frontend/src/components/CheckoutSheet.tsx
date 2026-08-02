@@ -19,7 +19,7 @@ export type CartItem = {
 
 type CustomerForm = Omit<
   CheckoutPayload,
-  'itens' | 'cliente' | 'contato' | 'observacoes' | 'freteEscolhido' | 'tipoEntrega' | 'endereco'
+  'itens' | 'cliente' | 'contato' | 'observacoes' | 'freteEscolhido' | 'tipoEntrega' | 'endereco' | 'aceitePrazoEncomenda'
 > & {
   endereco: NonNullable<CheckoutPayload['endereco']>;
   observacoes: string;
@@ -80,6 +80,11 @@ export function CheckoutSheet({
   const [opcoesFrete, setOpcoesFrete] = useState<OpcaoFrete[]>([]);
   const [freteSelecionado, setFreteSelecionado] = useState<OpcaoFrete | null>(null);
   const [freteRefresh, setFreteRefresh] = useState(0);
+  const [prazoEncomendaAceito, setPrazoEncomendaAceito] = useState(false);
+  const contemSobEncomenda = useMemo(
+    () => items.some((item) => item.perfume.prontaEntrega !== true),
+    [items],
+  );
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.option.preco * item.quantidade, 0),
     [items],
@@ -145,7 +150,12 @@ export function CheckoutSheet({
     if (!visible) return;
     setStep('dados');
     setError('');
+    setPrazoEncomendaAceito(false);
   }, [visible]);
+
+  useEffect(() => {
+    if (!contemSobEncomenda) setPrazoEncomendaAceito(false);
+  }, [contemSobEncomenda]);
 
   useEffect(() => {
     if (!visible || tipoEntrega !== 'entrega') {
@@ -260,6 +270,7 @@ export function CheckoutSheet({
     && entregaCompleta
     && pagamentoDisponivel
     && (form.formaPagamento !== 'cartao' || cartaoOnlineAtivo)
+    && (!contemSobEncomenda || prazoEncomendaAceito)
   );
 
   const selectDeliveryType = (type: DeliveryType) => {
@@ -282,6 +293,7 @@ export function CheckoutSheet({
         cliente: form.nomeCompleto.trim(),
         contato: form.whatsapp.trim(),
         ...dadosCliente,
+        aceitePrazoEncomenda: !contemSobEncomenda || prazoEncomendaAceito,
         tipoEntrega,
         ...(tipoEntrega === 'entrega'
           ? {
@@ -646,6 +658,56 @@ export function CheckoutSheet({
                 <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.heading, fontWeight: '700' }}>{brl(total)}</Text>
               </View>
             </View>
+
+            {contemSobEncomenda && (
+              <View
+                style={{
+                  padding: SPACING.md,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: COLORS.gold,
+                  backgroundColor: COLORS.surfaceRaised,
+                  marginBottom: SPACING.md,
+                }}
+                testID="made-to-order-deadline-notice"
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                  <Feather name="clock" size={19} color={COLORS.gold} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' }}>
+                      Prazo para itens sob encomenda
+                    </Text>
+                    <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 18, marginTop: 5 }}>
+                      A disponibilidade, preparação e maturação podem levar até 14 dias antes da postagem ou retirada. Em caso de envio, depois desse período soma-se o prazo da transportadora escolhido na etapa anterior.
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={() => setPrazoEncomendaAceito((current) => !current)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: prazoEncomendaAceito }}
+                  testID="accept-made-to-order-deadline"
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 9,
+                    marginTop: SPACING.md,
+                    paddingTop: SPACING.md,
+                    borderTopWidth: 1,
+                    borderTopColor: COLORS.border,
+                  }}
+                >
+                  <Feather
+                    name={prazoEncomendaAceito ? 'check-square' : 'square'}
+                    size={19}
+                    color={prazoEncomendaAceito ? COLORS.gold : COLORS.muted}
+                  />
+                  <Text style={{ color: COLORS.bone, flex: 1, fontSize: FONT_SIZES.label, lineHeight: 18 }}>
+                    Li e estou de acordo com esse prazo.
+                  </Text>
+                </Pressable>
+              </View>
+            )}
 
             {!!error && <Text style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
             <View style={{ flexDirection: 'row', gap: 8 }}>

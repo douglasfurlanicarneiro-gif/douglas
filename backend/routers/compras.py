@@ -21,6 +21,7 @@ from stock import RESERVATION_TTL_MINUTES, validar_estoque
 from utils import next_seq, serialize
 
 router = APIRouter(prefix="/api/compras", tags=["compras"])
+PRAZO_ENCOMENDA_DIAS = 14
 
 
 class EnderecoIn(BaseModel):
@@ -59,6 +60,7 @@ class CompraIn(BaseModel):
     email: Optional[EmailStr] = None
     endereco: Optional[EnderecoIn] = None
     formaPagamento: Optional[Literal["pix", "cartao"]] = None
+    aceitePrazoEncomenda: bool = False
     tipoEntrega: Literal["entrega", "retirada"] = "entrega"
     freteEscolhido: Optional[FreteEscolhidoIn] = None
 
@@ -80,6 +82,32 @@ class CompraIn(BaseModel):
             ):
                 raise ValueError("Informe o endereço e escolha uma opção de entrega.")
         return self
+
+
+def _tem_sob_encomenda(itens: list[dict]) -> bool:
+    return any(
+        item.get("tipoAtendimento") == "sob_encomenda"
+        or item.get("prontaEntrega") is False
+        for item in itens
+    )
+
+
+def _validar_aceite_prazo_encomenda(
+    itens: list[dict],
+    aceite: bool,
+    *,
+    status_code: int = 400,
+) -> bool:
+    tem_sob_encomenda = _tem_sob_encomenda(itens)
+    if tem_sob_encomenda and not aceite:
+        raise HTTPException(
+            status_code=status_code,
+            detail=(
+                "Confirme que está ciente do prazo de até "
+                f"{PRAZO_ENCOMENDA_DIAS} dias para itens sob encomenda."
+            ),
+        )
+    return tem_sob_encomenda
 
 
 @router.get("")
@@ -133,6 +161,11 @@ async def _criar_compra(payload: CompraIn):
                 else "sob_encomenda"
             ),
         })
+
+    _validar_aceite_prazo_encomenda(
+        itens_doc,
+        payload.aceitePrazoEncomenda,
+    )
 
     doc = payload.model_dump(
         exclude={
@@ -261,6 +294,21 @@ async def _criar_compra(payload: CompraIn):
             item["tipoAtendimento"] = (
                 "pronta_entrega" if pronta else "sob_encomenda"
             )
+        tem_sob_encomenda = _validar_aceite_prazo_encomenda(
+            itens_doc,
+            payload.aceitePrazoEncomenda,
+            status_code=409,
+        )
+        doc["temSobEncomenda"] = tem_sob_encomenda
+        doc["prazoEncomendaDias"] = (
+            PRAZO_ENCOMENDA_DIAS if tem_sob_encomenda else 0
+        )
+        doc["aceitePrazoEncomenda"] = (
+            bool(payload.aceitePrazoEncomenda) if tem_sob_encomenda else False
+        )
+        doc["aceitePrazoEncomendaEm"] = (
+            doc["criadoEm"] if tem_sob_encomenda else None
+        )
         await validar_estoque(
             db,
             itens_doc,

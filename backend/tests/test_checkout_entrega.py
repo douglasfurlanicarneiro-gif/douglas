@@ -1,7 +1,12 @@
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 
-from routers.compras import CompraIn
+from routers.compras import (
+    PRAZO_ENCOMENDA_DIAS,
+    CompraIn,
+    _validar_aceite_prazo_encomenda,
+)
 
 
 def payload_base():
@@ -61,3 +66,22 @@ def test_entrega_aceita_endereco_e_frete():
 
     assert compra.tipoEntrega == "entrega"
     assert compra.freteEscolhido.serviceId == 3
+
+
+def test_sob_encomenda_exige_confirmacao_do_prazo():
+    itens = [{"tipoAtendimento": "sob_encomenda", "prontaEntrega": False}]
+
+    with pytest.raises(HTTPException, match=f"{PRAZO_ENCOMENDA_DIAS} dias"):
+        _validar_aceite_prazo_encomenda(itens, False)
+
+
+def test_sob_encomenda_aceita_confirmacao_e_pronta_entrega_nao_exige():
+    itens_encomenda = [
+        {"tipoAtendimento": "sob_encomenda", "prontaEntrega": False},
+    ]
+    itens_pronta = [
+        {"tipoAtendimento": "pronta_entrega", "prontaEntrega": True},
+    ]
+
+    assert _validar_aceite_prazo_encomenda(itens_encomenda, True) is True
+    assert _validar_aceite_prazo_encomenda(itens_pronta, False) is False
