@@ -9,8 +9,10 @@ from pydantic import BaseModel, Field
 
 from config import INFINITEPAY_HANDLE
 from database import get_db
+from locks import stock_lock
 from payments.infinitepay import (InfinitePayError, token_webhook_valido,
                                   valor_em_centavos, verificar_pagamento)
+from stock import pedido_tem_reserva_ativa, validar_estoque
 from utils import serialize
 
 router = APIRouter(prefix="/api/pagamentos", tags=["pagamentos"])
@@ -130,36 +132,63 @@ async def _confirmar_pagamento(
         "pagoEm": pagamento_atual.get("pagoEm") or agora,
     }
 
-    if pedido.get("status") == "cancelado":
-        pagamento_confirmado["observacao"] = (
-            "Pagamento recebido após o cancelamento. Confira a transação e "
-            "realize o estorno pela InfinitePay, se necessário."
-        )
+    # A confirmação disputa a mesma trava do cancelamento. Assim um pagamento
+    # confirmado nunca perde sua reserva por uma atualização simultânea.
+    async with stock_lock(db):
+        atual = await db.pedidos.find_one({"_id": oid})
+        if not atual:
+            raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+        if atual.get("status") == "cancelado":
+            pagamento_confirmado["observacao"] = (
+                "Pagamento recebido após o cancelamento. Confira a transação e "
+                "realize o estorno pela InfinitePay, se necessário."
+            )
 
-    await db.pedidos.update_one(
-        {"_id": oid},
-        {
-            "$set": {
-                "pagamento": pagamento_confirmado,
-                "formaPagamento": forma_pagamento,
-            }
-        },
-    )
-    if pedido.get("status") == "pendente":
+        estoque_pendente = False
+        if atual.get("status") == "pendente" and not pedido_tem_reserva_ativa(atual):
+            try:
+                await validar_estoque(
+                    db,
+                    atual.get("itens", []),
+                    excluir_pedido_id=oid,
+                    somente_reservaveis=True,
+                )
+            except HTTPException as exc:
+                if exc.status_code != 409:
+                    raise
+                # O valor já foi recebido. O pedido é confirmado e passa a
+                # bloquear novas vendas, mas fica sinalizado para reposição.
+                estoque_pendente = True
+                pagamento_confirmado["observacao"] = (
+                    "Pagamento confirmado após a reserva expirar. "
+                    "É necessário repor o estoque antes de iniciar a preparação."
+                )
+
         await db.pedidos.update_one(
-            {"_id": oid, "status": "pendente"},
+            {"_id": oid},
             {
-                "$set": {"status": "pagamento_confirmado"},
-                "$push": {
-                    "historicoStatus": {
-                        "status": "pagamento_confirmado",
-                        "data": agora,
-                    }
+                "$set": {
+                    "pagamento": pagamento_confirmado,
+                    "formaPagamento": forma_pagamento,
+                    "estoquePendente": estoque_pendente,
                 },
             },
         )
+        if atual.get("status") == "pendente":
+            await db.pedidos.update_one(
+                {"_id": oid, "status": "pendente"},
+                {
+                    "$set": {"status": "pagamento_confirmado"},
+                    "$push": {
+                        "historicoStatus": {
+                            "status": "pagamento_confirmado",
+                            "data": agora,
+                        }
+                    },
+                },
+            )
 
-    atualizado = await db.pedidos.find_one({"_id": oid})
+        atualizado = await db.pedidos.find_one({"_id": oid})
     return atualizado or pedido
 
 

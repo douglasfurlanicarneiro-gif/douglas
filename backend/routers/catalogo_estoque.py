@@ -146,25 +146,26 @@ async def atualizar_disponibilidade(
     _: str = Depends(require_atelie_auth),
 ):
     db = get_db()
-    result = await apply_ready_delivery_by_ids(db, payload.ids)
-    await _registrar_operacao(
-        db,
-        tipo="atualizar_disponibilidade",
-        titulo="Disponibilidade do catálogo atualizada",
-        detalhes=(
-            f"{result['prontaEntrega']} perfume(s) em pronta entrega e "
-            f"{result['sobEncomenda']} sob encomenda."
-        ),
-        perfumes_afetados=result["prontaEntrega"] + result["sobEncomenda"],
-        quantidade_ml=0,
-    )
+    async with stock_lock(db):
+        result = await apply_ready_delivery_by_ids(db, payload.ids)
+        await _registrar_operacao(
+            db,
+            tipo="atualizar_disponibilidade",
+            titulo="Disponibilidade do catálogo atualizada",
+            detalhes=(
+                f"{result['prontaEntrega']} perfume(s) em pronta entrega e "
+                f"{result['sobEncomenda']} sob encomenda."
+            ),
+            perfumes_afetados=result["prontaEntrega"] + result["sobEncomenda"],
+            quantidade_ml=0,
+        )
     return result
 
 
 @router.post("/zerar-sob-encomenda")
 async def zerar_sob_encomenda(_: str = Depends(require_atelie_auth)):
-    async with stock_lock:
-        db = get_db()
+    db = get_db()
+    async with stock_lock(db):
         perfumes = await db.perfumes.find(
             {"prontaEntrega": {"$ne": True}},
             {"_id": 1},
@@ -196,8 +197,8 @@ async def completar_pronta_entrega(
     payload: CompletarProntaEntregaIn,
     _: str = Depends(require_atelie_auth),
 ):
-    async with stock_lock:
-        db = get_db()
+    db = get_db()
+    async with stock_lock(db):
         perfumes = await db.perfumes.find(
             {"prontaEntrega": True},
             {"_id": 1},

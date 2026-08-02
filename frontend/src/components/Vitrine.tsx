@@ -9,10 +9,11 @@ import { COLORS, SPACING, RADIUS, FONT_SIZES, brl, familiasDoPerfume, nomeConcen
 import { BottomSheet } from './BottomSheet';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
 import { Field, TInput, PrimaryButton, SecondaryButton, Chip, Stars } from './atoms';
-import { confirmarPagamentoInfinitePay, createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
+import { ApiError, confirmarPagamentoInfinitePay, createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
 import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
 import { storage } from '../utils/storage';
+import { tamanhoDisponivel } from '../utils/availability';
 import {
   instagramLink,
   publicStoreConfig,
@@ -177,33 +178,36 @@ function VitrineCard({
           {!!familiasResumo && <Text style={styles.familySummary} numberOfLines={2}>{familiasResumo}</Text>}
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>{nomeConcentracao(item.concentracao)}</Text>
-            <View style={[styles.availabilityDot, { backgroundColor: item.prontaEntrega ? COLORS.sage : PRODUCT_CARD_COLORS.gold }]} />
-            <Text style={[styles.metaText, { color: item.prontaEntrega ? COLORS.sage : PRODUCT_CARD_COLORS.gold }]}>
-              {item.prontaEntrega ? 'Pronta entrega' : 'Sob encomenda'}
+            <View style={[styles.availabilityDot, { backgroundColor: item.prontaEntrega ? (item.disponivel ? COLORS.sage : COLORS.rust) : PRODUCT_CARD_COLORS.gold }]} />
+            <Text style={[styles.metaText, { color: item.prontaEntrega ? (item.disponivel ? COLORS.sage : COLORS.rust) : PRODUCT_CARD_COLORS.gold }]}>
+              {item.prontaEntrega ? (item.disponivel ? 'Pronta entrega' : 'Indisponível') : 'Sob encomenda'}
             </Text>
           </View>
         </View>
       </View>
 
       <View style={styles.sizeRow}>
-          {item.precos.map((pr, i) => (
-            <Pressable
-              key={i}
-              disabled={!item.disponivel}
-              onPress={() => onBuy(pr.ml, pr.preco)}
-              testID={`buy-${item.id}-${pr.ml}`}
-              style={({ pressed }) => [
-                styles.sizeButton,
-                pressed && item.disponivel && styles.sizeButtonPressed,
-                !item.disponivel && styles.sizeButtonDisabled,
-              ]}
-            >
-              <Text style={[styles.sizeButtonText, !item.disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>{pr.ml} ml</Text>
-              <Text style={[styles.sizePrice, !item.disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>
-                {item.prontaEntrega ? brl(pr.preco) : 'Solicitar'}
-              </Text>
-            </Pressable>
-          ))}
+          {item.precos.map((pr, i) => {
+            const disponivel = tamanhoDisponivel(item, pr.ml);
+            return (
+              <Pressable
+                key={i}
+                disabled={!disponivel}
+                onPress={() => onBuy(pr.ml, pr.preco)}
+                testID={`buy-${item.id}-${pr.ml}`}
+                style={({ pressed }) => [
+                  styles.sizeButton,
+                  pressed && disponivel && styles.sizeButtonPressed,
+                  !disponivel && styles.sizeButtonDisabled,
+                ]}
+              >
+                <Text style={[styles.sizeButtonText, !disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>{pr.ml} ml</Text>
+                <Text style={[styles.sizePrice, !disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>
+                  {disponivel ? (item.prontaEntrega ? brl(pr.preco) : 'Solicitar') : 'Indisponível'}
+                </Text>
+              </Pressable>
+            );
+          })}
       </View>
 
       {temNotas ? (
@@ -301,9 +305,11 @@ export function Vitrine({
   const manualPixCode = successOrder?.pagamento?.metodo === 'pix'
     ? successOrder.pagamento.pixCopiaECola || ''
     : '';
+  const automaticCheckoutUrl = successOrder?.pagamento?.checkoutUrl || '';
+  const successTrackingCode = successOrder?.codigoAcompanhamento || '';
   const pagamentoAutomaticoPendente = Boolean(
-    successOrder?.pagamento?.checkoutUrl
-    && successOrder.pagamento.status !== 'pago'
+    automaticCheckoutUrl
+    && successOrder?.pagamento?.status !== 'pago'
   );
   const pagamentoConfirmado = Boolean(
     successOrder?.pagamento?.status === 'pago'
@@ -429,7 +435,7 @@ export function Vitrine({
         if (!saved || cartRestored.current) return;
         const lines = JSON.parse(saved) as SavedCartLine[];
         const restored = lines.flatMap((line) => {
-          const perfume = itens.find((item) => item.id === line.perfumeId && item.disponivel);
+          const perfume = itens.find((item) => item.id === line.perfumeId && tamanhoDisponivel(item, line.ml));
           const option = perfume?.precos.find((price) => price.ml === line.ml);
           if (!perfume || !option || option.preco <= 0) return [];
           return [{
@@ -457,6 +463,30 @@ export function Vitrine({
     }));
     storage.setItem(CART_KEY, JSON.stringify(lines));
   }, [cart]);
+
+  useEffect(() => {
+    if (!cartRestored.current || !itens.length) return;
+    setCart((current) => {
+      let changed = false;
+      const reconciled = current.flatMap((line) => {
+        const perfume = itens.find((item) => (
+          item.id === line.perfume.id
+          && tamanhoDisponivel(item, line.option.ml)
+        ));
+        const option = perfume?.precos.find((price) => price.ml === line.option.ml);
+        if (!perfume || !option || option.preco <= 0) {
+          changed = true;
+          return [];
+        }
+        if (perfume !== line.perfume || option.preco !== line.option.preco) {
+          changed = true;
+          return [{ ...line, perfume, option }];
+        }
+        return [line];
+      });
+      return changed ? reconciled : current;
+    });
+  }, [itens]);
 
   const familias = useMemo(
     () => ['Todas', 'Favoritos', ...Array.from(new Set(itens.flatMap(familiasDoPerfume))).sort((a, b) => a.localeCompare(b, 'pt-BR'))],
@@ -597,7 +627,7 @@ export function Vitrine({
   const rebuy = (order: Acompanhamento) => {
     const lines: CartItem[] = [];
     order.itens.forEach((orderItem) => {
-      const perfume = itens.find((item) => item.id === orderItem.perfumeId && item.disponivel);
+      const perfume = itens.find((item) => item.id === orderItem.perfumeId && tamanhoDisponivel(item, orderItem.ml));
       const option = perfume?.precos.find((price) => price.ml === orderItem.ml);
       if (perfume && option) {
         lines.push({ perfume, option, quantidade: Math.min(orderItem.quantidade || 1, 20) });
@@ -953,6 +983,7 @@ export function Vitrine({
             : current.map((line, lineIndex) => lineIndex === index ? { ...line, quantidade: Math.min(quantity, 20) } : line)
         ))}
         onRemove={(index) => setCart((current) => current.filter((_, lineIndex) => lineIndex !== index))}
+        onStockConflict={load}
         onSuccess={async (order, message) => {
           setCart([]);
           setCartOpen(false);
@@ -1246,8 +1277,8 @@ export function Vitrine({
             <View style={styles.pixCard}>
               <View style={styles.pixHeading}>
                 <View>
-                  <Text style={styles.pixEyebrow}>PIX · {successOrder.pagamento.instituicao || 'PicPay'}</Text>
-                  <Text style={styles.pixValue}>{brl(successOrder.pagamento.valor || successOrder.total || 0)}</Text>
+                  <Text style={styles.pixEyebrow}>PIX · {successOrder?.pagamento?.instituicao || 'PicPay'}</Text>
+                  <Text style={styles.pixValue}>{brl(successOrder?.pagamento?.valor || successOrder?.total || 0)}</Text>
                 </View>
                 <View style={styles.pixPendingPill}>
                   <View style={styles.pixPendingDot} />
@@ -1285,7 +1316,7 @@ export function Vitrine({
           )}
           {pagamentoAutomaticoPendente && (
             <Pressable
-              onPress={() => void Linking.openURL(successOrder.pagamento!.checkoutUrl!)}
+              onPress={() => void Linking.openURL(automaticCheckoutUrl)}
               style={[styles.copyPixButton, styles.paymentContinueButton]}
               testID="continue-infinitepay"
             >
@@ -1293,7 +1324,7 @@ export function Vitrine({
               <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.copyPixText}>Pagar na InfinitePay</Text>
             </Pressable>
           )}
-          {!!successOrder?.codigoAcompanhamento && !pagamentoAutomaticoPendente && !pagamentoConfirmado && (
+          {!!successTrackingCode && !pagamentoAutomaticoPendente && !pagamentoConfirmado && (
             <View style={styles.trackingAccess}>
               <Pressable
                 onPress={() => setTrackingCodeOpen((open) => !open)}
@@ -1314,11 +1345,11 @@ export function Vitrine({
               {trackingCodeOpen && (
                 <View style={styles.trackingCodeCard}>
                   <Text style={styles.trackingCodeLabel}>CÓDIGO PARA ACESSAR EM OUTRO APARELHO</Text>
-                  <Text selectable style={styles.trackingCode}>{successOrder.codigoAcompanhamento}</Text>
+                  <Text selectable style={styles.trackingCode}>{successTrackingCode}</Text>
                   <Pressable
                     onPress={() => {
                       void Share.share({
-                        message: `Meu pedido ${currentStore.nomeLoja} pode ser acompanhado com este código: ${successOrder.codigoAcompanhamento}`,
+                        message: `Meu pedido ${currentStore.nomeLoja} pode ser acompanhado com este código: ${successTrackingCode}`,
                       });
                     }}
                     style={styles.shareCodeButton}

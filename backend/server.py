@@ -17,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from availability import ensure_initial_ready_delivery
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
 from database import get_db
+from locks import stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
                      clientes, compras, frete, movimentos, opinioes,
                      pagamentos, pedidos, perfumes, sugestoes, vitrine)
@@ -77,7 +78,9 @@ async def _bootstrap_database() -> None:
         async with asyncio.timeout(_BOOTSTRAP_TIMEOUT_SECONDS):
             await _seed_admin()
             await _criar_indices()
-            disponibilidade = await ensure_initial_ready_delivery(get_db())
+            db = get_db()
+            async with stock_lock(db):
+                disponibilidade = await ensure_initial_ready_delivery(db)
     except TimeoutError:
         logger.error(
             "Bootstrap do banco excedeu %ss. A API continuará disponível e "

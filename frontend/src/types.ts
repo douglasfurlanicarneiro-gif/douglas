@@ -22,6 +22,7 @@ export type Perfume = {
   disponivel?: boolean;
   prontaEntrega?: boolean;
   estoqueAtualMl?: number;
+  tamanhosDisponiveisMl?: number[];
 };
 
 export type Movimento = {
@@ -79,6 +80,8 @@ export type PedidoItem = {
   quantidade: number;
   precoUnitario?: number;
   subtotal?: number;
+  prontaEntrega?: boolean;
+  tipoAtendimento?: 'pronta_entrega' | 'sob_encomenda';
 };
 
 export type StatusHistoryItem = {

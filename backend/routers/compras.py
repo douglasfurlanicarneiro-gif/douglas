@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
 from bson import ObjectId
@@ -12,10 +12,12 @@ from database import get_db
 from locks import stock_lock
 from payments.base import PaymentProviderError
 from payments.service import iniciar_pagamento
-from routers.pedidos import (ItemPedido, _aplicar_saida_estoque,
-                             _reverter_movimentos_do_pedido)
+from routers.pedidos import (_aplicar_saida_estoque,
+                             _reverter_movimentos_do_pedido,
+                             _validar_status_estoque)
 from security import require_atelie_auth
 from shipping.melhor_envio import MelhorEnvioError, cotar_frete
+from stock import RESERVATION_TTL_MINUTES, validar_estoque
 from utils import next_seq, serialize
 
 router = APIRouter(prefix="/api/compras", tags=["compras"])
@@ -89,10 +91,7 @@ async def listar_compras(_: str = Depends(require_atelie_auth)):
 
 @router.post("")
 async def criar_compra(payload: CompraIn):
-    # Saldo e saídas são tratados como uma única operação no processo atual.
-    # Assim dois checkouts simultâneos não consomem o mesmo mililitro.
-    async with stock_lock:
-        return await _criar_compra(payload)
+    return await _criar_compra(payload)
 
 
 async def _criar_compra(payload: CompraIn):
@@ -127,6 +126,12 @@ async def _criar_compra(payload: CompraIn):
             "quantidade": item.quantidade,
             "precoUnitario": float(opcao["preco"]),
             "subtotal": subtotal,
+            "prontaEntrega": perfume.get("prontaEntrega") is True,
+            "tipoAtendimento": (
+                "pronta_entrega"
+                if perfume.get("prontaEntrega") is True
+                else "sob_encomenda"
+            ),
         })
 
     doc = payload.model_dump(
@@ -193,7 +198,9 @@ async def _criar_compra(payload: CompraIn):
     doc["criadoEm"] = agora
     doc["status"] = "pendente"
     doc["origem"] = "vitrine"
-    doc["seq"] = await next_seq(db, "pedidos")
+    doc["reservaExpiraEm"] = (
+        datetime.now(timezone.utc) + timedelta(minutes=RESERVATION_TTL_MINUTES)
+    ).isoformat()
     doc["codigoAcompanhamento"] = secrets.token_urlsafe(12)
     doc["historicoStatus"] = [{"status": "pendente", "data": agora}]
 
@@ -232,7 +239,35 @@ async def _criar_compra(payload: CompraIn):
     # na coleção `pedidos`, usada pela aba Pedidos e pelo dashboard. A coleção
     # `compras` permanece somente para registros legados criados por versões
     # anteriores do aplicativo.
-    resultado = await db.pedidos.insert_one(doc)
+    # A validação e a criação do pedido acontecem sob a mesma trava
+    # distribuída. O próprio documento pendente passa a representar a reserva.
+    async with stock_lock(db):
+        # A modalidade pode ter sido alterada no painel enquanto o cliente
+        # preenchia o checkout. A decisão final usa sempre o estado mais novo.
+        perfumes_atuais = await db.perfumes.find(
+            {"_id": {"$in": ids}},
+            {"prontaEntrega": 1, "publicavel": 1},
+        ).to_list(len(ids))
+        atuais_por_id = {str(item["_id"]): item for item in perfumes_atuais}
+        for item in itens_doc:
+            atual = atuais_por_id.get(item["perfumeId"])
+            if not atual or atual.get("publicavel") is False:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Um produto foi atualizado. Reabra o carrinho e tente novamente.",
+                )
+            pronta = atual.get("prontaEntrega") is True
+            item["prontaEntrega"] = pronta
+            item["tipoAtendimento"] = (
+                "pronta_entrega" if pronta else "sob_encomenda"
+            )
+        await validar_estoque(
+            db,
+            itens_doc,
+            somente_reservaveis=True,
+        )
+        doc["seq"] = await next_seq(db, "pedidos")
+        resultado = await db.pedidos.insert_one(doc)
     pedido_id = str(resultado.inserted_id)
 
     # O pedido pendente reserva a quantidade no resumo, sem alterar o saldo
@@ -261,7 +296,8 @@ async def _criar_compra(payload: CompraIn):
         except PaymentProviderError as exc:
             # Não deixa pedido pendente ou reserva fantasma quando o gateway
             # falha antes de apresentar o checkout ao cliente.
-            await db.pedidos.delete_one({"_id": resultado.inserted_id})
+            async with stock_lock(db):
+                await db.pedidos.delete_one({"_id": resultado.inserted_id})
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         await db.pedidos.update_one({"_id": resultado.inserted_id}, {"$set": {"pagamento": pagamento}})
 
@@ -283,8 +319,8 @@ class CompraStatusIn(BaseModel):
 
 @router.patch("/{compra_id}")
 async def atualizar_status_compra(compra_id: str, payload: CompraStatusIn, _: str = Depends(require_atelie_auth)):
-    async with stock_lock:
-        db = get_db()
+    db = get_db()
+    async with stock_lock(db):
         try:
             oid = ObjectId(compra_id)
         except InvalidId:
@@ -304,14 +340,14 @@ async def atualizar_status_compra(compra_id: str, payload: CompraStatusIn, _: st
                 status_code=404,
                 detail="Pedido de compra não encontrado.",
             )
-        itens = [
-            ItemPedido(
-                perfumeId=item["perfumeId"],
-                ml=item["ml"],
-                quantidade=item.get("quantidade", 1),
-            )
-            for item in pedido.get("itens", [])
-        ]
+        itens = list(pedido.get("itens", []))
+        await _validar_status_estoque(
+            db,
+            itens=itens,
+            status=payload.status,
+            pedido_id=compra_id,
+            pedido_anterior=pedido,
+        )
         await _reverter_movimentos_do_pedido(db, compra_id)
         await _aplicar_saida_estoque(db, compra_id, itens, payload.status)
 
@@ -334,11 +370,12 @@ async def apagar_compra(compra_id: str, _: str = Depends(require_atelie_auth)):
         oid = ObjectId(compra_id)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de compra inválido.")
-    resultado = await db.compras.delete_one({"_id": oid})
-    if resultado.deleted_count == 0:
-        pedido = await db.pedidos.find_one({"_id": oid, "origem": "vitrine"})
-        if not pedido:
-            raise HTTPException(status_code=404, detail="Pedido de compra não encontrado.")
-        await db.movimentos.delete_many({"origem": f"pedido:{compra_id}"})
-        await db.pedidos.delete_one({"_id": oid})
+    async with stock_lock(db):
+        resultado = await db.compras.delete_one({"_id": oid})
+        if resultado.deleted_count == 0:
+            pedido = await db.pedidos.find_one({"_id": oid, "origem": "vitrine"})
+            if not pedido:
+                raise HTTPException(status_code=404, detail="Pedido de compra não encontrado.")
+            await db.movimentos.delete_many({"origem": f"pedido:{compra_id}"})
+            await db.pedidos.delete_one({"_id": oid})
     return {"status": "Pedido de compra apagado."}

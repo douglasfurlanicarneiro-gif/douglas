@@ -1,4 +1,4 @@
-"""Regression tests for stock alerts that do not block the storefront."""
+"""Regression tests for dynamic storefront stock availability."""
 import os
 import pytest
 import requests
@@ -47,23 +47,35 @@ class TestVitrineShape:
             assert k in it, f"Missing field {k} in vitrine item"
 
 
-# ---- Stock is internal planning data and never blocks a published size ----
-class TestVitrineSemBloqueio:
+# ---- Ready delivery respects stock; made-to-order remains available ----
+class TestVitrineDisponibilidadeReal:
     def test_publicado_continua_disponivel_com_estoque(self, s, vitrine_snapshot):
         ab = next((i for i in vitrine_snapshot["itens"] if i.get("seq") == 1), None)
         assert ab is not None, "Perfume Nº 001 not found in vitrine"
         assert ab["disponivel"] is True
 
-    def test_perfumes_sem_saldo_continuam_disponiveis(self, s, vitrine_snapshot):
+    def test_pronta_entrega_sem_saldo_fica_indisponivel(self, s, vitrine_snapshot):
         est = s.get(f"{API}/estoque").json()
-        sem_saldo = [i for i in vitrine_snapshot["itens"] if est.get(i["id"], 0) <= 0]
+        sem_saldo = [
+            i for i in vitrine_snapshot["itens"]
+            if i.get("prontaEntrega") and est.get(i["id"], 0) <= 0
+        ]
+        assert len(sem_saldo) > 0
+        assert all(i["disponivel"] is False for i in sem_saldo)
+
+    def test_sob_encomenda_continua_disponivel_sem_saldo(self, s, vitrine_snapshot):
+        est = s.get(f"{API}/estoque").json()
+        sem_saldo = [
+            i for i in vitrine_snapshot["itens"]
+            if not i.get("prontaEntrega") and est.get(i["id"], 0) <= 0
+        ]
         assert len(sem_saldo) > 0
         assert all(i["disponivel"] is True for i in sem_saldo)
 
     def test_movimentacao_nao_bloqueia_vitrine(self, s, vitrine_snapshot):
         est = s.get(f"{API}/estoque").json()
         target = next((i for i in vitrine_snapshot["itens"]
-                       if est.get(i["id"], 0) == 0), None)
+                       if i.get("prontaEntrega") and est.get(i["id"], 0) == 0), None)
         assert target is not None, "No candidate perfume without stock"
         pid = target["id"]
 
@@ -89,7 +101,7 @@ class TestVitrineSemBloqueio:
 
             v2 = s.get(f"{API}/vitrine").json()
             it2 = next((i for i in v2["itens"] if i["id"] == pid), None)
-            assert it2["disponivel"] is True
+            assert it2["disponivel"] is False
         finally:
             # cleanup TEST_ movimentos
             movs = s.get(f"{API}/movimentos", headers=AUTH).json()
@@ -104,13 +116,14 @@ class TestPublishStillWorks:
         before = s.get(f"{API}/vitrine").json().get("atualizadoEm")
         r = s.post(f"{API}/vitrine/publish", headers=AUTH)
         assert r.status_code == 200
-        snap = r.json()
-        assert "atualizadoEm" in snap
+        publication = r.json()
+        assert publication["itensPublicados"] == 418
+        snap = s.get(f"{API}/vitrine").json()
         assert isinstance(snap["itens"], list)
         assert len(snap["itens"]) == 418
         after = snap["atualizadoEm"]
         assert after != before or after is not None
-        # Ab Autentica must still be disponivel after publish
+        # Dynamic size information is present after every publication.
         ab = next((i for i in snap["itens"] if i.get("seq") == 1), None)
         assert ab is not None
-        assert ab["disponivel"] is True
+        assert "tamanhosDisponiveisMl" in ab

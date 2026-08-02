@@ -52,6 +52,7 @@ type Props = {
   onChangeQuantity: (index: number, quantity: number) => void;
   onRemove: (index: number) => void;
   onSuccess: (order: Compra, message: string) => void | Promise<void>;
+  onStockConflict?: () => void | Promise<void>;
   cartaoOnlineAtivo: boolean;
   pixManualAtivo: boolean;
 };
@@ -63,6 +64,7 @@ export function CheckoutSheet({
   onChangeQuantity,
   onRemove,
   onSuccess,
+  onStockConflict,
   cartaoOnlineAtivo,
   pixManualAtivo,
 }: Props) {
@@ -322,6 +324,9 @@ export function CheckoutSheet({
         }
       }
     } catch (cause) {
+      if (cause instanceof ApiError && cause.status === 409) {
+        try { await onStockConflict?.(); } catch { /* a mensagem original permanece */ }
+      }
       setError(cause instanceof ApiError ? cause.message : 'Não foi possível finalizar o pedido.');
     } finally {
       setLoading(false);

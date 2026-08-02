@@ -9,6 +9,7 @@ import { BottomSheet } from './BottomSheet';
 import { Chip, PrimaryButton, SecondaryButton, TInput } from './atoms';
 import { DEFAULT_STORE_CONFIG, whatsappNumber } from '../storeConfig';
 import { AppText as Text } from './Typography';
+import { tamanhoDisponivel } from '../utils/availability';
 
 const CUSTOMER_ORDER_ACTION_WIDTH = 104;
 
@@ -183,13 +184,13 @@ export function PerfumeDetailSheet({
           <View style={styles.availabilityPill}>
             <View style={[
               styles.availabilityDot,
-              { backgroundColor: perfume.prontaEntrega ? COLORS.sage : COLORS.gold },
+              { backgroundColor: perfume.prontaEntrega ? (perfume.disponivel ? COLORS.sage : COLORS.rust) : COLORS.gold },
             ]} />
             <Text style={[
               styles.availabilityText,
-              { color: perfume.prontaEntrega ? COLORS.sage : COLORS.gold },
+              { color: perfume.prontaEntrega ? (perfume.disponivel ? COLORS.sage : COLORS.rust) : COLORS.gold },
             ]}>
-              {perfume.prontaEntrega ? 'Pronta entrega' : 'Sob encomenda'}
+              {perfume.prontaEntrega ? (perfume.disponivel ? 'Pronta entrega' : 'Indisponível') : 'Sob encomenda'}
             </Text>
           </View>
 
@@ -207,23 +208,26 @@ export function PerfumeDetailSheet({
 
           <Text style={[styles.sectionLabel, styles.detailSectionLabel, { marginTop: SPACING.lg }]}>ESCOLHA O TAMANHO</Text>
           <View style={styles.sizeWrap}>
-            {perfume.precos.map((opcao) => (
-              <Pressable
-                key={opcao.ml}
-                disabled={!perfume.disponivel}
-                onPress={() => onBuy(opcao.ml, opcao.preco)}
-                style={({ pressed }) => [
-                  styles.sizeButton,
-                  pressed && perfume.disponivel && styles.sizeButtonPressed,
-                  !perfume.disponivel && { opacity: 0.45 },
-                ]}
-              >
-                <Text style={styles.sizeText}>{opcao.ml} ml</Text>
-                <Text style={styles.sizePrice}>
-                  {perfume.prontaEntrega ? brl(opcao.preco) : 'Solicitar'}
-                </Text>
-              </Pressable>
-            ))}
+            {perfume.precos.map((opcao) => {
+              const disponivel = tamanhoDisponivel(perfume, opcao.ml);
+              return (
+                <Pressable
+                  key={opcao.ml}
+                  disabled={!disponivel}
+                  onPress={() => onBuy(opcao.ml, opcao.preco)}
+                  style={({ pressed }) => [
+                    styles.sizeButton,
+                    pressed && disponivel && styles.sizeButtonPressed,
+                    !disponivel && { opacity: 0.45 },
+                  ]}
+                >
+                  <Text style={styles.sizeText}>{opcao.ml} ml</Text>
+                  <Text style={styles.sizePrice}>
+                    {disponivel ? (perfume.prontaEntrega ? brl(opcao.preco) : 'Solicitar') : 'Indisponível'}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
       )}
@@ -702,7 +706,7 @@ const styles = StyleSheet.create({
   resultMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
   orderCard: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md },
   customerSwipeWrap: { position: 'relative', overflow: 'hidden', borderRadius: RADIUS.lg, marginBottom: SPACING.md, userSelect: 'none' },
-  customerSwipeActions: { ...StyleSheet.absoluteFillObject, alignItems: 'flex-end', justifyContent: 'stretch', borderRadius: RADIUS.lg, overflow: 'hidden' },
+  customerSwipeActions: { ...StyleSheet.absoluteFillObject, alignItems: 'flex-end', borderRadius: RADIUS.lg, overflow: 'hidden' },
   customerSwipeRemove: { width: CUSTOMER_ORDER_ACTION_WIDTH, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.rust },
   customerSwipeRemoveText: { color: COLORS.inverse, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },

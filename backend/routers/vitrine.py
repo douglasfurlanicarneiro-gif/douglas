@@ -5,27 +5,10 @@ from fastapi import APIRouter, Depends
 
 from database import get_db
 from security import require_atelie_auth
+from stock import mapa_reservado, mapa_saldo_fisico, tamanhos_disponiveis
 from utils import serialize
 
 router = APIRouter(prefix="/api/vitrine", tags=["vitrine"])
-
-_PIPELINE_ESTOQUE = [
-    {
-        "$group": {
-            "_id": "$perfumeId",
-            "total": {
-                "$sum": {
-                    "$cond": [
-                        {"$eq": ["$tipo", "entrada"]},
-                        "$quantidadeMl",
-                        {"$multiply": ["$quantidadeMl", -1]},
-                    ]
-                }
-            },
-        }
-    },
-]
-
 
 def _alphabetical_name(item: dict) -> str:
     name = str(item.get("nome", ""))
@@ -42,21 +25,42 @@ def _alphabetical_name(item: dict) -> str:
     ).casefold()
 
 
+def _aplicar_disponibilidade(
+    item: dict,
+    *,
+    saldo_fisico_ml: int,
+    saldo_reservado_ml: int,
+) -> None:
+    pronta_entrega = bool(item.get("prontaEntrega", False))
+    saldo_livre_ml = saldo_fisico_ml - saldo_reservado_ml
+    tamanhos = tamanhos_disponiveis(item, saldo_livre_ml)
+
+    item["prontaEntrega"] = pronta_entrega
+    item["estoqueAtualMl"] = max(saldo_fisico_ml, 0)
+    item["tamanhosDisponiveisMl"] = tamanhos
+    if pronta_entrega:
+        item["disponivel"] = bool(tamanhos)
+        item["statusEstoque"] = "envio_imediato" if tamanhos else "indisponivel"
+    else:
+        item["disponivel"] = True
+        item["statusEstoque"] = "sob_encomenda"
+
+
 async def publicar_snapshot(db, *, registrar_operacao: bool = True) -> dict:
     perfumes = await db.perfumes.find({"publicavel": True}).to_list(2000)
 
-    estoque_map: dict[str, int] = {}
-    async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
-        estoque_map[linha["_id"]] = linha["total"]
+    estoque_map = await mapa_saldo_fisico(db)
+    reservado_map = await mapa_reservado(db)
 
     itens = []
     for perfume in perfumes:
         item = serialize(perfume)
         qtd = estoque_map.get(item["id"], 0)
-        item["disponivel"] = True
-        item["prontaEntrega"] = bool(item.get("prontaEntrega", False))
-        item["estoqueAtualMl"] = max(qtd, 0)
-        item["statusEstoque"] = "sob_consulta" if qtd <= 0 else "envio_imediato"
+        _aplicar_disponibilidade(
+            item,
+            saldo_fisico_ml=qtd,
+            saldo_reservado_ml=reservado_map.get(item["id"], 0),
+        )
         itens.append(item)
 
     itens.sort(key=_alphabetical_name)
@@ -85,19 +89,17 @@ async def obter_vitrine():
     if not snapshot:
         return {"atualizadoEm": None, "itens": []}
 
-    estoque_map: dict[str, int] = {}
-    async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
-        estoque_map[linha["_id"]] = linha["total"]
+    estoque_map = await mapa_saldo_fisico(db)
+    reservado_map = await mapa_reservado(db)
 
     itens = [dict(item) for item in snapshot.get("itens", [])]
     for item in itens:
         qtd = estoque_map.get(item.get("id"), 0)
-        # Estoque baixo gera alerta interno, mas não bloqueia tamanhos na
-        # vitrine. A disponibilidade comercial continua sob controle manual.
-        item["disponivel"] = True
-        item["prontaEntrega"] = bool(item.get("prontaEntrega", False))
-        item["estoqueAtualMl"] = max(qtd, 0)
-        item["statusEstoque"] = "sob_consulta" if qtd <= 0 else "envio_imediato"
+        _aplicar_disponibilidade(
+            item,
+            saldo_fisico_ml=qtd,
+            saldo_reservado_ml=reservado_map.get(item.get("id"), 0),
+        )
 
     itens.sort(key=_alphabetical_name)
     return {"atualizadoEm": snapshot.get("atualizadoEm"), "itens": itens}

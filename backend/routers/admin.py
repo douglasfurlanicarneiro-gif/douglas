@@ -266,27 +266,29 @@ async def limpar_dados(recurso: str, _: str = Depends(require_atelie_auth)):
             "removidos": opinioes.deleted_count + sugestoes.deleted_count,
         }
     if recurso == "estoque":
-        movimentos = await db.movimentos.delete_many({})
+        async with stock_lock(db):
+            movimentos = await db.movimentos.delete_many({})
         return {
             "status": "Movimentos de estoque removidos.",
             "removidos": movimentos.deleted_count,
         }
     if recurso == "catalogo":
-        pedidos_ativos = await db.pedidos.count_documents({
-            "status": {"$nin": ["cancelado", "entregue"]},
-        })
-        if pedidos_ativos:
-            raise HTTPException(
-                status_code=409,
-                detail="Conclua ou cancele os pedidos ativos antes de resetar o catálogo.",
+        async with stock_lock(db):
+            pedidos_ativos = await db.pedidos.count_documents({
+                "status": {"$nin": ["cancelado", "entregue"]},
+            })
+            if pedidos_ativos:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Conclua ou cancele os pedidos ativos antes de resetar o catálogo.",
+                )
+            perfumes = await db.perfumes.delete_many({})
+            await asyncio.gather(
+                db.movimentos.delete_many({}),
+                db.opinioes.delete_many({}),
+                db.vitrine.delete_many({}),
+                db.counters.delete_one({"_id": "perfumes"}),
             )
-        perfumes = await db.perfumes.delete_many({})
-        await asyncio.gather(
-            db.movimentos.delete_many({}),
-            db.opinioes.delete_many({}),
-            db.vitrine.delete_many({}),
-            db.counters.delete_one({"_id": "perfumes"}),
-        )
         return {
             "status": "Catálogo resetado.",
             "removidos": perfumes.deleted_count,
@@ -310,8 +312,8 @@ async def obter_versao_reset_pedidos():
 @router.post("/pedidos/reset")
 async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
     """Apaga pedidos e invalida os códigos salvos em todos os aparelhos."""
-    async with stock_lock:
-        db = get_db()
+    db = get_db()
+    async with stock_lock(db):
         pedidos = await db.pedidos.count_documents({})
         compras_legadas = await db.compras.count_documents({})
 

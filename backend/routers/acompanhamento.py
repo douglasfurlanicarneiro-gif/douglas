@@ -55,8 +55,8 @@ async def acompanhar_pedido(codigo: str):
 async def cancelar_pedido_cliente(codigo: str):
     _validar_codigo(codigo)
 
-    async with stock_lock:
-        db = get_db()
+    db = get_db()
+    async with stock_lock(db):
         pedido = await db.pedidos.find_one({"codigoAcompanhamento": codigo})
         if not pedido:
             raise HTTPException(status_code=404, detail="Pedido não encontrado.")

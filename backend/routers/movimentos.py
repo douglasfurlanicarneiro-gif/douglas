@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from database import get_db
+from locks import stock_lock
 from security import require_atelie_auth
+from stock import STOCK_PIPELINE, mapa_reservado, mapa_saldo_fisico
 from utils import serialize
 
 router = APIRouter(tags=["estoque"])
@@ -14,22 +16,7 @@ router = APIRouter(tags=["estoque"])
 # Soma de entradas menos saídas, agrupado por perfume — é assim que o
 # estoque "atual" é sempre calculado, nunca guardado como um número solto
 # no documento do perfume (ver auditoria: única fonte da verdade).
-_PIPELINE_ESTOQUE = [
-    {
-        "$group": {
-            "_id": "$perfumeId",
-            "total": {
-                "$sum": {
-                    "$cond": [
-                        {"$eq": ["$tipo", "entrada"]},
-                        "$quantidadeMl",
-                        {"$multiply": ["$quantidadeMl", -1]},
-                    ]
-                }
-            },
-        }
-    },
-]
+_PIPELINE_ESTOQUE = STOCK_PIPELINE
 
 
 class MovimentoIn(BaseModel):
@@ -73,11 +60,12 @@ async def criar_movimento(payload: MovimentoIn, _: str = Depends(require_atelie_
     if payload.quantidadeMl <= 0:
         raise HTTPException(status_code=400, detail="Quantidade deve ser maior que zero.")
     db = get_db()
-    doc = payload.model_dump()
-    doc["data"] = datetime.now(timezone.utc).isoformat()
-    doc["origem"] = "manual"
-    resultado = await db.movimentos.insert_one(doc)
-    novo = await db.movimentos.find_one({"_id": resultado.inserted_id})
+    async with stock_lock(db):
+        doc = payload.model_dump()
+        doc["data"] = datetime.now(timezone.utc).isoformat()
+        doc["origem"] = "manual"
+        resultado = await db.movimentos.insert_one(doc)
+        novo = await db.movimentos.find_one({"_id": resultado.inserted_id})
     return serialize(novo)
 
 
@@ -85,31 +73,29 @@ async def criar_movimento(payload: MovimentoIn, _: str = Depends(require_atelie_
 async def completar_estoque(payload: CompletarEstoqueIn, _: str = Depends(require_atelie_auth)):
     """Completa cada perfume até o saldo alvo sem duplicar entradas existentes."""
     db = get_db()
-    filtro = {"publicavel": True} if payload.somentePublicaveis else {}
-    perfumes = await db.perfumes.find(filtro, {"_id": 1}).to_list(5000)
+    async with stock_lock(db):
+        filtro = {"publicavel": True} if payload.somentePublicaveis else {}
+        perfumes = await db.perfumes.find(filtro, {"_id": 1}).to_list(5000)
+        estoque_atual = await mapa_saldo_fisico(db)
 
-    estoque_atual: dict[str, int] = {}
-    async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
-        estoque_atual[linha["_id"]] = linha["total"]
+        agora = datetime.now(timezone.utc).isoformat()
+        movimentos = []
+        for perfume in perfumes:
+            perfume_id = str(perfume["_id"])
+            diferenca = payload.quantidadeMl - estoque_atual.get(perfume_id, 0)
+            if diferenca <= 0:
+                continue
+            movimentos.append({
+                "perfumeId": perfume_id,
+                "tipo": "entrada",
+                "quantidadeMl": diferenca,
+                "motivo": f"Carga inicial até {payload.quantidadeMl}ml",
+                "origem": "ajuste-inicial-em-massa",
+                "data": agora,
+            })
 
-    agora = datetime.now(timezone.utc).isoformat()
-    movimentos = []
-    for perfume in perfumes:
-        perfume_id = str(perfume["_id"])
-        diferenca = payload.quantidadeMl - estoque_atual.get(perfume_id, 0)
-        if diferenca <= 0:
-            continue
-        movimentos.append({
-            "perfumeId": perfume_id,
-            "tipo": "entrada",
-            "quantidadeMl": diferenca,
-            "motivo": f"Carga inicial até {payload.quantidadeMl}ml",
-            "origem": "ajuste-inicial-em-massa",
-            "data": agora,
-        })
-
-    if movimentos:
-        await db.movimentos.insert_many(movimentos)
+        if movimentos:
+            await db.movimentos.insert_many(movimentos)
 
     return {
         "perfumesConsiderados": len(perfumes),
@@ -126,50 +112,51 @@ async def conferir_estoque(payload: ConferenciaEstoqueIn, _: str = Depends(requi
         perfume_oid = ObjectId(payload.perfumeId)
     except InvalidId as exc:
         raise HTTPException(status_code=400, detail="Perfume inválido.") from exc
-    perfume = await db.perfumes.find_one({"_id": perfume_oid}, {"nome": 1})
-    if not perfume:
-        raise HTTPException(status_code=404, detail="Perfume não encontrado.")
+    async with stock_lock(db):
+        perfume = await db.perfumes.find_one({"_id": perfume_oid}, {"nome": 1})
+        if not perfume:
+            raise HTTPException(status_code=404, detail="Perfume não encontrado.")
 
-    saldo_atual = 0
-    pipeline = [
-        {"$match": {"perfumeId": payload.perfumeId}},
-        *_PIPELINE_ESTOQUE,
-    ]
-    async for linha in db.movimentos.aggregate(pipeline):
-        saldo_atual = int(linha["total"])
+        saldo_atual = 0
+        pipeline = [
+            {"$match": {"perfumeId": payload.perfumeId}},
+            *_PIPELINE_ESTOQUE,
+        ]
+        async for linha in db.movimentos.aggregate(pipeline):
+            saldo_atual = int(linha["total"])
 
-    if payload.saldoEsperadoMl is not None and payload.saldoEsperadoMl != saldo_atual:
-        raise HTTPException(
-            status_code=409,
-            detail=f"O saldo mudou para {saldo_atual}ml. Atualize a tela e confira novamente.",
-        )
+        if payload.saldoEsperadoMl is not None and payload.saldoEsperadoMl != saldo_atual:
+            raise HTTPException(
+                status_code=409,
+                detail=f"O saldo mudou para {saldo_atual}ml. Atualize a tela e confira novamente.",
+            )
 
-    ajuste = calcular_ajuste_contagem(saldo_atual, payload.quantidadeFisicaMl)
-    if not ajuste:
-        return {
-            "alterado": False,
+        ajuste = calcular_ajuste_contagem(saldo_atual, payload.quantidadeFisicaMl)
+        if not ajuste:
+            return {
+                "alterado": False,
+                "saldoAnteriorMl": saldo_atual,
+                "saldoAtualMl": saldo_atual,
+                "diferencaMl": 0,
+                "movimento": None,
+            }
+
+        tipo, quantidade = ajuste
+        agora = datetime.now(timezone.utc).isoformat()
+        motivo = payload.motivo.strip() or "Conferência física"
+        doc = {
+            "perfumeId": payload.perfumeId,
+            "tipo": tipo,
+            "quantidadeMl": quantidade,
+            "motivo": motivo,
+            "categoria": "conferencia-inventario",
+            "origem": "conferencia-fisica",
             "saldoAnteriorMl": saldo_atual,
-            "saldoAtualMl": saldo_atual,
-            "diferencaMl": 0,
-            "movimento": None,
+            "saldoEncontradoMl": payload.quantidadeFisicaMl,
+            "data": agora,
         }
-
-    tipo, quantidade = ajuste
-    agora = datetime.now(timezone.utc).isoformat()
-    motivo = payload.motivo.strip() or "Conferência física"
-    doc = {
-        "perfumeId": payload.perfumeId,
-        "tipo": tipo,
-        "quantidadeMl": quantidade,
-        "motivo": motivo,
-        "categoria": "conferencia-inventario",
-        "origem": "conferencia-fisica",
-        "saldoAnteriorMl": saldo_atual,
-        "saldoEncontradoMl": payload.quantidadeFisicaMl,
-        "data": agora,
-    }
-    resultado = await db.movimentos.insert_one(doc)
-    novo = await db.movimentos.find_one({"_id": resultado.inserted_id})
+        resultado = await db.movimentos.insert_one(doc)
+        novo = await db.movimentos.find_one({"_id": resultado.inserted_id})
     return {
         "alterado": True,
         "saldoAnteriorMl": saldo_atual,
@@ -186,7 +173,8 @@ async def apagar_movimento(movimento_id: str, _: str = Depends(require_atelie_au
         oid = ObjectId(movimento_id)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de movimento inválido.")
-    resultado = await db.movimentos.delete_one({"_id": oid})
+    async with stock_lock(db):
+        resultado = await db.movimentos.delete_one({"_id": oid})
     if resultado.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Movimento não encontrado.")
     return {"status": "Movimento apagado."}
@@ -205,22 +193,8 @@ async def mapa_estoque():
 async def resumo_estoque(_: str = Depends(require_atelie_auth)):
     """Separa saldo físico, reservas pendentes e saldo livre para planejamento."""
     db = get_db()
-    saldo_atual: dict[str, int] = {}
-    async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
-        saldo_atual[linha["_id"]] = linha["total"]
-
-    reservado: dict[str, int] = {}
-    pedidos_pendentes = await db.pedidos.find(
-        {"status": {"$in": ["pendente", "pagamento_confirmado"]}},
-        {"itens": 1},
-    ).to_list(5000)
-    for pedido in pedidos_pendentes:
-        for item in pedido.get("itens", []):
-            perfume_id = item.get("perfumeId")
-            if not perfume_id:
-                continue
-            quantidade_ml = int(item.get("ml", 0)) * int(item.get("quantidade", 1))
-            reservado[perfume_id] = reservado.get(perfume_id, 0) + quantidade_ml
+    saldo_atual = await mapa_saldo_fisico(db)
+    reservado = await mapa_reservado(db)
 
     ids = set(saldo_atual) | set(reservado)
     return {
