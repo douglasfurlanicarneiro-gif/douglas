@@ -189,8 +189,6 @@ export function Vitrine({
   const supportNumber = whatsappNumber(currentStore.whatsapp);
   const instagramUrl = instagramLink(currentStore.instagram);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [usingCache, setUsingCache] = useState(false);
   const [storeLogoFailed, setStoreLogoFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [snapshot, setSnapshot] = useState<{ atualizadoEm: string | null; itens: VitrineItem[] } | null>(null);
@@ -217,6 +215,10 @@ export function Vitrine({
   const [trackingCodeOpen, setTrackingCodeOpen] = useState(false);
   const cartRestored = useRef(false);
   const ordersKeyRef = useRef(`${ORDERS_KEY_PREFIX}${ORDERS_INITIAL_VERSION}`);
+  const hasCatalogRef = useRef(false);
+  const retryAttemptRef = useRef(0);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadRef = useRef<() => Promise<void>>(async () => undefined);
 
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
@@ -231,18 +233,35 @@ export function Vitrine({
     : '';
 
   const load = useCallback(async () => {
+    if (retryTimerRef.current) {
+      clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    }
     try {
-      setLoadError(false);
       // A identidade da loja é atualizada sem bloquear o catálogo.
       onRefreshStoreConfig?.().catch(() => undefined);
       const r = await getVitrine();
+      hasCatalogRef.current = true;
+      retryAttemptRef.current = 0;
       setSnapshot(r);
-      setUsingCache(false);
+      setLoading(false);
       storage.setItem(VITRINE_CACHE_KEY, JSON.stringify(r));
     } catch {
-      setLoadError(true);
-    } finally { setLoading(false); setRefreshing(false); }
+      // Com catálogo salvo, o cliente continua navegando normalmente. Sem
+      // catálogo, a abertura permanece visível e a conexão é refeita sozinha.
+      if (!hasCatalogRef.current) {
+        setLoading(true);
+        const retryDelays = [1500, 3000, 5000, 8000, 12000, 15000];
+        const delay = retryDelays[Math.min(retryAttemptRef.current, retryDelays.length - 1)];
+        retryAttemptRef.current += 1;
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null;
+          void loadRef.current();
+        }, delay);
+      }
+    } finally { setRefreshing(false); }
   }, [onRefreshStoreConfig]);
+  loadRef.current = load;
 
   useEffect(() => {
     const start = async () => {
@@ -251,8 +270,8 @@ export function Vitrine({
         try {
           const parsed = JSON.parse(cached) as { atualizadoEm: string | null; itens: VitrineItem[] };
           if (Array.isArray(parsed.itens) && parsed.itens.length > 0) {
+            hasCatalogRef.current = true;
             setSnapshot(parsed);
-            setUsingCache(true);
             setLoading(false);
           }
         } catch {
@@ -263,6 +282,9 @@ export function Vitrine({
     };
     start();
   }, [load]);
+  useEffect(() => () => {
+    if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+  }, []);
   useEffect(() => {
     if (!loading) onReady?.();
   }, [loading, onReady]);
@@ -546,20 +568,6 @@ export function Vitrine({
               {(!currentStore.logoUrl || storeLogoFailed) && <Text style={styles.h1}>{brand.title}</Text>}
               <Text style={styles.subtitle}>PERFUMARIA AUTORAL</Text>
             </View>
-            {usingCache && (
-              <View style={{ marginHorizontal: SPACING.lg, marginBottom: SPACING.md, padding: 12, borderRadius: RADIUS.md, backgroundColor: STOREFRONT_COLORS.surfaceRaised }}>
-                <Text style={{ color: STOREFRONT_COLORS.ink, fontSize: 12, textAlign: 'center' }}>
-                  {loadError ? 'Mostrando a última vitrine salva.' : 'Atualizando a vitrine em segundo plano…'}
-                </Text>
-                {loadError && (
-                  <Pressable onPress={() => { setRefreshing(true); load(); }} testID="vitrine-retry-cached">
-                    <Text style={{ color: COLORS.gold, fontSize: 12, fontWeight: '700', textAlign: 'center', marginTop: 6 }}>
-                      Tentar atualizar novamente
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            )}
             {!showEmpty && (
               <View style={{ paddingHorizontal: SPACING.lg }}>
                 <View style={styles.searchBox}>
@@ -657,22 +665,11 @@ export function Vitrine({
           showEmpty ? (
             <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
               <Text style={[styles.h1, { fontSize: 22, marginTop: 32 }]}>
-                {loadError ? 'Não foi possível conectar' : 'Vitrine em preparação'}
+                Vitrine em preparação
               </Text>
               <Text style={{ color: COLORS.muted, marginTop: 6, textAlign: 'center' }}>
-                {loadError
-                  ? 'O servidor gratuito pode estar acordando. Aguarde um momento e tente novamente.'
-                  : 'Volte em breve para conferir a coleção.'}
+                Volte em breve para conferir a coleção.
               </Text>
-              {loadError && (
-                <Pressable
-                  onPress={() => { setLoading(true); load(); }}
-                  style={{ marginTop: SPACING.md, paddingHorizontal: 18, paddingVertical: 11, borderRadius: RADIUS.pill, backgroundColor: COLORS.gold }}
-                  testID="vitrine-retry"
-                >
-                  <Text style={{ color: COLORS.ink, fontWeight: '700' }}>Tentar novamente</Text>
-                </Pressable>
-              )}
             </View>
           ) : (
             <View style={{ paddingHorizontal: SPACING.lg }}>
