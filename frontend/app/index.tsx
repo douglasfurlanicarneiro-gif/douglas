@@ -56,15 +56,21 @@ export default function Index() {
   const [storeConfig, setStoreConfig] = useState<ConfiguracoesLojaPublicas>(DEFAULT_STORE_CONFIG);
 
   useEffect(() => {
-    (async () => {
-      const [t, config] = await Promise.all([
-        getToken(),
-        getConfiguracoesPublicas().catch(() => DEFAULT_STORE_CONFIG),
-      ]);
-      if (t) setModo('atelie');
-      setStoreConfig(publicStoreConfig(config));
-      setChecked(true);
-    })();
+    let active = true;
+
+    // Libera a interface imediatamente. Token e identidade da loja vêm do
+    // armazenamento/API em segundo plano e não podem deixar uma tela vazia.
+    setChecked(true);
+    getToken().then((token) => {
+      if (active && token) setModo('atelie');
+    });
+    getConfiguracoesPublicas()
+      .then((config) => {
+        if (active) setStoreConfig(publicStoreConfig(config));
+      })
+      .catch(() => undefined);
+
+    return () => { active = false; };
   }, []);
 
   const sair = async () => { await clearToken(); setModo('vitrine'); };

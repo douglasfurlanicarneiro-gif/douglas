@@ -231,12 +231,9 @@ export function Vitrine({
   const load = useCallback(async () => {
     try {
       setLoadError(false);
-      const [r] = await Promise.all([
-        getVitrine(),
-        onRefreshStoreConfig
-          ? onRefreshStoreConfig().catch(() => undefined)
-          : Promise.resolve(undefined),
-      ]);
+      // A identidade da loja é atualizada sem bloquear o catálogo.
+      onRefreshStoreConfig?.().catch(() => undefined);
+      const r = await getVitrine();
       setSnapshot(r);
       setUsingCache(false);
       storage.setItem(VITRINE_CACHE_KEY, JSON.stringify(r));
