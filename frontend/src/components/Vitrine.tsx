@@ -34,34 +34,67 @@ type ContactFallback = {
   webUrl: string;
   copyValue: string;
 };
-const FAQ_ITEMS = [
+type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+const FAQ_ITEMS: { question: string; answer: string; icon: FeatherIconName }[] = [
   {
-    question: 'O que é um perfume contratipo?',
-    answer: 'É uma criação inspirada no perfil olfativo de uma fragrância conhecida, produzida por uma marca independente. Não se trata do perfume original nem possui vínculo com a marca de referência.',
+    question: 'O que é um perfume inspirado (contratipo)?',
+    answer: 'Nossos perfumes são criações inspiradas no perfil olfativo de fragrâncias mundialmente conhecidas, desenvolvidas de forma independente. Não comercializamos produtos originais das marcas de referência e não possuímos qualquer vínculo com elas.',
+    icon: 'droplet',
   },
   {
-    question: 'Qual é o prazo de preparação e entrega?',
-    answer: 'Após a confirmação do pagamento, seu pedido entra em preparação. No carrinho, depois de informar o CEP, você verá o prazo estimado de cada modalidade de entrega antes de pagar.',
+    question: 'Qual é o prazo de preparação e envio?',
+    answer: 'Cada perfume é preparado com cuidado para garantir qualidade e desempenho. O prazo de produção é de até 3 dias úteis. Após a postagem, o prazo de entrega depende da transportadora e do CEP informado. Em períodos promocionais ou datas comemorativas, a produção poderá levar mais tempo.',
+    icon: 'clock',
   },
   {
     question: 'Como o frete é calculado?',
-    answer: 'O valor é calculado conforme o CEP, os itens do pedido e a modalidade escolhida. Todas as opções disponíveis aparecem no carrinho antes do pagamento.',
+    answer: 'O valor é calculado automaticamente no checkout conforme o CEP de destino, os itens do pedido e a modalidade de envio escolhida. Você verá o valor antes de finalizar a compra.',
+    icon: 'truck',
   },
   {
     question: 'Como acompanho meu pedido?',
-    answer: 'Abra a opção Pedidos na vitrine para consultar o andamento. A loja também poderá enviar as principais atualizações pelo WhatsApp informado na compra.',
+    answer: 'Abra a opção Pedidos na vitrine para consultar o andamento. Quando houver código de rastreamento, nossa equipe também poderá enviá-lo pelo WhatsApp informado na compra.',
+    icon: 'package',
   },
   {
     question: 'Como funciona a retirada combinada?',
-    answer: 'Escolha Retirada Combinada no carrinho. Depois da confirmação, nossa equipe entrará em contato para combinar o local e o melhor horário.',
+    answer: 'Caso prefira, você pode retirar seu pedido pessoalmente mediante agendamento. Após a confirmação do pagamento, entraremos em contato para combinar local, data e horário.',
+    icon: 'map-pin',
   },
   {
     question: 'Quais formas de pagamento são aceitas?',
-    answer: 'As formas disponíveis, como Pix ou cartão, são apresentadas durante a finalização do pedido.',
+    answer: 'Aceitamos PIX e os cartões disponíveis no checkout. As condições de pagamento e parcelamento serão exibidas antes da confirmação do pedido.',
+    icon: 'credit-card',
   },
   {
     question: 'Preciso solicitar uma troca ou devolução. O que faço?',
-    answer: 'Entre em contato pelo WhatsApp e informe o número do pedido. Nossa equipe analisará o caso e passará todas as orientações aplicáveis.',
+    answer: 'Caso receba um produto com defeito ou avaria, entre em contato conosco em até 7 dias corridos após o recebimento. Após a análise do caso, realizaremos a substituição ou o reembolso conforme as regras aplicáveis. Em casos de desistência, o produto deverá estar sem uso e em perfeitas condições.',
+    icon: 'refresh-cw',
+  },
+  {
+    question: 'Os perfumes têm boa fixação?',
+    answer: 'A duração pode variar conforme a pele, o clima e o ambiente. Utilizamos matérias-primas selecionadas para proporcionar ótimo desempenho e projeção.',
+    icon: 'activity',
+  },
+  {
+    question: 'Os perfumes são originais?',
+    answer: 'Não. São fragrâncias autorais inspiradas em perfumes conhecidos, produzidas de forma independente e sem vínculo com as marcas de referência.',
+    icon: 'info',
+  },
+  {
+    question: 'Posso encomendar um perfume personalizado?',
+    answer: 'Sim. Desenvolvemos fragrâncias personalizadas para criar uma identidade olfativa exclusiva. Nossa equipe orientará você sobre acordes, intensidade e possibilidades de criação.',
+    icon: 'sliders',
+  },
+  {
+    question: 'Como devo armazenar meu perfume?',
+    answer: 'Mantenha o frasco em local fresco, seco e protegido da luz solar direta. Assim, a fragrância preserva suas características por mais tempo.',
+    icon: 'sun',
+  },
+  {
+    question: 'Os perfumes já vêm prontos para uso?',
+    answer: 'Sim. Todos os perfumes passam pelo período adequado de maturação antes do envio, buscando oferecer o melhor desempenho olfativo.',
+    icon: 'check-circle',
   },
 ];
 const PRODUCT_CARD_COLORS = {
@@ -1009,11 +1042,11 @@ export function Vitrine({
       <BottomSheet
         visible={faqOpen}
         onClose={() => setFaqOpen(false)}
-        title="Dúvidas e prazos"
+        title="Central de Ajuda"
         testID="faq-sheet"
       >
         <View>
-          <Text style={styles.faqIntro}>Toque em uma pergunta para consultar a resposta.</Text>
+          <Text style={styles.faqIntro}>Tudo o que você precisa saber antes da sua compra.</Text>
           {FAQ_ITEMS.map((item, index) => {
             const expanded = faqExpanded === index;
             return (
@@ -1026,6 +1059,9 @@ export function Vitrine({
                 testID={`faq-item-${index}`}
               >
                 <View style={styles.faqQuestionRow}>
+                  <View style={styles.faqQuestionIcon}>
+                    <Feather name={item.icon} size={15} color={COLORS.gold} />
+                  </View>
                   <Text style={styles.faqQuestion}>{item.question}</Text>
                   <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.gold} />
                 </View>
@@ -1033,17 +1069,23 @@ export function Vitrine({
               </Pressable>
             );
           })}
-          <Pressable
-            onPress={() => {
-              setFaqOpen(false);
-              setContactOpen(true);
-            }}
-            style={styles.faqBack}
-            testID="faq-back-contact"
-          >
-            <Feather name="message-circle" size={15} color={COLORS.gold} />
-            <Text style={styles.faqBackText}>Ainda precisa de ajuda? Voltar para Fale Conosco</Text>
-          </Pressable>
+          {!!supportNumber && (
+            <Pressable
+              onPress={() => {
+                setFaqOpen(false);
+                openStoreWhatsapp();
+              }}
+              style={[styles.contactAction, styles.faqWhatsapp]}
+              testID="faq-whatsapp"
+            >
+              <View style={styles.contactActionIcon}><Feather name="message-circle" size={17} color={COLORS.gold} /></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.contactActionTitle}>Ainda ficou com alguma dúvida?</Text>
+                <Text style={styles.contactActionSubtitle}>Nossa equipe responde pelo WhatsApp</Text>
+              </View>
+              <Feather name="arrow-up-right" size={15} color={COLORS.muted} />
+            </Pressable>
+          )}
         </View>
       </BottomSheet>
 
@@ -1280,12 +1322,12 @@ const styles = StyleSheet.create({
   contactActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
   faqIntro: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: SPACING.md },
   faqItem: { padding: 13, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  faqItemExpanded: { borderColor: COLORS.gold + '77', backgroundColor: COLORS.surfaceRaised },
+  faqItemExpanded: { borderColor: COLORS.gold + '99', backgroundColor: COLORS.surface },
   faqQuestionRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  faqQuestionIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   faqQuestion: { flex: 1, color: COLORS.bone, fontSize: 12, fontWeight: '700' },
-  faqAnswer: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
-  faqBack: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, marginTop: SPACING.sm },
-  faqBackText: { color: COLORS.gold, fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  faqAnswer: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 10, marginLeft: 42, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+  faqWhatsapp: { marginTop: SPACING.sm },
   contactFallbackText: { color: COLORS.bone, fontSize: 12, lineHeight: 18, marginBottom: SPACING.lg },
   contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
