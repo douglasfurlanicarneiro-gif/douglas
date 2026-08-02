@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
@@ -11,6 +11,7 @@ export function LaunchIntro({
   onFinish: () => void;
   storeName?: string;
 }) {
+  const { width, height } = useWindowDimensions();
   const [logoReady, setLogoReady] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -22,7 +23,7 @@ export function LaunchIntro({
 
   const shineTranslateX = shineProgress.interpolate({
     inputRange: [0, 1],
-    outputRange: [-320, 520],
+    outputRange: [-Math.max(width * 0.75, 320), Math.max(width * 1.45, 560)],
   });
 
   const hideHtmlPreloader = () => {
@@ -145,28 +146,32 @@ export function LaunchIntro({
             },
           ]}
         />
-        <AnimatedGradient
-          colors={[
-            'rgba(239, 211, 157, 0)',
-            'rgba(255, 239, 204, 0.92)',
-            'rgba(199, 162, 92, 0)',
-          ]}
-          locations={[0, 0.5, 1]}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          pointerEvents="none"
-          style={[
-            styles.shine,
-            {
-              opacity: shineOpacity,
-              transform: [
-                { translateX: shineTranslateX },
-                { rotate: '16deg' },
-              ],
-            },
-          ]}
-        />
       </View>
+      <AnimatedGradient
+        colors={[
+          'rgba(239, 211, 157, 0)',
+          'rgba(255, 249, 240, 0.22)',
+          'rgba(255, 239, 204, 0.78)',
+          'rgba(199, 162, 92, 0.18)',
+          'rgba(199, 162, 92, 0)',
+        ]}
+        locations={[0, 0.28, 0.5, 0.72, 1]}
+        start={{ x: 0, y: 0.5 }}
+        end={{ x: 1, y: 0.5 }}
+        pointerEvents="none"
+        style={[
+          styles.pageShine,
+          {
+            width: Math.max(width * 0.42, 190),
+            height: Math.max(height * 1.4, 720),
+            opacity: shineOpacity,
+            transform: [
+              { translateX: shineTranslateX },
+              { rotate: '9deg' },
+            ],
+          },
+        ]}
+      />
       <Animated.View
         style={[
           styles.captionWrap,
@@ -218,13 +223,12 @@ const styles = StyleSheet.create({
     height: '100%',
     zIndex: 1,
   },
-  shine: {
+  pageShine: {
     position: 'absolute',
     zIndex: 2,
-    top: '-18%',
+    top: '-20%',
     left: 0,
-    width: '28%',
-    height: '136%',
+    borderRadius: 220,
   },
   captionWrap: {
     position: 'absolute',
