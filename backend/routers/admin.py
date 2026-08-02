@@ -39,8 +39,8 @@ class ConfiguracoesLojaPublica(BaseModel):
     whatsapp: str
     instagram: str
     email: str
-    pix: str
     cartaoOnlineAtivo: bool
+    pixManualAtivo: bool
 
 
 def _configuracoes_completas(doc: dict | None = None) -> dict:
@@ -211,11 +211,11 @@ async def obter_configuracoes_publicas():
         ),
         instagram=str(dados["instagram"]).strip(),
         email=str(dados["email"]).strip(),
-        pix=str(dados["pix"]).strip() or PIX_KEY,
         cartaoOnlineAtivo=bool(
             str(dados["infinitePayHandle"]).strip().lstrip("$")
             or INFINITEPAY_HANDLE
         ),
+        pixManualAtivo=bool(str(dados["pix"]).strip() or PIX_KEY),
     ).model_dump()
 
 
@@ -244,6 +244,8 @@ async def salvar_configuracoes(
     dados["infinitePayHandle"] = (
         str(enviados.get("infinitePayHandle", "")).strip().lstrip("$")
     )
+    # Permite desativar a contingencia manual sem manter uma chave antiga.
+    dados["pix"] = str(enviados.get("pix", "")).strip()
     dados["atualizadoEm"] = datetime.now(timezone.utc).isoformat()
     await db.configuracoes.update_one(
         {"_id": "loja"},

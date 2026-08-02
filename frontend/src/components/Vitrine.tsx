@@ -12,7 +12,6 @@ import { confirmarPagamentoInfinitePay, createOpiniao, createSugestao, getOrders
 import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
 import { storage } from '../utils/storage';
-import { createManualPixPayload } from '../utils/pix';
 import {
   instagramLink,
   publicStoreConfig,
@@ -299,12 +298,7 @@ export function Vitrine({
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
   const [enviando, setEnviando] = useState(false);
   const manualPixCode = successOrder?.pagamento?.metodo === 'pix'
-    ? successOrder.pagamento.pixCopiaECola || createManualPixPayload(
-      successOrder.pagamento.referencia || successOrder.id,
-      successOrder.pagamento.valor || successOrder.total || 0,
-      currentStore.pix,
-      currentStore.nomeLoja,
-    )
+    ? successOrder.pagamento.pixCopiaECola || ''
     : '';
   const pagamentoAutomaticoPendente = Boolean(
     successOrder?.pagamento?.checkoutUrl
@@ -950,6 +944,7 @@ export function Vitrine({
         visible={cartOpen}
         items={cart}
         cartaoOnlineAtivo={currentStore.cartaoOnlineAtivo}
+        pixManualAtivo={currentStore.pixManualAtivo}
         onClose={() => setCartOpen(false)}
         onChangeQuantity={(index, quantity) => setCart((current) => (
           quantity <= 0

@@ -10,10 +10,10 @@ from datetime import datetime, timezone
 from decimal import Decimal
 import unicodedata
 
-from payments.base import PaymentProvider
+from payments.base import PaymentProvider, PaymentProviderError
 
 
-PIX_KEY = os.getenv("PIX_KEY", "douglasfurlanicarneiro@gmail.com").strip()
+PIX_KEY = os.getenv("PIX_KEY", "").strip()
 PIX_RECEIVER_NAME = os.getenv("PIX_RECEIVER_NAME", "L ESSENCE FURLANI").strip()
 PIX_RECEIVER_CITY = os.getenv("PIX_RECEIVER_CITY", "SAO PAULO").strip()
 
@@ -48,7 +48,9 @@ def criar_pix_copia_e_cola(
     recebedor = (receiver_name or PIX_RECEIVER_NAME).strip()
     cidade = (receiver_city or PIX_RECEIVER_CITY).strip()
     if not chave:
-        raise RuntimeError("Configure PIX_KEY para habilitar o Pix manual.")
+        raise PaymentProviderError(
+            "O Pix manual nao foi configurado. Cadastre uma chave no painel."
+        )
 
     txid = "".join(char for char in referencia.upper() if char.isalnum())[:25] or "***"
     merchant_account = _tlv("00", "BR.GOV.BCB.PIX") + _tlv("01", chave)

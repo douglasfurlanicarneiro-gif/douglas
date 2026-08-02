@@ -2445,7 +2445,7 @@ export function Atelie({
                     storePreview.whatsapp && 'WhatsApp',
                     storePreview.instagram && 'Instagram',
                     storePreview.email && 'E-mail',
-                    storePreview.pix && 'Pix',
+                    storeConfig.pix.trim() && 'Pix manual',
                   ].filter(Boolean).join(' · ') || 'Adicione seus canais de contato'}
                 </Text>
               </View>
@@ -2459,7 +2459,7 @@ export function Atelie({
             </View>
             <Field label="E-mail"><TInput value={storeConfig.email} onChangeText={(value) => setStoreField('email', value)} keyboardType="email-address" autoCapitalize="none" /></Field>
             <Text style={styles.storeConfigHelp}>WhatsApp, Instagram e e-mail preenchidos aparecem em “Fale Conosco” para o cliente.</Text>
-            <Field label="Chave Pix"><TInput value={storeConfig.pix} onChangeText={(value) => setStoreField('pix', value)} autoCapitalize="none" /></Field>
+            <Field label="Chave Pix manual (contingência)"><TInput value={storeConfig.pix} onChangeText={(value) => setStoreField('pix', value)} autoCapitalize="none" /></Field>
             <Text style={styles.storeConfigHelp}>Usada somente como contingência manual quando o checkout automático da InfinitePay estiver desativado.</Text>
             <Field label="InfiniteTag da InfinitePay">
               <TInput

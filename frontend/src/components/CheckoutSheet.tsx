@@ -52,6 +52,7 @@ type Props = {
   onRemove: (index: number) => void;
   onSuccess: (order: Compra, message: string) => void | Promise<void>;
   cartaoOnlineAtivo: boolean;
+  pixManualAtivo: boolean;
 };
 
 export function CheckoutSheet({
@@ -62,6 +63,7 @@ export function CheckoutSheet({
   onRemove,
   onSuccess,
   cartaoOnlineAtivo,
+  pixManualAtivo,
 }: Props) {
   const [form, setForm] = useState<CustomerForm>(EMPTY_FORM);
   const [step, setStep] = useState<CheckoutStep>('dados');
@@ -81,6 +83,7 @@ export function CheckoutSheet({
   );
   const valorEntrega = tipoEntrega === 'entrega' ? (freteSelecionado?.preco || 0) : 0;
   const total = subtotal + valorEntrega;
+  const pagamentoDisponivel = cartaoOnlineAtivo || pixManualAtivo;
 
   useEffect(() => {
     setForm((current) => ({
@@ -252,6 +255,7 @@ export function CheckoutSheet({
   const complete = Boolean(
     dadosCompletos
     && entregaCompleta
+    && pagamentoDisponivel
     && (form.formaPagamento !== 'cartao' || cartaoOnlineAtivo)
   );
 
@@ -584,26 +588,32 @@ export function CheckoutSheet({
             </Text>
             <Field label="Forma de pagamento">
               <Pressable
-                onPress={() => setForm({ ...form, formaPagamento: cartaoOnlineAtivo ? 'cartao' : 'pix' })}
+                onPress={() => pagamentoDisponivel && setForm({ ...form, formaPagamento: cartaoOnlineAtivo ? 'cartao' : 'pix' })}
                 style={{
                   paddingVertical: 14,
                   paddingHorizontal: SPACING.md,
                   alignItems: 'center',
                   borderRadius: 12,
                   borderWidth: 1,
-                  borderColor: COLORS.gold,
-                  backgroundColor: COLORS.gold,
+                  borderColor: pagamentoDisponivel ? COLORS.gold : COLORS.border,
+                  backgroundColor: pagamentoDisponivel ? COLORS.gold : COLORS.surface,
                 }}
               >
-                <Text style={{ color: COLORS.ink, fontWeight: '600' }}>
-                  {cartaoOnlineAtivo ? 'Pix ou cartão · InfinitePay' : 'Pix'}
+                <Text style={{ color: pagamentoDisponivel ? COLORS.ink : COLORS.muted, fontWeight: '600' }}>
+                  {cartaoOnlineAtivo ? 'Pix ou cartão · InfinitePay' : pixManualAtivo ? 'Pix' : 'Pagamento indisponível'}
                 </Text>
               </Pressable>
             </Field>
-            {!cartaoOnlineAtivo && (
+            {!cartaoOnlineAtivo && pixManualAtivo && (
               <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: -8, marginBottom: SPACING.md }}>
                 Pagamento por Pix com confirmação manual. O checkout automático está temporariamente indisponível.
               </Text>
+            )}
+            {!pagamentoDisponivel && (
+              <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
+                <Text style={{ color: COLORS.bone, fontSize: 12, fontWeight: '600' }}>Pagamento temporariamente indisponível</Text>
+                <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 4 }}>Entre em contato com a loja para combinar o pagamento.</Text>
+              </View>
             )}
             {cartaoOnlineAtivo && form.formaPagamento === 'cartao' && (
               <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>

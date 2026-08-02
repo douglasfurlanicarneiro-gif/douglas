@@ -277,9 +277,10 @@ export type ConfiguracoesLoja = {
 
 export type ConfiguracoesLojaPublicas = Pick<
   ConfiguracoesLoja,
-  'nomeLoja' | 'logoUrl' | 'whatsapp' | 'instagram' | 'email' | 'pix'
+  'nomeLoja' | 'logoUrl' | 'whatsapp' | 'instagram' | 'email'
 > & {
   cartaoOnlineAtivo: boolean;
+  pixManualAtivo: boolean;
 };
 
 export type ConfirmacaoInfinitePay = {
