@@ -18,6 +18,8 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="L’Essence Furlani" />
         <link rel="manifest" href="/manifest.json" />
+        <link rel="dns-prefetch" href="//lessence-furlani-api.onrender.com" />
+        <link rel="preconnect" href="https://lessence-furlani-api.onrender.com" crossOrigin="anonymous" />
         <link rel="icon" type="image/png" sizes="192x192" href="/favicon-light.png?v=2" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-light.png?v=2" />
         <link rel="preload" as="image" href="/launch-logo-light.png?v=2" />

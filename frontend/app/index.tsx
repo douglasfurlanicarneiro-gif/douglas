@@ -1,15 +1,32 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StatusBar, Platform } from 'react-native';
+import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
+import { View, Text, StatusBar, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { COLORS, SPACING } from '../src/theme';
 import { Vitrine } from '../src/components/Vitrine';
-import { Atelie } from '../src/components/Atelie';
 import { BottomSheet } from '../src/components/BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton } from '../src/components/atoms';
 import { LaunchIntro } from '../src/components/LaunchIntro';
 import { login, saveToken, getToken, clearToken, getConfiguracoesPublicas } from '../src/api';
 import { DEFAULT_STORE_CONFIG, publicStoreConfig } from '../src/storeConfig';
 import type { ConfiguracoesLojaPublicas } from '../src/types';
+
+const LazyAtelie = lazy(() => import('../src/components/Atelie').then((module) => ({
+  default: module.Atelie,
+})));
+
+function AdminLoading() {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background }}>
+      <ActivityIndicator color={COLORS.gold} />
+      <Text style={{ color: COLORS.gold, fontSize: 12, marginTop: SPACING.sm }}>Abrindo painel…</Text>
+    </View>
+  );
+}
+
+function AdminReady({ children, onReady }: { children: React.ReactNode; onReady: () => void }) {
+  useEffect(() => onReady(), [onReady]);
+  return children;
+}
 
 function LoginForm({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () => void }) {
   const [usuario, setUsuario] = useState('');
@@ -67,12 +84,17 @@ export default function Index() {
   useEffect(() => {
     let active = true;
 
-    // Libera a interface imediatamente. Token e identidade da loja vêm do
-    // armazenamento/API em segundo plano e não podem deixar uma tela vazia.
-    setChecked(true);
-    getToken().then((token) => {
-      if (active && token) setModo('atelie');
-    });
+    // Decide a área inicial antes de liberar a interface para evitar montar a
+    // vitrine e baixar seus dados quando o usuário já está autenticado.
+    getToken()
+      .then((token) => {
+        if (!active) return;
+        if (token) setModo('atelie');
+        setChecked(true);
+      })
+      .catch(() => {
+        if (active) setChecked(true);
+      });
     getConfiguracoesPublicas()
       .then((config) => {
         if (active) setStoreConfig(publicStoreConfig(config));
@@ -102,19 +124,19 @@ export default function Index() {
     favicon?.setAttribute('href', '/favicon-light.png?v=2');
   }, [storeConfig.nomeLoja]);
 
-  useEffect(() => {
-    if (checked && modo === 'atelie') finishWebPreloader();
-  }, [checked, finishWebPreloader, modo]);
-
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
       {checked ? (
         modo === 'atelie' ? (
-          <Atelie
-            onSair={sair}
-            onStoreConfigChange={(config) => setStoreConfig(publicStoreConfig(config))}
-          />
+          <Suspense fallback={<AdminLoading />}>
+            <AdminReady onReady={finishWebPreloader}>
+              <LazyAtelie
+                onSair={sair}
+                onStoreConfigChange={(config) => setStoreConfig(publicStoreConfig(config))}
+              />
+            </AdminReady>
+          </Suspense>
         ) : (
           <Vitrine
             onAtelieClick={() => setPedindoSenha(true)}

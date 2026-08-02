@@ -10,6 +10,12 @@ services:
       - key: EXPO_PUBLIC_BACKEND_URL
         value: https://lessence-furlani-api.onrender.com
     headers:
+      - path: /_expo/static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /manifest.json
+        name: Cache-Control
+        value: no-cache
       - path: /*
         name: X-Content-Type-Options
         value: nosniff
