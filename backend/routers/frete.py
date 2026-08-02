@@ -43,6 +43,7 @@ class ConfiguracaoFreteIn(BaseModel):
     ajustePrioritarioTipo: Literal["valor", "percentual"] = "valor"
     ajustePrioritarioValor: float = Field(default=0, ge=0, le=100_000)
     prazoPrioritarioDias: int = Field(default=0, ge=0, le=90)
+    diferencaMinimaPrioritario: float = Field(default=3, ge=0, le=1000)
 
 
 async def itens_para_cotacao(db, itens: list[ItemFreteIn]) -> list[dict[str, Any]]:
@@ -124,6 +125,7 @@ async def atualizar_configuracao(
         ajuste_prioritario_tipo=payload.ajustePrioritarioTipo,
         ajuste_prioritario_valor=payload.ajustePrioritarioValor,
         prazo_prioritario_dias=payload.prazoPrioritarioDias,
+        diferenca_minima_prioritario=payload.diferencaMinimaPrioritario,
     )
     return {**config, **(await status_integracao(db))}
 

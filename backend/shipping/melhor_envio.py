@@ -76,6 +76,10 @@ async def configuracao_frete(db) -> dict[str, Any]:
         "ajustePrioritarioTipo": str((saved or {}).get("ajustePrioritarioTipo", "valor")),
         "ajustePrioritarioValor": round(float((saved or {}).get("ajustePrioritarioValor", 0)), 2),
         "prazoPrioritarioDias": int((saved or {}).get("prazoPrioritarioDias", 0)),
+        "diferencaMinimaPrioritario": round(
+            float((saved or {}).get("diferencaMinimaPrioritario", 3)),
+            2,
+        ),
     }
 
 
@@ -91,6 +95,7 @@ async def salvar_configuracao_frete(
     ajuste_prioritario_tipo: str = "valor",
     ajuste_prioritario_valor: float = 0,
     prazo_prioritario_dias: int = 0,
+    diferenca_minima_prioritario: float = 3,
 ) -> dict[str, Any]:
     await db.configuracoes.update_one(
         {"_id": "frete"},
@@ -105,6 +110,7 @@ async def salvar_configuracao_frete(
                 "ajustePrioritarioTipo": ajuste_prioritario_tipo,
                 "ajustePrioritarioValor": round(ajuste_prioritario_valor, 2),
                 "prazoPrioritarioDias": prazo_prioritario_dias,
+                "diferencaMinimaPrioritario": round(diferenca_minima_prioritario, 2),
                 "atualizadoEm": datetime.now(timezone.utc).isoformat(),
             }
         },
@@ -390,6 +396,21 @@ async def cotar_frete(
             "freteGratis": frete_gratis,
             "prazoDias": prazo_configurado or int(opcao["prazoTransportadora"]),
         })
+
+    diferenca_prioritaria = max(
+        0.0,
+        round(float(config.get("diferencaMinimaPrioritario", 3)), 2),
+    )
+    precos_padrao = [
+        float(opcao["preco"])
+        for opcao in opcoes
+        if opcao["categoriaFrete"] == "padrao"
+    ]
+    if not frete_gratis and precos_padrao and diferenca_prioritaria > 0:
+        preco_minimo_prioritario = round(min(precos_padrao) + diferenca_prioritaria, 2)
+        for opcao in opcoes:
+            if opcao["categoriaFrete"] == "prioritaria":
+                opcao["preco"] = max(float(opcao["preco"]), preco_minimo_prioritario)
     return sorted(opcoes, key=lambda item: (item["preco"], item["prazoDias"]))
 
 

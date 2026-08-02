@@ -249,6 +249,7 @@ export type ConfiguracaoFrete = {
   ajustePrioritarioTipo: 'valor' | 'percentual';
   ajustePrioritarioValor: number;
   prazoPrioritarioDias: number;
+  diferencaMinimaPrioritario: number;
   integrado: boolean;
   aplicativoConfigurado: boolean;
   ambiente: 'sandbox' | 'producao';

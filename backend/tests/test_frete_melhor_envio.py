@@ -126,3 +126,38 @@ def test_dimensoes_aumentam_conforme_tamanho():
 
     assert pequena[3] < media[3] < grande[3]
     assert pequena[1] < media[1] < grande[1]
+
+
+def test_prioritaria_mantem_diferenca_minima_sobre_padrao(monkeypatch):
+    async def fake_config(_db):
+        return {
+            "cepOrigem": "03069000",
+            "taxaEmbalagem": 6.0,
+            "ajustePadraoTipo": "valor",
+            "ajustePadraoValor": 2.5,
+            "ajustePrioritarioTipo": "percentual",
+            "ajustePrioritarioValor": 6.55,
+            "diferencaMinimaPrioritario": 3.0,
+        }
+
+    async def fake_token(_db):
+        return "token-seguro"
+
+    async def fake_request(*_args, **_kwargs):
+        return FakeResponse([
+            {"id": 1, "name": ".Package", "price": "18.07", "delivery_time": 6, "company": {"name": "Jadlog"}},
+            {"id": 2, "name": ".Com", "price": "16.48", "delivery_time": 5, "company": {"name": "Jadlog"}},
+        ])
+
+    monkeypatch.setattr(melhor_envio, "configuracao_frete", fake_config)
+    monkeypatch.setattr(melhor_envio, "obter_access_token", fake_token)
+    monkeypatch.setattr(melhor_envio, "_run_request", fake_request)
+
+    result = asyncio.run(melhor_envio.cotar_frete(
+        object(),
+        cep_destino="08070-320",
+        itens=[{"perfumeId": "produto-1", "ml": 50, "quantidade": 1, "precoUnitario": 80}],
+    ))
+    por_categoria = {item["categoriaFrete"]: item for item in result}
+    assert por_categoria["padrao"]["preco"] == 26.57
+    assert por_categoria["prioritaria"]["preco"] == 29.57

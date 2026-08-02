@@ -212,6 +212,7 @@ export const updateConfiguracaoFrete = (data: Pick<
   | 'ajustePrioritarioTipo'
   | 'ajustePrioritarioValor'
   | 'prazoPrioritarioDias'
+  | 'diferencaMinimaPrioritario'
 >) =>
   request<ConfiguracaoFrete>('/frete/configuracao', {
     method: 'PUT',

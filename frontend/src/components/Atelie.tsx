@@ -982,6 +982,7 @@ export function Atelie({
   const [fretePrioritarioTipo, setFretePrioritarioTipo] = useState<'valor' | 'percentual'>('valor');
   const [fretePrioritarioInput, setFretePrioritarioInput] = useState('0,00');
   const [fretePrioritarioPrazoInput, setFretePrioritarioPrazoInput] = useState('0');
+  const [fretePrioritarioDiferencaInput, setFretePrioritarioDiferencaInput] = useState('3,00');
   const [savingFrete, setSavingFrete] = useState(false);
   const [priceInputs, setPriceInputs] = useState({ 30: '50,00', 50: '80,00', 100: '120,00' });
   const [savingPrices, setSavingPrices] = useState(false);
@@ -1062,6 +1063,7 @@ export function Atelie({
         setFretePrioritarioTipo(shipping.ajustePrioritarioTipo || 'valor');
         setFretePrioritarioInput(Number(shipping.ajustePrioritarioValor || 0).toFixed(2).replace('.', ','));
         setFretePrioritarioPrazoInput(String(shipping.prazoPrioritarioDias || 0));
+        setFretePrioritarioDiferencaInput(Number(shipping.diferencaMinimaPrioritario ?? 3).toFixed(2).replace('.', ','));
       }
     } catch (err) { console.error(err); }
     finally { setLoading(false); setRefreshing(false); }
@@ -1076,8 +1078,9 @@ export function Atelie({
     const padraoDeadline = Number(fretePadraoPrazoInput);
     const priorityValue = Number(fretePrioritarioInput.replace(',', '.'));
     const priorityDeadline = Number(fretePrioritarioPrazoInput);
+    const priorityDifference = Number(fretePrioritarioDiferencaInput.replace(',', '.'));
     const cep = freteCepInput.replace(/\D/g, '');
-    const invalidNumbers = [fee, freeAbove, padraoValue, padraoDeadline, priorityValue, priorityDeadline]
+    const invalidNumbers = [fee, freeAbove, padraoValue, padraoDeadline, priorityValue, priorityDeadline, priorityDifference]
       .some((value) => !Number.isFinite(value) || value < 0);
     if (invalidNumbers || !Number.isInteger(padraoDeadline) || !Number.isInteger(priorityDeadline) || cep.length !== 8) {
       setSheet({ type: 'info', label: 'Informe um CEP válido e valores de frete iguais ou maiores que zero.' });
@@ -1099,6 +1102,7 @@ export function Atelie({
         ajustePrioritarioTipo: fretePrioritarioTipo,
         ajustePrioritarioValor: priorityValue,
         prazoPrioritarioDias: priorityDeadline,
+        diferencaMinimaPrioritario: priorityDifference,
       });
       setFreteConfig(updated);
       setFreteFeeInput(updated.taxaEmbalagem.toFixed(2).replace('.', ','));
@@ -1110,6 +1114,7 @@ export function Atelie({
       setFretePrioritarioTipo(updated.ajustePrioritarioTipo);
       setFretePrioritarioInput(updated.ajustePrioritarioValor.toFixed(2).replace('.', ','));
       setFretePrioritarioPrazoInput(String(updated.prazoPrioritarioDias));
+      setFretePrioritarioDiferencaInput(updated.diferencaMinimaPrioritario.toFixed(2).replace('.', ','));
       setSheet({ type: 'info', label: 'Configuração de entrega salva. As próximas cotações já usarão esses valores.' });
     } catch {
       setSheet({ type: 'info', label: 'Não foi possível salvar a configuração de entrega.' });
@@ -2133,6 +2138,10 @@ export function Atelie({
                 <View style={{ flex: 1 }}><Field label="Acréscimo"><TInput keyboardType="decimal-pad" value={fretePrioritarioInput} onChangeText={setFretePrioritarioInput} placeholder="0,00" /></Field></View>
                 <View style={{ flex: 1 }}><Field label="Prazo exibido · 0 usa transportadora"><TInput keyboardType="numeric" value={fretePrioritarioPrazoInput} onChangeText={setFretePrioritarioPrazoInput} placeholder="0" /></Field></View>
               </View>
+              <Field label="Diferença mínima acima da Entrega Padrão (R$)">
+                <TInput keyboardType="decimal-pad" value={fretePrioritarioDiferencaInput} onChangeText={setFretePrioritarioDiferencaInput} placeholder="3,00" />
+              </Field>
+              <Text style={styles.shippingRuleHint}>Se necessário, o sistema elevará automaticamente a Prioritária para manter essa diferença.</Text>
             </View>
             <Pressable onPress={saveFreteConfig} disabled={savingFrete} style={styles.systemPrimaryButton}>
               <Feather name="save" size={15} color={COLORS.ink} />
