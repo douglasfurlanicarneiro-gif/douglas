@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform, type StyleProp, type ViewStyle } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform, type StyleProp, type ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { COLORS, SPACING } from '../theme';
+import { COLORS, SPACING, TYPOGRAPHY, FONT_SIZES } from '../theme';
+import { AppText as Text } from './Typography';
 
 type Props = {
   visible: boolean;
@@ -71,7 +72,7 @@ const styles = StyleSheet.create({
   sheetCompact: { height: 'auto' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   headerLight: { borderBottomColor: COLORS.border },
-  title: { color: COLORS.bone, fontSize: 18, fontFamily: Platform.select({ default: undefined }), fontWeight: '500', flex: 1 },
+  title: { ...TYPOGRAPHY.subtitle, color: COLORS.bone, fontSize: FONT_SIZES.heading, lineHeight: 24, flex: 1 },
   titleLight: { color: COLORS.bone },
   body: { flex: 1, minHeight: 0 },
   bodyCompact: { flex: 0 },

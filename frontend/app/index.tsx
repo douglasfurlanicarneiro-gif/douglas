@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { View, Text, StatusBar, Platform, ActivityIndicator } from 'react-native';
+import { View, StatusBar, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { COLORS, SPACING } from '../src/theme';
+import { COLORS, SPACING, FONT_SIZES } from '../src/theme';
 import { Vitrine } from '../src/components/Vitrine';
 import { BottomSheet } from '../src/components/BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton } from '../src/components/atoms';
@@ -9,6 +9,7 @@ import { LaunchIntro } from '../src/components/LaunchIntro';
 import { login, saveToken, getToken, clearToken, getConfiguracoesPublicas } from '../src/api';
 import { DEFAULT_STORE_CONFIG, publicStoreConfig } from '../src/storeConfig';
 import type { ConfiguracoesLojaPublicas } from '../src/types';
+import { AppText as Text } from '../src/components/Typography';
 
 const LazyAtelie = lazy(() => import('../src/components/Atelie').then((module) => ({
   default: module.Atelie,
@@ -18,7 +19,7 @@ function AdminLoading() {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background }}>
       <ActivityIndicator color={COLORS.gold} />
-      <Text style={{ color: COLORS.gold, fontSize: 12, marginTop: SPACING.sm }}>Abrindo painel…</Text>
+      <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label, marginTop: SPACING.sm }}>Abrindo painel…</Text>
     </View>
   );
 }
@@ -48,15 +49,15 @@ function LoginForm({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () 
   };
   return (
     <View>
-      <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1.5, marginBottom: SPACING.sm }}>
+      <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.5, marginBottom: SPACING.sm }}>
         ACESSO RESTRITO
       </Text>
-      <Text style={{ color: COLORS.muted, fontSize: 13, marginBottom: SPACING.md }}>
+      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.bodySmall, marginBottom: SPACING.md }}>
         Entre com suas credenciais de administrador.
       </Text>
       <Field label="Usuário"><TInput value={usuario} onChangeText={setUsuario} autoCapitalize="none" autoCorrect={false} testID="login-usuario" /></Field>
       <Field label="Senha"><TInput value={senha} onChangeText={setSenha} secureTextEntry testID="login-senha" /></Field>
-      {!!erro && <Text style={{ color: COLORS.rust, fontSize: 12, marginBottom: 8 }} testID="login-erro">{erro}</Text>}
+      {!!erro && <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.label, marginBottom: 8 }} testID="login-erro">{erro}</Text>}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <SecondaryButton label="Cancelar" onPress={onCancel} />
         <PrimaryButton label={loading ? 'Entrando…' : 'Entrar'} onPress={entrar} disabled={loading || !usuario.trim() || !senha} testID="login-submit" />

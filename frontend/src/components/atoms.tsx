@@ -1,10 +1,12 @@
 import React from 'react';
-import { View, Text, TextInput, Pressable, TextInputProps, TextStyle } from 'react-native';
+import { View, Pressable, TextInputProps, TextStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { COLORS, RADIUS, SPACING } from '../theme';
+import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme';
+import { AppText as Text, AppTextInput as TextInput } from './Typography';
 
 export const inputStyle: TextStyle = {
+  ...TYPOGRAPHY.body,
   width: '100%',
   backgroundColor: COLORS.surface,
   borderWidth: 1,
@@ -13,13 +15,12 @@ export const inputStyle: TextStyle = {
   paddingHorizontal: 12,
   paddingVertical: 10,
   color: COLORS.bone,
-  fontSize: 14,
 };
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View style={{ marginBottom: SPACING.md }}>
-      <Text style={{ color: COLORS.muted, fontSize: 12, marginBottom: 4 }}>{label}</Text>
+      <Text style={{ ...TYPOGRAPHY.label, color: COLORS.muted, marginBottom: 4 }}>{label}</Text>
       {children}
     </View>
   );
@@ -43,7 +44,7 @@ export function PrimaryButton({ label, onPress, disabled, testID }: { label: str
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.78}
-        style={{ width: '100%', color: COLORS.ink, fontWeight: '600', fontSize: 14, textAlign: 'center' }}
+        style={{ ...TYPOGRAPHY.label, width: '100%', color: COLORS.ink, textAlign: 'center' }}
       >
         {label}
       </Text>
@@ -64,7 +65,7 @@ export function SecondaryButton({ label, onPress, testID }: { label: string; onP
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.78}
-        style={{ width: '100%', color: COLORS.muted, fontSize: 14, textAlign: 'center' }}
+        style={{ ...TYPOGRAPHY.label, width: '100%', color: COLORS.muted, textAlign: 'center' }}
       >
         {label}
       </Text>
@@ -75,7 +76,7 @@ export function SecondaryButton({ label, onPress, testID }: { label: string; onP
 export function EmptyState({ text }: { text: string }) {
   return (
     <View style={{ padding: SPACING.xl, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed', backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
-      <Text style={{ color: COLORS.muted, fontSize: 14, textAlign: 'center' }}>{text}</Text>
+      <Text style={{ ...TYPOGRAPHY.body, color: COLORS.muted, textAlign: 'center' }}>{text}</Text>
     </View>
   );
 }
@@ -109,7 +110,7 @@ export function Chip({ label, active, onPress, testID }: { label: string; active
         flexShrink: 0,
       }}
     >
-      <Text style={{ color: active ? COLORS.ink : COLORS.muted, fontSize: 12, fontWeight: active ? '600' : '400' }}>{label}</Text>
+      <Text style={{ ...TYPOGRAPHY.label, color: active ? COLORS.ink : COLORS.muted, fontWeight: active ? '600' : '400' }}>{label}</Text>
     </Pressable>
   );
 }

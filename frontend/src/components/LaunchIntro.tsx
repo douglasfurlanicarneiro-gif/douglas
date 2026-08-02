@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS } from '../theme';
+import { COLORS, TYPOGRAPHY } from '../theme';
+import { AppText as Text } from './Typography';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -249,10 +250,8 @@ const styles = StyleSheet.create({
     height: 1,
   },
   caption: {
+    ...TYPOGRAPHY.eyebrow,
     color: COLORS.gold,
-    fontSize: 12,
-    lineHeight: 18,
-    fontWeight: '700',
     letterSpacing: 2.2,
     textAlign: 'center',
     textShadowColor: 'rgba(239, 211, 157, 0.28)',

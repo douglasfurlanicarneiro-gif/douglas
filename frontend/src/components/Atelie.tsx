@@ -1,13 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, View, Text, StyleSheet, ScrollView, Pressable, TextInput, ActivityIndicator, RefreshControl, useWindowDimensions, Linking, Platform } from 'react-native';
+import { Animated, PanResponder, View, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl, useWindowDimensions, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import {
-  COLORS, SPACING, RADIUS, STATUS, FAMILIAS, CONCENTRACOES, OCASIOES,
+  COLORS, SPACING, RADIUS, STATUS, FAMILIAS, CONCENTRACOES, OCASIOES, FONT_SIZES,
   brl, familiasDoPerfume, fmtDate, nomeConcentracao, padSeq,
 } from '../theme';
 import { BottomSheet } from './BottomSheet';
+import { AppText as Text, AppTextInput as TextInput } from './Typography';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
   listPerfumes, createPerfume, updatePerfume, deletePerfume, bulkImport, padronizarTamanhos,
@@ -578,7 +579,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
             const selected = (f.ocasioes || []).includes(item);
             return (
               <Pressable key={item} onPress={() => toggleOcasiao(item)} style={[styles.miniChip, selected && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                <Text style={{ color: selected ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{item}</Text>
+                <Text style={{ color: selected ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{item}</Text>
               </Pressable>
             );
           })}
@@ -590,7 +591,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
             const selected = familiasDoPerfume(f).includes(fam);
             return (
               <Pressable key={fam} onPress={() => toggleFamilia(fam)} style={[styles.miniChip, selected && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                <Text style={{ color: selected ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{fam}</Text>
+                <Text style={{ color: selected ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{fam}</Text>
               </Pressable>
             );
           })}
@@ -600,13 +601,13 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           {CONCENTRACOES.map((c) => (
             <Pressable key={c} onPress={() => set('concentracao', c)} style={[styles.miniChip, f.concentracao === c && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-              <Text style={{ color: f.concentracao === c ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{c}</Text>
+              <Text style={{ color: f.concentracao === c ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{c}</Text>
             </Pressable>
           ))}
         </View>
       </Field>
       <View style={{ padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
-        <Text style={{ color: COLORS.gold, fontSize: 11, marginBottom: 8 }}>PIRÂMIDE OLFATIVA</Text>
+        <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginBottom: 8 }}>PIRÂMIDE OLFATIVA</Text>
         {[
           { c: COLORS.topNote, label: 'Saída', k: 'notasSaida' },
           { c: COLORS.heartNote, label: 'Coração', k: 'notasCoracao' },
@@ -618,25 +619,25 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
           </View>
         ))}
       </View>
-      <Text style={{ color: COLORS.muted, fontSize: 12, marginBottom: 6 }}>Tamanhos e preços</Text>
+      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginBottom: 6 }}>Tamanhos e preços</Text>
       {f.precos.map((p: any, i: number) => (
         <View key={i} style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 }}>
           <TInput style={{ width: 70 }} keyboardType="numeric" value={String(p.ml)} onChangeText={(v) => setPreco(i, 'ml', Number(v) || 0)} placeholder="ml" />
-          <Text style={{ color: COLORS.muted, fontSize: 11 }}>ml</Text>
+          <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>ml</Text>
           <TInput style={{ flex: 1 }} keyboardType="decimal-pad" value={String(p.preco)} onChangeText={(v) => setPreco(i, 'preco', Number(v) || 0)} placeholder="Preço" />
           {f.precos.length > 1 && (
             <Pressable onPress={() => rmPreco(i)} hitSlop={8}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>
           )}
         </View>
       ))}
-      <Pressable onPress={addPreco}><Text style={{ color: COLORS.gold, fontSize: 12, marginBottom: SPACING.md }}>+ adicionar tamanho</Text></Pressable>
+      <Pressable onPress={addPreco}><Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label, marginBottom: SPACING.md }}>+ adicionar tamanho</Text></Pressable>
       <Field label="Estoque mínimo de alerta (ml)">
         <TInput keyboardType="numeric" value={String(f.estoqueMinimoMl)} onChangeText={(v) => set('estoqueMinimoMl', Number(v) || 0)} />
       </Field>
       <Pressable onPress={() => set('prontaEntrega', !f.prontaEntrega)} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, marginBottom: SPACING.md }}>
         <View style={{ flex: 1, paddingRight: SPACING.md }}>
-          <Text style={{ color: COLORS.bone, fontSize: 14 }}>Pronta entrega</Text>
-          <Text style={{ color: COLORS.muted, fontSize: 10, marginTop: 2 }}>
+          <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body }}>Pronta entrega</Text>
+          <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 }}>
             Desative para mostrar este perfume como Sob encomenda.
           </Text>
         </View>
@@ -645,7 +646,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
         </View>
       </Pressable>
       <Pressable onPress={() => set('publicavel', !f.publicavel)} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, marginBottom: SPACING.md }}>
-        <Text style={{ color: COLORS.bone, fontSize: 14 }}>Mostrar na vitrine pública</Text>
+        <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body }}>Mostrar na vitrine pública</Text>
         <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: f.publicavel ? COLORS.gold : COLORS.border, justifyContent: 'center', paddingHorizontal: 2, alignItems: f.publicavel ? 'flex-end' : 'flex-start' }}>
           <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.bone }} />
         </View>
@@ -697,7 +698,7 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
         <ScrollView style={{ maxHeight: 200 }}>
           {perfumes.map((p: any) => (
             <Pressable key={p.id} onPress={() => setF({ ...f, perfumeId: p.id })} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border }}>
-              <Text style={{ color: f.perfumeId === p.id ? COLORS.gold : COLORS.bone, fontSize: 13 }}>Nº{padSeq(p.seq)} · {p.nome}</Text>
+              <Text style={{ color: f.perfumeId === p.id ? COLORS.gold : COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>Nº{padSeq(p.seq)} · {p.nome}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -710,7 +711,7 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
               onPress={() => selecionarMovimento(opcao)}
               style={[styles.miniChip, f.categoria === opcao.id && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}
             >
-              <Text style={{ color: f.categoria === opcao.id ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{opcao.label}</Text>
+              <Text style={{ color: f.categoria === opcao.id ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{opcao.label}</Text>
             </Pressable>
           ))}
         </View>
@@ -870,7 +871,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
     <View>
       <Field label="Cliente"><TInput value={f.cliente} onChangeText={(v) => set('cliente', v)} testID="pedido-cliente" /></Field>
       <Field label="Contato (opcional)"><TInput value={f.contato} onChangeText={(v) => set('contato', v)} /></Field>
-      <Text style={{ color: COLORS.muted, fontSize: 12, marginBottom: 6 }}>Itens do pedido</Text>
+      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginBottom: 6 }}>Itens do pedido</Text>
       {f.itens.map((it: any, i: number) => {
         const p = perfumes.find((pf: any) => pf.id === it.perfumeId);
         const editando = searchingIdx === i;
@@ -883,9 +884,9 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
                 style={{ flex: 1 }}
                 testID={`item-select-${i}`}
               >
-                <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p?.seq || 0)}</Text>
-                <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '500' }} numberOfLines={1}>{p?.nome || 'Selecionar perfume'}</Text>
-                {!pedidoRecebido && <Text style={{ color: COLORS.muted, fontSize: 11 }}>{editando ? 'toque para fechar' : 'toque para trocar'}</Text>}
+                <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(p?.seq || 0)}</Text>
+                <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }} numberOfLines={1}>{p?.nome || 'Selecionar perfume'}</Text>
+                {!pedidoRecebido && <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>{editando ? 'toque para fechar' : 'toque para trocar'}</Text>}
               </Pressable>
               {!pedidoRecebido && <Pressable onPress={() => rmItem(i)} hitSlop={8}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>}
             </View>
@@ -904,7 +905,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
                   />
                 </View>
                 <ScrollView style={{ maxHeight: 200, borderRadius: 8, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border }} nestedScrollEnabled>
-                  {filtrados.length === 0 && <Text style={{ color: COLORS.muted, fontSize: 12, padding: 12 }}>Nenhum resultado.</Text>}
+                  {filtrados.length === 0 && <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, padding: 12 }}>Nenhum resultado.</Text>}
                   {filtrados.map((p2: any) => (
                     <Pressable
                       key={p2.id}
@@ -912,8 +913,8 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
                       style={{ paddingVertical: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: it.perfumeId === p2.id ? COLORS.surfaceRaised : 'transparent' }}
                       testID={`item-option-${p2.id}`}
                     >
-                      <Text style={{ color: COLORS.gold, fontSize: 10 }}>Nº {padSeq(p2.seq)}</Text>
-                      <Text style={{ color: COLORS.bone, fontSize: 13 }} numberOfLines={1}>{p2.nome}</Text>
+                      <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(p2.seq)}</Text>
+                      <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall }} numberOfLines={1}>{p2.nome}</Text>
                     </Pressable>
                   ))}
                 </ScrollView>
@@ -936,7 +937,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
               <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: SPACING.sm }}>
                 {(p?.precos || []).map((pr: any) => (
                   <Pressable key={pr.ml} onPress={() => setItem(i, 'ml', pr.ml)} style={[styles.miniChip, Number(it.ml) === pr.ml && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                    <Text style={{ color: Number(it.ml) === pr.ml ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{pr.ml}ml · {brl(pr.preco)}</Text>
+                    <Text style={{ color: Number(it.ml) === pr.ml ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{pr.ml}ml · {brl(pr.preco)}</Text>
                   </Pressable>
                 ))}
                 <TInput style={{ width: 60 }} keyboardType="numeric" value={String(it.quantidade)} onChangeText={(v) => setItem(i, 'quantidade', Number(v) || 1)} />
@@ -945,7 +946,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
           </View>
         );
       })}
-      {!pedidoRecebido && <Pressable onPress={addItem} testID="pedido-add-item"><Text style={{ color: COLORS.gold, fontSize: 12, marginBottom: SPACING.md }}>+ adicionar item</Text></Pressable>}
+      {!pedidoRecebido && <Pressable onPress={addItem} testID="pedido-add-item"><Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label, marginBottom: SPACING.md }}>+ adicionar item</Text></Pressable>}
       {pedidoRecebido && initial?.entrega && (
         <View style={styles.orderDeliveryCard}>
           <View style={styles.orderDeliveryIcon}>
@@ -971,7 +972,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           {STATUS.map((s) => (
             <Pressable key={s.id} onPress={() => set('status', s.id)} style={[styles.miniChip, f.status === s.id && { backgroundColor: s.color, borderColor: s.color }]}>
-              <Text style={{ color: f.status === s.id ? COLORS.ink : COLORS.muted, fontSize: 11 }}>{s.label}</Text>
+              <Text style={{ color: f.status === s.id ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{s.label}</Text>
             </Pressable>
           ))}
         </View>
@@ -1702,14 +1703,14 @@ export function Atelie({
               <Pressable key={`${p.fonte}-${p.id}`} onPress={() => abrirPedido(p)} style={styles.rowCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <View>
-                    <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text>
-                    <Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p.cliente}</Text>
+                    <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(p.seq)}</Text>
+                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p.cliente}</Text>
                   </View>
-                  <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: 11 }}>{st.label}</Text></View>
+                  <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: FONT_SIZES.caption }}>{st.label}</Text></View>
                 </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                  <Text style={{ color: COLORS.muted, fontSize: 12 }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
-                  <Text style={{ color: COLORS.bone, fontSize: 13 }}>{brl(p.total)}</Text>
+                  <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
+                  <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>{brl(p.total)}</Text>
                 </View>
               </Pressable>
             );
@@ -1739,9 +1740,9 @@ export function Atelie({
                 <View style={{ flex: 1, padding: SPACING.md }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text>
-                      <Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p.nome}</Text>
-                      <Text style={{ color: COLORS.muted, fontSize: 11 }}>
+                      <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(p.seq)}</Text>
+                      <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p.nome}</Text>
+                      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>
                         {(p.ocasioes || []).length ? (p.ocasioes || []).join(' · ') : 'Clima & ocasião não informados'}
                       </Text>
                     </View>
@@ -1751,12 +1752,12 @@ export function Atelie({
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                    <View style={styles.tag}><Text style={{ color: COLORS.gold, fontSize: 10 }}>{familiasDoPerfume(p).join(' · ')}</Text></View>
-                    <View style={styles.tag}><Text style={{ color: COLORS.muted, fontSize: 10 }}>{nomeConcentracao(p.concentracao)}</Text></View>
+                    <View style={styles.tag}><Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>{familiasDoPerfume(p).join(' · ')}</Text></View>
+                    <View style={styles.tag}><Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>{nomeConcentracao(p.concentracao)}</Text></View>
                     <View style={styles.tag}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                         <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.prontaEntrega ? COLORS.sage : COLORS.gold }} />
-                        <Text style={{ color: p.prontaEntrega ? COLORS.sage : COLORS.gold, fontSize: 10 }}>
+                        <Text style={{ color: p.prontaEntrega ? COLORS.sage : COLORS.gold, fontSize: FONT_SIZES.caption }}>
                           {p.prontaEntrega ? 'Pronta entrega' : 'Sob encomenda'}
                         </Text>
                       </View>
@@ -1764,12 +1765,12 @@ export function Atelie({
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                     {p.precos.map((pr: any, i: number) => (
-                      <Text key={i} style={{ color: COLORS.bone, fontSize: 11 }}>{pr.ml}ml · {brl(pr.preco)}</Text>
+                      <Text key={i} style={{ color: COLORS.bone, fontSize: FONT_SIZES.caption }}>{pr.ml}ml · {brl(pr.preco)}</Text>
                     ))}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
                     {baixo && <Feather name="alert-triangle" size={11} color={COLORS.rust} />}
-                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: 11 }}>
+                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: FONT_SIZES.caption }}>
                       {resumo.disponivelMl}ml disponíveis
                       {resumo.reservadoMl > 0 ? ` · ${resumo.reservadoMl}ml reservados` : ''}
                       {baixo ? ' · baixo' : ''}
@@ -1817,12 +1818,12 @@ export function Atelie({
               <View key={p.id} style={styles.rowCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº{padSeq(p.seq)}</Text>
-                    <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '500' }}>{p.nome}</Text>
+                    <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº{padSeq(p.seq)}</Text>
+                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }}>{p.nome}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: 15 }}>{resumo.disponivelMl}ml</Text>
-                    <Text style={{ color: COLORS.muted, fontSize: 10 }}>disponíveis</Text>
+                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: FONT_SIZES.bodyLarge }}>{resumo.disponivelMl}ml</Text>
+                    <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>disponíveis</Text>
                   </View>
                 </View>
                 <View style={styles.stockBreakdown}>
@@ -1852,10 +1853,10 @@ export function Atelie({
               <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border }}>
                 <Feather name={m.tipo === 'entrada' ? 'arrow-up-circle' : 'arrow-down-circle'} size={18} color={m.tipo === 'entrada' ? COLORS.sage : COLORS.rust} />
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: COLORS.bone, fontSize: 13 }}>{p?.nome || 'Perfume removido'}</Text>
-                  <Text style={{ color: COLORS.muted, fontSize: 11 }}>{m.motivo || (m.tipo === 'entrada' ? 'Entrada' : 'Saída')} · {fmtDate(m.data)}</Text>
+                  <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>{p?.nome || 'Perfume removido'}</Text>
+                  <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>{m.motivo || (m.tipo === 'entrada' ? 'Entrada' : 'Saída')} · {fmtDate(m.data)}</Text>
                 </View>
-                <Text style={{ color: m.tipo === 'entrada' ? COLORS.sage : COLORS.rust, fontSize: 13 }}>{m.tipo === 'entrada' ? '+' : '-'}{m.quantidadeMl}ml</Text>
+                <Text style={{ color: m.tipo === 'entrada' ? COLORS.sage : COLORS.rust, fontSize: FONT_SIZES.bodySmall }}>{m.tipo === 'entrada' ? '+' : '-'}{m.quantidadeMl}ml</Text>
               </View>
             );
           })}
@@ -1995,12 +1996,12 @@ export function Atelie({
                     testID={`pedido-${p.id}`}
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <View><Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(p.seq)}</Text><Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p.cliente}</Text></View>
-                      <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: 11 }}>{st.label}</Text></View>
+                      <View><Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(p.seq)}</Text><Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p.cliente}</Text></View>
+                      <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: FONT_SIZES.caption }}>{st.label}</Text></View>
                     </View>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                      <Text style={{ color: COLORS.muted, fontSize: 12 }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
-                      <Text style={{ color: COLORS.bone, fontSize: 13 }}>{brl(p.total)}</Text>
+                      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
+                      <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>{brl(p.total)}</Text>
                     </View>
                   </SwipeablePedidoCard>
                 );
@@ -2020,14 +2021,14 @@ export function Atelie({
             return (
               <View key={o.id} style={styles.rowCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: COLORS.bone, fontSize: 15, fontWeight: '500' }}>{p?.nome || 'Perfume removido'}</Text>
+                  <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p?.nome || 'Perfume removido'}</Text>
                   <Pressable onPress={() => setSheet({ type: 'confirm', label: 'Excluir opinião?', onConfirm: () => doDelOpiniao(o.id), danger: true })} hitSlop={8}>
                     <Feather name="trash-2" size={14} color={COLORS.muted} />
                   </Pressable>
                 </View>
                 <View style={{ marginTop: 4 }}><Stars value={o.nota} size={14} /></View>
-                {!!o.cliente && <Text style={{ color: COLORS.muted, fontSize: 12, marginTop: 4 }}>{o.cliente}</Text>}
-                {!!o.comentario && <Text style={{ color: COLORS.bone, fontSize: 13, marginTop: 4 }}>{o.comentario}</Text>}
+                {!!o.cliente && <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginTop: 4 }}>{o.cliente}</Text>}
+                {!!o.comentario && <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, marginTop: 4 }}>{o.comentario}</Text>}
               </View>
             );
           })}
@@ -2036,12 +2037,12 @@ export function Atelie({
           {[...sugestoes].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()).map((s) => (
             <View key={s.id} style={styles.rowCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '500' }}>{s.cliente || 'Anônimo'}</Text>
+                <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }}>{s.cliente || 'Anônimo'}</Text>
                 <Pressable onPress={() => doDelSugestao(s.id)} hitSlop={8}><Feather name="trash-2" size={14} color={COLORS.muted} /></Pressable>
               </View>
-              {!!s.contato && <Text style={{ color: COLORS.muted, fontSize: 12, marginTop: 2 }}>{s.contato}</Text>}
-              <Text style={{ color: COLORS.bone, fontSize: 13, marginTop: 4 }}>{s.mensagem}</Text>
-              <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 4 }}>{fmtDate(s.data)}</Text>
+              {!!s.contato && <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginTop: 2 }}>{s.contato}</Text>}
+              <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, marginTop: 4 }}>{s.mensagem}</Text>
+              <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 4 }}>{fmtDate(s.data)}</Text>
             </View>
           ))}
         </View>
@@ -2293,7 +2294,7 @@ export function Atelie({
               <Text style={styles.shippingTitle}>Melhor Envio</Text>
               <View style={[styles.shippingStatus, freteConfig?.integrado && { borderColor: COLORS.sage }]}>
                 <View style={[styles.shippingStatusDot, { backgroundColor: freteConfig?.integrado ? COLORS.sage : COLORS.rust }]} />
-                <Text style={{ color: freteConfig?.integrado ? COLORS.sage : COLORS.muted, fontSize: 10 }}>
+                <Text style={{ color: freteConfig?.integrado ? COLORS.sage : COLORS.muted, fontSize: FONT_SIZES.caption }}>
                   {freteConfig?.integrado ? 'Conectado' : 'Aguardando conexão'}
                 </Text>
               </View>
@@ -2517,8 +2518,8 @@ export function Atelie({
     <SafeAreaView style={styles.screen} edges={['top']}>
       <View style={styles.topbar}>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 2 }}>PAINEL DE CONTROLE</Text>
-          <Text style={{ color: COLORS.bone, fontSize: 22, fontWeight: '500' }}>Administração</Text>
+          <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 2 }}>PAINEL DE CONTROLE</Text>
+          <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '500' }}>Administração</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           <Pressable
@@ -2527,7 +2528,7 @@ export function Atelie({
             testID="publish-btn"
           >
             <Feather name="share-2" size={13} color={COLORS.gold} />
-            <Text style={{ color: COLORS.gold, fontSize: 11, marginLeft: 4 }}>Vitrine</Text>
+            <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginLeft: 4 }}>Vitrine</Text>
           </Pressable>
           <Pressable onPress={onSair} style={styles.topBtn} testID="sair-btn">
             <Feather name="log-out" size={13} color={COLORS.muted} />
@@ -2554,7 +2555,7 @@ export function Atelie({
           return (
             <Pressable key={t.id} onPress={() => { setTab(t.id); setSystemView('main'); }} style={styles.tabItem} testID={`tab-${t.id}`}>
               <Feather name={t.icon} size={18} color={active ? COLORS.gold : COLORS.muted} />
-              <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: 10, marginTop: 2 }}>{t.label}</Text>
+              <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 }}>{t.label}</Text>
             </Pressable>
           );
         })}
@@ -2635,217 +2636,217 @@ const styles = StyleSheet.create({
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.md },
   topBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   statCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg },
-  statValue: { color: COLORS.bone, fontSize: 24, fontWeight: '500', marginTop: 6 },
-  statLabel: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  statValue: { color: COLORS.bone, fontSize: FONT_SIZES.display, fontWeight: '500', marginTop: 6 },
+  statLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   metricsPanel: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
   metricsRow: { flexDirection: 'row', gap: 12 },
-  metricLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.6 },
-  metricValue: { color: COLORS.bone, fontSize: 18, fontWeight: '600', marginTop: 3 },
+  metricLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.6 },
+  metricValue: { color: COLORS.bone, fontSize: FONT_SIZES.heading, fontWeight: '600', marginTop: 3 },
   rankingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  rankingNumber: { color: COLORS.gold, width: 22, fontSize: 12, fontWeight: '700' },
-  rankingName: { color: COLORS.bone, flex: 1, fontSize: 12 },
-  rankingQty: { color: COLORS.muted, fontSize: 11 },
+  rankingNumber: { color: COLORS.gold, width: 22, fontSize: FONT_SIZES.label, fontWeight: '700' },
+  rankingName: { color: COLORS.bone, flex: 1, fontSize: FONT_SIZES.label },
+  rankingQty: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
   shippingPanel: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
   shippingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  shippingTitle: { color: COLORS.bone, fontSize: 17, fontWeight: '600', marginTop: -4 },
+  shippingTitle: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '600', marginTop: -4 },
   shippingStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border },
   shippingStatusDot: { width: 6, height: 6, borderRadius: 3 },
-  shippingHint: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginVertical: SPACING.md },
+  shippingHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 16, marginVertical: SPACING.md },
   shippingRuleCard: { padding: 12, marginBottom: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  shippingRuleTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '700' },
-  shippingRuleHint: { color: COLORS.muted, fontSize: 10, lineHeight: 14, marginTop: 2, marginBottom: 9 },
+  shippingRuleTitle: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  shippingRuleHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 14, marginTop: 2, marginBottom: 9 },
   shippingTypeRow: { flexDirection: 'row', gap: 7, marginBottom: 9 },
   shippingTypeButton: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border },
   shippingTypeButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
-  shippingTypeText: { color: COLORS.muted, fontSize: 10, fontWeight: '600' },
+  shippingTypeText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   shippingTypeTextActive: { color: COLORS.ink },
   shippingFields: { flexDirection: 'row', gap: 8 },
-  shippingFieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.8, marginBottom: 5 },
+  shippingFieldLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.8, marginBottom: 5 },
   shippingSaveButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, marginTop: SPACING.sm },
-  shippingSaveText: { color: COLORS.ink, fontSize: 12, fontWeight: '600' },
+  shippingSaveText: { color: COLORS.ink, fontSize: FONT_SIZES.label, fontWeight: '600' },
   shippingConnectButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, marginTop: SPACING.sm },
-  shippingConnectText: { color: COLORS.gold, fontSize: 12 },
-  shippingEnvironment: { color: COLORS.muted, fontSize: 9, textAlign: 'center', marginTop: 8 },
+  shippingConnectText: { color: COLORS.gold, fontSize: FONT_SIZES.label },
+  shippingEnvironment: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textAlign: 'center', marginTop: 8 },
   whatsappStatusNotice: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.sage + '66', backgroundColor: COLORS.sage + '12' },
-  whatsappStatusTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '700' },
-  whatsappStatusSubtitle: { color: COLORS.sage, fontSize: 10, marginTop: 2 },
-  whatsappStatusHint: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginBottom: SPACING.sm },
+  whatsappStatusTitle: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  whatsappStatusSubtitle: { color: COLORS.sage, fontSize: FONT_SIZES.caption, marginTop: 2 },
+  whatsappStatusHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 16, marginBottom: SPACING.sm },
   whatsappMessagePreview: { padding: SPACING.md, marginBottom: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  whatsappMessageText: { color: COLORS.bone, fontSize: 12, lineHeight: 18 },
+  whatsappMessageText: { color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18 },
   whatsappStatusActions: { flexDirection: 'row', gap: 8 },
   systemPage: { padding: SPACING.lg },
   systemBackButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 9, paddingHorizontal: 11, marginBottom: SPACING.md, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  systemBackText: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
+  systemBackText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   systemHero: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   systemHeroIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface },
-  systemEyebrow: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.4 },
-  systemTitle: { color: COLORS.bone, fontSize: 22, fontWeight: '600', marginTop: 1 },
-  systemIntro: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  systemEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.4 },
+  systemTitle: { color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '600', marginTop: 1 },
+  systemIntro: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 16, marginTop: 3 },
   systemCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
   systemCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SPACING.md },
   systemCardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  systemCardTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700' },
-  systemCardSubtitle: { color: COLORS.muted, fontSize: 10, lineHeight: 14, marginTop: 2 },
+  systemCardTitle: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700' },
+  systemCardSubtitle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 14, marginTop: 2 },
   catalogStatsGrid: { flexDirection: 'row', gap: 8, marginBottom: SPACING.sm },
   catalogStat: { flex: 1, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  catalogStatValue: { color: COLORS.bone, fontSize: 22, fontWeight: '700' },
-  catalogStatLabel: { color: COLORS.muted, fontSize: 10, marginTop: 1 },
-  catalogStatMeta: { color: COLORS.gold, fontSize: 10, fontWeight: '600', marginTop: 6 },
+  catalogStatValue: { color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '700' },
+  catalogStatLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 1 },
+  catalogStatMeta: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600', marginTop: 6 },
   alphabeticalStatus: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 10, marginBottom: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.sage + '66', backgroundColor: COLORS.surface },
   alphabeticalIcon: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.sage + '22', borderWidth: 1, borderColor: COLORS.sage + '55' },
-  alphabeticalTitle: { color: COLORS.bone, fontSize: 11, fontWeight: '600' },
-  alphabeticalHint: { color: COLORS.muted, fontSize: 9, lineHeight: 12, marginTop: 2 },
-  systemSuccessBadge: { color: COLORS.sage, fontSize: 8, letterSpacing: 0.6, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.sage + '77' },
-  catalogHistoryEmpty: { color: COLORS.muted, fontSize: 10, lineHeight: 15, paddingVertical: 8 },
+  alphabeticalTitle: { color: COLORS.bone, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  alphabeticalHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 12, marginTop: 2 },
+  systemSuccessBadge: { color: COLORS.sage, fontSize: FONT_SIZES.caption, letterSpacing: 0.6, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.sage + '77' },
+  catalogHistoryEmpty: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, paddingVertical: 8 },
   catalogHistoryRow: { flexDirection: 'row', gap: 9, paddingVertical: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
   catalogHistoryIcon: { width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  catalogHistoryTitle: { color: COLORS.bone, fontSize: 11, fontWeight: '600' },
-  catalogHistoryDetails: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
-  catalogHistoryDate: { color: COLORS.gold, fontSize: 8, marginTop: 3 },
+  catalogHistoryTitle: { color: COLORS.bone, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  catalogHistoryDetails: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
+  catalogHistoryDate: { color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 3 },
   availabilitySummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   availabilitySummaryDivider: { width: 1, height: 42, backgroundColor: COLORS.border },
-  availabilityCount: { color: COLORS.bone, fontSize: 24, fontWeight: '700', textAlign: 'center' },
-  availabilityCountLabel: { color: COLORS.muted, fontSize: 9, textAlign: 'center', marginTop: 2 },
+  availabilityCount: { color: COLORS.bone, fontSize: FONT_SIZES.display, fontWeight: '700', textAlign: 'center' },
+  availabilityCountLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textAlign: 'center', marginTop: 2 },
   availabilityTools: { flexDirection: 'row', gap: 7, marginVertical: SPACING.sm },
   availabilityToolButton: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 34, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  availabilityToolText: { color: COLORS.gold, fontSize: 9, fontWeight: '600' },
+  availabilityToolText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   availabilityList: { borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, overflow: 'hidden' },
   availabilityRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: COLORS.surface },
   availabilityRowChecked: { backgroundColor: COLORS.gold + '12' },
   availabilityCheck: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
   availabilityCheckActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
-  availabilityName: { flex: 1, color: COLORS.bone, fontSize: 11 },
-  availabilityState: { color: COLORS.muted, fontSize: 8, textTransform: 'uppercase' },
+  availabilityName: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.caption },
+  availabilityState: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textTransform: 'uppercase' },
   availabilityFooter: { flexDirection: 'row', gap: 8, marginTop: SPACING.md },
   storePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 104, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   storePreviewVisual: { width: 74, height: 74, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   storePreviewLogo: { width: '100%', height: '100%' },
-  storePreviewInitials: { color: COLORS.gold, fontSize: 25, fontWeight: '700', letterSpacing: 1 },
-  storePreviewLabel: { color: COLORS.gold, fontSize: 8, letterSpacing: 1.4, marginBottom: 4 },
-  storePreviewEyebrow: { color: COLORS.gold, fontSize: 8, letterSpacing: 2.2 },
-  storePreviewTitle: { color: COLORS.bone, fontSize: 18, lineHeight: 22, fontWeight: '700', letterSpacing: 0.8 },
-  storePreviewHint: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 4 },
+  storePreviewInitials: { color: COLORS.gold, fontSize: FONT_SIZES.display, fontWeight: '700', letterSpacing: 1 },
+  storePreviewLabel: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.4, marginBottom: 4 },
+  storePreviewEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 2.2 },
+  storePreviewTitle: { color: COLORS.bone, fontSize: FONT_SIZES.heading, lineHeight: 22, fontWeight: '700', letterSpacing: 0.8 },
+  storePreviewHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 4 },
   systemFieldGrid: { flexDirection: 'row', gap: 8, marginBottom: SPACING.sm },
   systemPriceField: { flex: 1 },
-  systemPriceHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginBottom: SPACING.md },
-  systemFieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.7, marginBottom: 5 },
-  storeConfigHelp: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: -8, marginBottom: SPACING.md },
+  systemPriceHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginBottom: SPACING.md },
+  systemFieldLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.7, marginBottom: 5 },
+  storeConfigHelp: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: -8, marginBottom: SPACING.md },
   systemPrimaryButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 12, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, marginTop: SPACING.sm },
-  systemPrimaryText: { color: COLORS.ink, fontSize: 12, fontWeight: '700' },
+  systemPrimaryText: { color: COLORS.ink, fontSize: FONT_SIZES.label, fontWeight: '700' },
   systemMiniActions: { flexDirection: 'row', gap: 6, marginTop: 7 },
   systemMiniButton: { flex: 1, minHeight: 35, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  systemMiniText: { color: COLORS.gold, fontSize: 9, fontWeight: '600', textAlign: 'center' },
+  systemMiniText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600', textAlign: 'center' },
   systemAction: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
-  systemActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '600' },
-  systemActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
-  systemBadge: { color: COLORS.muted, fontSize: 8, letterSpacing: 0.5, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border },
+  systemActionTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' },
+  systemActionSubtitle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
+  systemBadge: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.5, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border },
   supplierActive: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 4, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.gold + '44' },
-  supplierName: { color: COLORS.bone, fontSize: 13, fontWeight: '700' },
-  supplierMeta: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  supplierName: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  supplierMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   connectedPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.sage + '88' },
-  connectedPillText: { color: COLORS.sage, fontSize: 8, fontWeight: '700', letterSpacing: 0.6 },
+  connectedPillText: { color: COLORS.sage, fontSize: FONT_SIZES.caption, fontWeight: '700', letterSpacing: 0.6 },
   orderDeliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, marginBottom: SPACING.md },
   orderDeliveryIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
-  orderDeliveryTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '600' },
-  orderDeliveryMeta: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  orderDeliveryTitle: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '600' },
+  orderDeliveryMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
   manualValueCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '88', backgroundColor: COLORS.surfaceRaised },
   manualValueHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 5 },
-  manualValueEyebrow: { color: COLORS.gold, fontSize: 8, fontWeight: '700', letterSpacing: 1.2 },
-  manualValueTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700', marginTop: 2 },
-  manualValueReset: { color: COLORS.gold, fontSize: 10, fontWeight: '600', textDecorationLine: 'underline' },
-  manualValueHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginBottom: 10 },
+  manualValueEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700', letterSpacing: 1.2 },
+  manualValueTitle: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700', marginTop: 2 },
+  manualValueReset: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600', textDecorationLine: 'underline' },
+  manualValueHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginBottom: 10 },
   manualValueInputRow: { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, overflow: 'hidden' },
-  manualValueCurrency: { color: COLORS.gold, fontSize: 15, fontWeight: '700', paddingLeft: 12 },
-  manualValueInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent', color: COLORS.bone, fontSize: 18, fontWeight: '700' },
+  manualValueCurrency: { color: COLORS.gold, fontSize: FONT_SIZES.bodyLarge, fontWeight: '700', paddingLeft: 12 },
+  manualValueInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent', color: COLORS.bone, fontSize: FONT_SIZES.heading, fontWeight: '700' },
   manualValueSummary: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 8 },
-  manualValueSummaryLabel: { color: COLORS.muted, fontSize: 11 },
-  manualValueSummaryValue: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
-  manualValueError: { color: COLORS.rust, fontSize: 10, marginTop: 7 },
+  manualValueSummaryLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
+  manualValueSummaryValue: { color: COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  manualValueError: { color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 7 },
   manualValueTotal: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, paddingTop: 9, marginTop: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
-  manualValueTotalLabel: { color: COLORS.bone, fontSize: 12, fontWeight: '600' },
-  manualValueTotalAmount: { color: COLORS.gold, fontSize: 19, fontWeight: '800' },
-  sectionLabel: { color: COLORS.muted, fontSize: 11, marginBottom: SPACING.sm, letterSpacing: 1 },
+  manualValueTotalLabel: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' },
+  manualValueTotalAmount: { color: COLORS.gold, fontSize: FONT_SIZES.heading, fontWeight: '800' },
+  sectionLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
   stockSummary: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.md },
   stockSummaryGrid: { flexDirection: 'row', gap: 8 },
   stockSummaryItem: { flex: 1, padding: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  stockSummaryValue: { color: COLORS.gold, fontSize: 15, fontWeight: '600' },
-  stockSummaryLabel: { color: COLORS.muted, fontSize: 9, marginTop: 3 },
-  stockSummaryHint: { color: COLORS.muted, fontSize: 10, lineHeight: 15, marginTop: SPACING.sm },
+  stockSummaryValue: { color: COLORS.gold, fontSize: FONT_SIZES.bodyLarge, fontWeight: '600' },
+  stockSummaryLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
+  stockSummaryHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: SPACING.sm },
   stockBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
-  stockBreakdownText: { color: COLORS.muted, fontSize: 10 },
+  stockBreakdownText: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
   stockAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7 },
-  stockAlertText: { color: COLORS.rust, fontSize: 10, flex: 1 },
+  stockAlertText: { color: COLORS.rust, fontSize: FONT_SIZES.caption, flex: 1 },
   stockCountButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 9, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surfaceRaised },
-  stockCountButtonText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
+  stockCountButtonText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   stockCountResults: { maxHeight: 210, marginTop: -8, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
   stockCountResultRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  stockCountResultName: { flex: 1, color: COLORS.bone, fontSize: 11 },
-  stockCountResultBalance: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
-  stockCountEmpty: { color: COLORS.muted, fontSize: 11, padding: SPACING.md, textAlign: 'center' },
+  stockCountResultName: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.caption },
+  stockCountResultBalance: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  stockCountEmpty: { color: COLORS.muted, fontSize: FONT_SIZES.caption, padding: SPACING.md, textAlign: 'center' },
   stockCountSelected: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surfaceRaised },
-  stockCountEyebrow: { color: COLORS.gold, fontSize: 8, letterSpacing: 1.1 },
-  stockCountTitle: { color: COLORS.bone, fontSize: 16, fontWeight: '700', marginTop: 3, marginBottom: 10 },
+  stockCountEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1 },
+  stockCountTitle: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700', marginTop: 3, marginBottom: 10 },
   stockCountSummaryRow: { flexDirection: 'row', gap: 7 },
   stockCountSummaryItem: { flex: 1, padding: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  stockCountValue: { color: COLORS.gold, fontSize: 13, fontWeight: '700' },
-  stockCountLabel: { color: COLORS.muted, fontSize: 8, lineHeight: 11, marginTop: 2 },
+  stockCountValue: { color: COLORS.gold, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  stockCountLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 11, marginTop: 2 },
   stockCountPreview: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 11, marginTop: -6, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  stockCountPreviewTitle: { color: COLORS.bone, fontSize: 11, fontWeight: '600' },
-  stockCountPreviewHint: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
+  stockCountPreviewTitle: { color: COLORS.bone, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  stockCountPreviewHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
   swipeOrderHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm, paddingHorizontal: 2 },
-  swipeOrderHintText: { color: COLORS.muted, fontSize: 11, flex: 1 },
+  swipeOrderHintText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, flex: 1 },
   ordersManagement: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
-  ordersManagementTitle: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, marginBottom: 3 },
-  ordersManagementText: { color: COLORS.muted, fontSize: 11, lineHeight: 15 },
+  ordersManagementTitle: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, marginBottom: 3 },
+  ordersManagementText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15 },
   resetOrdersButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingHorizontal: 11, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.rust + '88', backgroundColor: COLORS.surface },
-  resetOrdersText: { color: COLORS.rust, fontSize: 10, fontWeight: '700' },
+  resetOrdersText: { color: COLORS.rust, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   orderToolbar: { marginBottom: SPACING.md, gap: SPACING.sm },
   orderViewToggle: { flexDirection: 'row', alignSelf: 'flex-start', padding: 3, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   orderViewButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 34, paddingHorizontal: 13, borderRadius: RADIUS.pill },
   orderViewButtonActive: { backgroundColor: COLORS.gold },
-  orderViewText: { color: COLORS.muted, fontSize: 11, fontWeight: '600' },
+  orderViewText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   orderSearchBox: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 44, paddingHorizontal: 13, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  orderSearchInput: { flex: 1, color: COLORS.bone, fontSize: 13, paddingVertical: 11 },
+  orderSearchInput: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, paddingVertical: 11 },
   kanbanHint: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: SPACING.sm, paddingHorizontal: 2 },
-  kanbanHintText: { flex: 1, color: COLORS.muted, fontSize: 11, lineHeight: 15 },
+  kanbanHintText: { flex: 1, color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15 },
   kanbanBoard: { gap: SPACING.sm, paddingBottom: SPACING.sm, paddingRight: SPACING.lg },
   kanbanColumn: { padding: 10, alignSelf: 'flex-start', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
   kanbanColumnHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 2 },
   kanbanColumnTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
   kanbanStatusDot: { width: 8, height: 8, borderRadius: 4 },
-  kanbanColumnTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700', letterSpacing: 0.2 },
+  kanbanColumnTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700', letterSpacing: 0.2 },
   kanbanCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  kanbanCountText: { color: COLORS.muted, fontSize: 10, fontWeight: '700' },
+  kanbanCountText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   kanbanEmpty: { minHeight: 98, alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  kanbanEmptyText: { color: COLORS.muted, fontSize: 11, textAlign: 'center' },
+  kanbanEmptyText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textAlign: 'center' },
   kanbanCard: { marginBottom: 8, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   kanbanCardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  kanbanOrderNumber: { color: COLORS.gold, fontSize: 9, letterSpacing: 0.6, fontWeight: '700' },
-  kanbanOrderDate: { color: COLORS.muted, fontSize: 9 },
-  kanbanCustomer: { color: COLORS.bone, fontSize: 14, fontWeight: '600', marginTop: 5 },
-  kanbanOrderMeta: { color: COLORS.bone, fontSize: 11, marginTop: 4 },
-  kanbanContact: { color: COLORS.muted, fontSize: 10, marginTop: 3 },
+  kanbanOrderNumber: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 0.6, fontWeight: '700' },
+  kanbanOrderDate: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
+  kanbanCustomer: { color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '600', marginTop: 5 },
+  kanbanOrderMeta: { color: COLORS.bone, fontSize: FONT_SIZES.caption, marginTop: 4 },
+  kanbanContact: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
   kanbanCardActions: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10, paddingTop: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
   kanbanMoveButton: { width: 34, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   kanbanMoveDisabled: { opacity: 0.45 },
   kanbanEditButton: { flex: 1, minHeight: 30, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface },
-  kanbanEditText: { color: COLORS.gold, fontSize: 10, fontWeight: '600' },
+  kanbanEditText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   cancelledOrders: { marginTop: SPACING.lg },
   cancelledOrderCard: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, marginBottom: 7, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '55', backgroundColor: COLORS.surface },
-  cancelledOrderCustomer: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
+  cancelledOrderCustomer: { color: COLORS.muted, fontSize: FONT_SIZES.label, marginTop: 3 },
   swipeOrderWrap: { position: 'relative', marginBottom: SPACING.sm, borderRadius: RADIUS.lg, overflow: 'hidden', backgroundColor: COLORS.surfaceRaised },
   swipeOrderActions: { position: 'absolute', top: 0, right: 0, bottom: 0, width: ORDER_ACTIONS_WIDTH, flexDirection: 'row' },
   swipeOrderAction: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 5 },
   swipeOrderEdit: { backgroundColor: COLORS.gold },
   swipeOrderDelete: { backgroundColor: COLORS.rust },
   swipeOrderActionPressed: { opacity: 0.82 },
-  swipeOrderEditText: { color: COLORS.ink, fontSize: 11, fontWeight: '700' },
-  swipeOrderDeleteText: { color: COLORS.inverse, fontSize: 11, fontWeight: '700' },
+  swipeOrderEditText: { color: COLORS.ink, fontSize: FONT_SIZES.caption, fontWeight: '700' },
+  swipeOrderDeleteText: { color: COLORS.inverse, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   swipeOrderFront: { backgroundColor: COLORS.surface },
   swipeOrderCard: { padding: SPACING.md, minHeight: 88, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, justifyContent: 'center' },
   deleteSafetyNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  deleteSafetyText: { color: COLORS.muted, fontSize: 11, lineHeight: 16, flex: 1 },
+  deleteSafetyText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 16, flex: 1 },
   confirmAction: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   confirmActionDisabled: { opacity: 0.45 },
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
@@ -2853,25 +2854,25 @@ const styles = StyleSheet.create({
   catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
   imagePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginTop: -6, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   imagePreviewPhoto: { width: 64, height: 64, borderRadius: 8, backgroundColor: COLORS.surface },
-  imagePreviewText: { color: COLORS.muted, fontSize: 12 },
+  imagePreviewText: { color: COLORS.muted, fontSize: FONT_SIZES.label },
   orderChoiceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: SPACING.md, paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border },
-  orderChoiceLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.8, marginBottom: 3 },
-  orderChoiceValue: { color: COLORS.gold, fontSize: 15, fontWeight: '600' },
+  orderChoiceLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.8, marginBottom: 3 },
+  orderChoiceValue: { color: COLORS.gold, fontSize: FONT_SIZES.bodyLarge, fontWeight: '600' },
   orderQuantity: { minWidth: 76, alignItems: 'center', paddingLeft: 12, borderLeftWidth: 1, borderLeftColor: COLORS.border },
-  orderQuantityValue: { color: COLORS.bone, fontSize: 17, fontWeight: '600' },
+  orderQuantityValue: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '600' },
   confirmPaymentButton: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
-  confirmPaymentTitle: { color: COLORS.ink, fontSize: 13, fontWeight: '700' },
-  confirmPaymentHint: { color: COLORS.ink, opacity: 0.72, fontSize: 10, marginTop: 2 },
+  confirmPaymentTitle: { color: COLORS.ink, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  confirmPaymentHint: { color: COLORS.ink, opacity: 0.72, fontSize: FONT_SIZES.caption, marginTop: 2 },
   cancelAdminOrderButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '80' },
-  cancelAdminOrderText: { color: COLORS.rust, fontSize: 12, fontWeight: '700' },
+  cancelAdminOrderText: { color: COLORS.rust, fontSize: FONT_SIZES.label, fontWeight: '700' },
   deleteAdminOrderButton: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },
-  deleteAdminOrderTitle: { color: COLORS.inverse, fontSize: 12, fontWeight: '700' },
-  deleteAdminOrderHint: { color: COLORS.inverse, opacity: 0.78, fontSize: 10, marginTop: 2 },
+  deleteAdminOrderTitle: { color: COLORS.inverse, fontSize: FONT_SIZES.label, fontWeight: '700' },
+  deleteAdminOrderHint: { color: COLORS.inverse, opacity: 0.78, fontSize: FONT_SIZES.caption, marginTop: 2 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.surface },
   tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, marginBottom: SPACING.sm },
-  searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 10, fontSize: 14 },
+  searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 10, fontSize: FONT_SIZES.body },
   actionBtn: { paddingVertical: 10, paddingHorizontal: 12, borderRadius: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.sm, alignItems: 'center' },
   fab: { position: 'absolute', right: 20, bottom: 86, width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8 },
   tabbar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingBottom: 16, paddingTop: 8, backgroundColor: COLORS.surfaceRaised, borderTopWidth: 1, borderTopColor: COLORS.border },

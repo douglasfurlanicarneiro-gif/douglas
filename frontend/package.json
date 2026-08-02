@@ -10,9 +10,10 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
-    "lint": "expo lint"
+    "lint": "expo lint && node ./scripts/check-typography.mjs"
   },
   "dependencies": {
+    "@expo-google-fonts/dm-sans": "0.4.2",
     "@expo/metro-runtime": "6.1.2",
     "@expo/vector-icons": "15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",

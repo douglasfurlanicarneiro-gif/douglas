@@ -22,6 +22,41 @@ export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
 export const RADIUS = { sm: 6, md: 12, lg: 20, pill: 999 };
 
+export const FONTS = {
+  regular: 'DMSans_400Regular',
+  italic: 'DMSans_400Regular_Italic',
+  medium: 'DMSans_500Medium',
+  semiBold: 'DMSans_600SemiBold',
+  bold: 'DMSans_700Bold',
+} as const;
+
+export const FONT_SIZES = {
+  caption: 11,
+  label: 12,
+  bodySmall: 13,
+  body: 14,
+  bodyLarge: 15,
+  subtitle: 16,
+  heading: 18,
+  title: 20,
+  titleLarge: 22,
+  display: 26,
+} as const;
+
+export const TYPOGRAPHY = {
+  display: { fontSize: FONT_SIZES.display, lineHeight: 32, fontWeight: '700' as const },
+  title: { fontSize: FONT_SIZES.title, lineHeight: 26, fontWeight: '700' as const },
+  subtitle: { fontSize: FONT_SIZES.subtitle, lineHeight: 22, fontWeight: '600' as const },
+  body: { fontSize: FONT_SIZES.body, lineHeight: 20, fontWeight: '400' as const },
+  bodySmall: { fontSize: FONT_SIZES.bodySmall, lineHeight: 18, fontWeight: '400' as const },
+  bodyLarge: { fontSize: FONT_SIZES.bodyLarge, lineHeight: 21, fontWeight: '500' as const },
+  label: { fontSize: FONT_SIZES.label, lineHeight: 17, fontWeight: '600' as const },
+  caption: { fontSize: FONT_SIZES.caption, lineHeight: 15, fontWeight: '400' as const },
+  eyebrow: { fontSize: FONT_SIZES.caption, lineHeight: 15, fontWeight: '600' as const, letterSpacing: 1.4 },
+  heading: { fontSize: FONT_SIZES.heading, lineHeight: 24, fontWeight: '600' as const },
+  titleLarge: { fontSize: FONT_SIZES.titleLarge, lineHeight: 28, fontWeight: '700' as const },
+} as const;
+
 export const STATUS = [
   { id: 'pendente', label: 'Aguardando pagamento', color: '#C7A25C' },
   { id: 'pagamento_confirmado', label: 'Pagamento confirmado', color: '#A98A56' },

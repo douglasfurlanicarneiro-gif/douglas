@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking, Platform } from 'react-native';
+import { View, StyleSheet, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
-import { COLORS, SPACING, RADIUS, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZES, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
+import { AppText as Text, AppTextInput as TextInput } from './Typography';
 import { Field, TInput, PrimaryButton, SecondaryButton, Chip, Stars } from './atoms';
 import { confirmarPagamentoInfinitePay, createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
 import { CartItem, CheckoutSheet } from './CheckoutSheet';
@@ -875,7 +876,7 @@ export function Vitrine({
         ListEmptyComponent={
           showEmpty ? (
             <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
-              <Text style={[styles.h1, { fontSize: 22, marginTop: 32 }]}>
+              <Text style={[styles.h1, { fontSize: FONT_SIZES.titleLarge, marginTop: 32 }]}>
                 Vitrine em preparação
               </Text>
               <Text style={{ color: COLORS.muted, marginTop: 6, textAlign: 'center' }}>
@@ -1177,7 +1178,7 @@ export function Vitrine({
       {/* Sugestão sheet */}
       <BottomSheet visible={sugestaoOpen} onClose={() => setSugestaoOpen(false)} title="Enviar sugestão" testID="sugestao-sheet">
         <View>
-          <Text style={{ color: COLORS.muted, fontSize: 13, marginBottom: SPACING.md }}>Que fragrância você gostaria de ver na nossa vitrine? Escreva aqui.</Text>
+          <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.bodySmall, marginBottom: SPACING.md }}>Que fragrância você gostaria de ver na nossa vitrine? Escreva aqui.</Text>
           <Field label="Seu nome (opcional)"><TInput value={sugForm.cliente} onChangeText={(v) => setSugForm({ ...sugForm, cliente: v })} testID="sug-cliente" /></Field>
           <Field label="Contato (opcional)"><TInput value={sugForm.contato} onChangeText={(v) => setSugForm({ ...sugForm, contato: v })} /></Field>
           <Field label="Sugestão"><TInput value={sugForm.mensagem} onChangeText={(v) => setSugForm({ ...sugForm, mensagem: v })} placeholder="Ex: gostaria de um contratipo do..." multiline style={{ minHeight: 100, textAlignVertical: 'top' }} testID="sug-mensagem" /></Field>
@@ -1381,8 +1382,8 @@ export function Vitrine({
         {reviewItem && (
           <View>
             <View style={{ padding: SPACING.md, borderRadius: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
-              <Text style={{ color: COLORS.gold, fontSize: 11 }}>Nº {padSeq(reviewItem.seq)}</Text>
-              <Text style={{ color: COLORS.bone, fontSize: 16, fontWeight: '500' }}>{reviewItem.nome}</Text>
+              <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(reviewItem.seq)}</Text>
+              <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '500' }}>{reviewItem.nome}</Text>
             </View>
             <Field label="Seu nome (opcional)"><TInput value={reviewForm.cliente} onChangeText={(v) => setReviewForm({ ...reviewForm, cliente: v })} testID="review-cliente" /></Field>
             <Field label="Nota"><Stars value={reviewForm.nota} onChange={(n) => setReviewForm({ ...reviewForm, nota: n })} size={26} /></Field>
@@ -1402,44 +1403,44 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: STOREFRONT_COLORS.background },
   brandHeader: { alignItems: 'center', paddingHorizontal: 56, paddingTop: 26, paddingBottom: 20 },
   storeLogo: { width: 118, height: 86, marginBottom: 4 },
-  eyebrow: { color: COLORS.gold, fontSize: 11, letterSpacing: 5, fontWeight: '500' },
-  h1: { color: STOREFRONT_COLORS.ink, fontSize: 26, lineHeight: 30, letterSpacing: 1.5, fontWeight: '700', marginTop: 7 },
-  subtitle: { color: STOREFRONT_COLORS.muted, fontSize: 9, letterSpacing: 2.2, marginTop: 5 },
+  eyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 5, fontWeight: '500' },
+  h1: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.display, lineHeight: 30, letterSpacing: 1.5, fontWeight: '700', marginTop: 7 },
+  subtitle: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 2.2, marginTop: 5 },
   atelieAccess: { position: 'absolute', top: 51, right: SPACING.lg, zIndex: 40, width: 32, height: 32, borderRadius: 16, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, alignItems: 'center', justifyContent: 'center' },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 11, height: 60, paddingHorizontal: 18, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.md, marginBottom: 12 },
-  searchInput: { flex: 1, color: STOREFRONT_COLORS.ink, paddingVertical: 15, fontSize: 14 },
+  searchInput: { flex: 1, color: STOREFRONT_COLORS.ink, paddingVertical: 15, fontSize: FONT_SIZES.body },
   quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 60, paddingHorizontal: 18, paddingVertical: 6, borderRadius: RADIUS.md, backgroundColor: STOREFRONT_COLORS.surfaceRaised, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold + '88', marginBottom: 12 },
   quizIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
-  quizTitle: { color: STOREFRONT_COLORS.ink, fontSize: 14, fontWeight: '700' },
-  quizSubtitle: { color: STOREFRONT_COLORS.muted, fontSize: 10, marginTop: 2 },
+  quizTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
+  quizSubtitle: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   quickFilters: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, marginBottom: SPACING.sm },
   quickFilterButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   quickFilterGrow: { flex: 1 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
-  quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: 11, fontWeight: '600' },
+  quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   quickFilterTextActive: { color: COLORS.ink },
   storefrontEmpty: { alignItems: 'center', padding: SPACING.xl, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
-  storefrontEmptyTitle: { color: STOREFRONT_COLORS.ink, fontSize: 14, fontWeight: '700' },
-  storefrontEmptyText: { color: STOREFRONT_COLORS.muted, fontSize: 11, marginTop: 5, textAlign: 'center' },
+  storefrontEmptyTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
+  storefrontEmptyText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 5, textAlign: 'center' },
   filterBadge: { minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
-  filterBadgeText: { color: COLORS.gold, fontSize: 8, fontWeight: '700' },
-  filterSheetLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.2, marginBottom: 9 },
+  filterBadgeText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700' },
+  filterSheetLabel: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.2, marginBottom: 9 },
   filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg },
   filterSheetActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
-  contactIntro: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: SPACING.md },
+  contactIntro: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.md },
   contactAction: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   contactActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
-  contactActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
-  contactActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
-  faqIntro: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: SPACING.md },
+  contactActionTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
+  contactActionSubtitle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
+  faqIntro: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.md },
   faqItem: { padding: 13, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   faqItemExpanded: { borderColor: COLORS.gold + '99', backgroundColor: COLORS.surface },
   faqQuestionRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   faqQuestionIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
-  faqQuestion: { flex: 1, color: COLORS.bone, fontSize: 12, fontWeight: '700' },
-  faqAnswer: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 10, marginLeft: 42, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+  faqQuestion: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
+  faqAnswer: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 17, marginTop: 10, marginLeft: 42, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
   faqWhatsapp: { marginTop: SPACING.sm },
-  contactFallbackText: { color: COLORS.bone, fontSize: 12, lineHeight: 18, marginBottom: SPACING.lg },
+  contactFallbackText: { color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.lg },
   contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
     backgroundColor: PRODUCT_CARD_COLORS.background,
@@ -1459,70 +1460,70 @@ const styles = StyleSheet.create({
   imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  imagePlaceholderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9 },
+  imagePlaceholderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
   productInfo: { flex: 1, minWidth: 0, paddingTop: 2 },
-  cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: 17, lineHeight: 21, fontWeight: '700' },
-  occasionLabel: { color: PRODUCT_CARD_COLORS.gold, fontSize: 9, letterSpacing: 1.1, marginTop: 9 },
-  cardSub: { color: PRODUCT_CARD_COLORS.muted, fontSize: 11, lineHeight: 15, marginTop: 2 },
-  familySummary: { color: PRODUCT_CARD_COLORS.text, fontSize: 10, lineHeight: 14, marginTop: 6 },
+  cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.subtitle, lineHeight: 21, fontWeight: '700' },
+  occasionLabel: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, marginTop: 9 },
+  cardSub: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 2 },
+  familySummary: { color: PRODUCT_CARD_COLORS.text, fontSize: FONT_SIZES.caption, lineHeight: 14, marginTop: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 5 },
-  metaText: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9 },
+  metaText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
   availabilityDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: SPACING.md },
   sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold, alignItems: 'center', backgroundColor: COLORS.surface },
   sizeButtonPressed: { backgroundColor: COLORS.surfaceRaised },
   sizeButtonDisabled: { borderColor: PRODUCT_CARD_COLORS.border, opacity: 0.65 },
-  sizeButtonText: { color: PRODUCT_CARD_COLORS.ink, fontSize: 12, lineHeight: 15, fontWeight: '700' },
-  sizePrice: { color: PRODUCT_CARD_COLORS.muted, fontSize: 9, lineHeight: 12, marginTop: 1 },
+  sizeButtonText: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.label, lineHeight: 15, fontWeight: '700' },
+  sizePrice: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 12, marginTop: 1 },
   notes: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10, gap: 6 },
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  noteLabel: { width: 58, color: PRODUCT_CARD_COLORS.muted, fontSize: 9, lineHeight: 15, letterSpacing: 0.8 },
-  noteValue: { flex: 1, color: PRODUCT_CARD_COLORS.text, fontSize: 11, lineHeight: 15, fontStyle: 'italic' },
+  noteLabel: { width: 58, color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, letterSpacing: 0.8 },
+  noteValue: { flex: 1, color: PRODUCT_CARD_COLORS.text, fontSize: FONT_SIZES.caption, lineHeight: 15, fontStyle: 'italic' },
   notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
-  notesEmptyText: { color: PRODUCT_CARD_COLORS.muted, fontSize: 10, fontStyle: 'italic' },
+  notesEmptyText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
   reviewButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
-  reviewText: { color: PRODUCT_CARD_COLORS.gold, fontSize: 10 },
+  reviewText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption },
   detailsButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
-  detailsText: { color: PRODUCT_CARD_COLORS.gold, fontSize: 10, fontWeight: '600' },
+  detailsText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
   navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
-  navTextActive: { color: COLORS.gold, fontSize: 11, marginTop: 3 },
-  navText: { color: STOREFRONT_COLORS.muted, fontSize: 11, marginTop: 3 },
+  navTextActive: { color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 3 },
+  navText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
   cartBadge: { position: 'absolute', top: -7, right: -10, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
-  cartBadgeText: { color: COLORS.ink, fontSize: 9, fontWeight: '700' },
+  cartBadgeText: { color: COLORS.ink, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   successSheetBody: { paddingTop: SPACING.md, paddingBottom: SPACING.xl },
   successContent: { alignItems: 'center', paddingTop: 0 },
   successIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md },
-  successEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.6, textAlign: 'center' },
-  successTitle: { color: COLORS.bone, fontSize: 20, lineHeight: 25, fontWeight: '700', textAlign: 'center', marginTop: 5 },
-  successOrderNumber: { color: COLORS.gold, fontSize: 11, letterSpacing: 1.2, marginTop: 7 },
-  successText: { width: '100%', color: COLORS.muted, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 7, marginBottom: SPACING.md },
+  successEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.6, textAlign: 'center' },
+  successTitle: { color: COLORS.bone, fontSize: FONT_SIZES.title, lineHeight: 25, fontWeight: '700', textAlign: 'center', marginTop: 5 },
+  successOrderNumber: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.2, marginTop: 7 },
+  successText: { width: '100%', color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, textAlign: 'center', marginTop: 7, marginBottom: SPACING.md },
   successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.lg },
   pixCard: { width: '100%', padding: SPACING.lg, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface, marginBottom: SPACING.md },
   pixHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
-  pixEyebrow: { color: COLORS.gold, fontSize: 10, letterSpacing: 1.2 },
-  pixValue: { color: COLORS.bone, fontSize: 22, fontWeight: '700', marginTop: 2 },
+  pixEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.2 },
+  pixValue: { color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '700', marginTop: 2 },
   pixPendingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: COLORS.gold + '66', borderRadius: RADIUS.pill, paddingHorizontal: 9, paddingVertical: 5 },
   pixPendingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gold },
-  pixPendingText: { color: COLORS.gold, fontSize: 10 },
+  pixPendingText: { color: COLORS.gold, fontSize: FONT_SIZES.caption },
   qrFrame: { alignSelf: 'center', backgroundColor: COLORS.white, padding: 12, borderRadius: RADIUS.md, marginBottom: SPACING.md },
-  pixHint: { color: COLORS.muted, fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: SPACING.md },
+  pixHint: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 17, textAlign: 'center', marginBottom: SPACING.md },
   copyPixButton: { minHeight: 46, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   paymentContinueButton: { width: '100%', minHeight: 50, paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
-  copyPixText: { color: COLORS.ink, fontSize: 14, fontWeight: '700' },
-  manualConfirmation: { color: COLORS.muted, fontSize: 10, textAlign: 'center', marginTop: 10 },
-  successNextText: { flex: 1, color: COLORS.bone, fontSize: 12, lineHeight: 18 },
+  copyPixText: { color: COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
+  manualConfirmation: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textAlign: 'center', marginTop: 10 },
+  successNextText: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18 },
   trackingAccess: { width: '100%', marginBottom: SPACING.lg },
   trackingAccessButton: { width: '100%', minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SPACING.md, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   trackingKeyIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '70', backgroundColor: COLORS.surface },
   trackingAccessCopy: { flex: 1 },
-  trackingAccessTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
-  trackingAccessHint: { color: COLORS.muted, fontSize: 10, marginTop: 2 },
+  trackingAccessTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
+  trackingAccessHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   trackingCodeCard: { width: '100%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.gold + '0C', marginTop: 8 },
-  trackingCodeLabel: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.1, textAlign: 'center' },
-  trackingCode: { color: COLORS.bone, fontSize: 17, fontWeight: '700', letterSpacing: 1.2, marginTop: 8 },
+  trackingCodeLabel: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, textAlign: 'center' },
+  trackingCode: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700', letterSpacing: 1.2, marginTop: 8 },
   shareCodeButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 12, marginTop: 7 },
-  shareCodeText: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
+  shareCodeText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
 });

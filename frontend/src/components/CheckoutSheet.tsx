@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Linking, Platform, Pressable, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
 import { storage } from '../utils/storage';
 import type { CheckoutPayload, Compra, OpcaoFrete, Perfume, PriceOption } from '../types';
-import { brl, COLORS, SPACING } from '../theme';
+import { brl, COLORS, SPACING, FONT_SIZES } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';
+import { AppText as Text } from './Typography';
 
 const CUSTOMER_KEY = 'checkout-customer-v1';
 
@@ -356,14 +357,14 @@ export function CheckoutSheet({
       >
         <Feather name={active ? 'check-circle' : 'circle'} size={18} color={active ? COLORS.gold : COLORS.muted} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: COLORS.bone, fontSize: 13, fontWeight: '600' }}>
+          <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '600' }}>
             {displayName}
           </Text>
-          <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 2 }}>
+          <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 }}>
             Prazo estimado: {opcao.prazoDias} {opcao.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
           </Text>
         </View>
-        <Text style={{ color: COLORS.gold, fontSize: 14, fontWeight: '600' }}>{brl(opcao.preco)}</Text>
+        <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.body, fontWeight: '600' }}>{brl(opcao.preco)}</Text>
       </Pressable>
     );
   };
@@ -395,11 +396,11 @@ export function CheckoutSheet({
                     borderWidth: 1,
                     borderColor: active ? COLORS.gold : COLORS.border,
                   }}>
-                    <Text style={{ color: active ? COLORS.ink : COLORS.muted, fontSize: 11, fontWeight: '700' }}>
+                    <Text style={{ color: active ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '700' }}>
                       {index + 1}
                     </Text>
                   </View>
-                  <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: 10, marginTop: 4 }}>
+                  <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 4 }}>
                     {item.label}
                   </Text>
                 </Pressable>
@@ -424,8 +425,8 @@ export function CheckoutSheet({
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '500' }}>{item.perfume.nome}</Text>
-                    <Text style={{ color: COLORS.muted, fontSize: 12 }}>{item.option.ml}ml · {brl(item.option.preco)}</Text>
+                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }}>{item.perfume.nome}</Text>
+                    <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label }}>{item.option.ml}ml · {brl(item.option.preco)}</Text>
                   </View>
                   <Pressable onPress={() => onChangeQuantity(index, item.quantidade - 1)} hitSlop={8}>
                     <Feather name="minus-circle" size={20} color={COLORS.muted} />
@@ -443,10 +444,10 @@ export function CheckoutSheet({
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: SPACING.md }}>
               <Text style={{ color: COLORS.muted }}>Produtos</Text>
-              <Text style={{ color: COLORS.bone, fontSize: 17 }}>{brl(subtotal)}</Text>
+              <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.subtitle }}>{brl(subtotal)}</Text>
             </View>
 
-            <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1, marginBottom: SPACING.md }}>
+            <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>
               DADOS DO CLIENTE
             </Text>
             <Field label="Nome completo"><TInput value={form.nomeCompleto} onChangeText={(nomeCompleto) => setForm({ ...form, nomeCompleto })} /></Field>
@@ -459,7 +460,7 @@ export function CheckoutSheet({
                 onChangeText={(email) => setForm({ ...form, email })}
               />
               {!!form.email && !emailValido && (
-                <Text style={{ color: COLORS.rust, fontSize: 11, marginTop: 5 }}>
+                <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 5 }}>
                   Informe um e-mail válido, como nome@exemplo.com.
                 </Text>
               )}
@@ -474,7 +475,7 @@ export function CheckoutSheet({
 
         {step === 'entrega' && (
           <View>
-            <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1, marginBottom: SPACING.md }}>
+            <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>
               COMO VOCÊ QUER RECEBER?
             </Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: SPACING.lg }}>
@@ -497,8 +498,8 @@ export function CheckoutSheet({
                     }}
                   >
                     <Feather name={method.icon} size={18} color={active ? COLORS.gold : COLORS.muted} />
-                    <Text style={{ color: COLORS.bone, fontSize: 13, fontWeight: '600', marginTop: 8 }}>{method.title}</Text>
-                    <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: 11, marginTop: 2 }}>{method.meta}</Text>
+                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '600', marginTop: 8 }}>{method.title}</Text>
+                    <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 }}>{method.meta}</Text>
                   </Pressable>
                 );
               })}
@@ -520,17 +521,17 @@ export function CheckoutSheet({
                   <Feather name="check" size={19} color={COLORS.ink} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '600' }}>Retirada Combinada · Grátis</Text>
-                  <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 3 }}>Combine o local e o horário pelo WhatsApp.</Text>
+                  <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '600' }}>Retirada Combinada · Grátis</Text>
+                  <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 }}>Combine o local e o horário pelo WhatsApp.</Text>
                 </View>
               </View>
             ) : (
               <View>
-                <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1, marginBottom: SPACING.md }}>ENDEREÇO</Text>
+                <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>ENDEREÇO</Text>
                 <Field label="CEP">
                   <TInput keyboardType="numeric" autoComplete="postal-code" maxLength={9} value={form.endereco.cep} onChangeText={handleCep} />
-                  {cepLoading && <Text style={{ color: COLORS.gold, fontSize: 11, marginTop: 5 }}>Buscando endereço…</Text>}
-                  {!!cepError && <Text style={{ color: COLORS.rust, fontSize: 11, marginTop: 5 }}>{cepError}</Text>}
+                  {cepLoading && <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 5 }}>Buscando endereço…</Text>}
+                  {!!cepError && <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 5 }}>{cepError}</Text>}
                 </Field>
                 <Field label="Endereço"><TInput value={form.endereco.endereco} onChangeText={(value) => setAddress('endereco', value)} /></Field>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -563,12 +564,12 @@ export function CheckoutSheet({
                     }}
                   >
                     <Feather name="refresh-cw" size={14} color={COLORS.gold} />
-                    <Text style={{ color: COLORS.gold, fontSize: 12, fontWeight: '600' }}>Atualizar valores do frete</Text>
+                    <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label, fontWeight: '600' }}>Atualizar valores do frete</Text>
                   </Pressable>
                 )}
                 {!!freteError && (
                   <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: SPACING.sm }}>
-                    <Text style={{ color: COLORS.rust, fontSize: 12 }}>{freteError}</Text>
+                    <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.label }}>{freteError}</Text>
                   </View>
                 )}
               </View>
@@ -583,7 +584,7 @@ export function CheckoutSheet({
 
         {step === 'pagamento' && (
           <View>
-            <Text style={{ color: COLORS.gold, fontSize: 11, letterSpacing: 1, marginBottom: SPACING.md }}>
+            <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>
               PAGAMENTO
             </Text>
             <Field label="Forma de pagamento">
@@ -605,20 +606,20 @@ export function CheckoutSheet({
               </Pressable>
             </Field>
             {!cartaoOnlineAtivo && pixManualAtivo && (
-              <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: -8, marginBottom: SPACING.md }}>
+              <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: -8, marginBottom: SPACING.md }}>
                 Pagamento por Pix com confirmação manual. O checkout automático está temporariamente indisponível.
               </Text>
             )}
             {!pagamentoDisponivel && (
               <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
-                <Text style={{ color: COLORS.bone, fontSize: 12, fontWeight: '600' }}>Pagamento temporariamente indisponível</Text>
-                <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 4 }}>Entre em contato com a loja para combinar o pagamento.</Text>
+                <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' }}>Pagamento temporariamente indisponível</Text>
+                <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 4 }}>Entre em contato com a loja para combinar o pagamento.</Text>
               </View>
             )}
             {cartaoOnlineAtivo && form.formaPagamento === 'cartao' && (
               <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
-                <Text style={{ color: COLORS.bone, fontSize: 12, fontWeight: '600' }}>Pagamento automático pela InfinitePay</Text>
-                <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 4 }}>No ambiente seguro da InfinitePay, escolha Pix ou cartão. A confirmação do pedido será automática.</Text>
+                <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' }}>Pagamento automático pela InfinitePay</Text>
+                <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 4 }}>No ambiente seguro da InfinitePay, escolha Pix ou cartão. A confirmação do pedido será automática.</Text>
               </View>
             )}
             <Field label="Observações (opcional)"><TInput multiline style={{ minHeight: 72, textAlignVertical: 'top' }} value={form.observacoes} onChangeText={(observacoes) => setForm({ ...form, observacoes })} /></Field>
@@ -636,8 +637,8 @@ export function CheckoutSheet({
               </View>
               <View style={{ height: 1, backgroundColor: COLORS.border, marginBottom: 11 }} />
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ color: COLORS.bone, fontSize: 14, fontWeight: '600' }}>Total</Text>
-                <Text style={{ color: COLORS.gold, fontSize: 19, fontWeight: '700' }}>{brl(total)}</Text>
+                <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '600' }}>Total</Text>
+                <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.heading, fontWeight: '700' }}>{brl(total)}</Text>
               </View>
             </View>
 

@@ -33,6 +33,7 @@ export default function Root({ children }: PropsWithChildren) {
           dangerouslySetInnerHTML={{
             __html: `
               body > div:first-child { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; }
+              body { font-family: DMSans_400Regular, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
               [role="tablist"] [role="tab"] * { overflow: visible !important; }
               [role="heading"], [role="heading"] * { overflow: visible !important; }
               input:-webkit-autofill,
@@ -102,10 +103,10 @@ export default function Root({ children }: PropsWithChildren) {
                 padding: 8px;
                 box-sizing: border-box;
                 color: #8C642B;
-                font-family: Arial, sans-serif;
-                font-size: 12px;
-                line-height: 18px;
-                font-weight: 700;
+                font-family: DMSans_700Bold, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                font-size: 11px;
+                line-height: 15px;
+                font-weight: 400;
                 letter-spacing: 2.2px;
                 text-align: center;
                 white-space: nowrap;

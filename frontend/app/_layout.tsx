@@ -3,7 +3,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { LogBox } from "react-native";
 
-import { useIconFonts } from "@/src/hooks/use-icon-fonts";
+import { useAppFonts } from "@/src/hooks/use-app-fonts";
 
 
 // Disable logbox errors etc so that users can see the app
@@ -17,7 +17,7 @@ LogBox.ignoreAllLogs(true)
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded, error] = useIconFonts();
+  const [loaded, error] = useAppFonts();
 
   useEffect(() => {
     if (loaded || error) {
