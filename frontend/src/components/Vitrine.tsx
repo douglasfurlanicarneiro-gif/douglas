@@ -306,6 +306,23 @@ export function Vitrine({
       currentStore.nomeLoja,
     )
     : '';
+  const pagamentoAutomaticoPendente = Boolean(
+    successOrder?.pagamento?.checkoutUrl
+    && successOrder.pagamento.status !== 'pago'
+  );
+  const pagamentoConfirmado = Boolean(
+    successOrder?.pagamento?.status === 'pago'
+    || successOrder?.status === 'pagamento_confirmado'
+  );
+
+  useEffect(() => {
+    if (!orderSuccess || !pagamentoConfirmado) return;
+    const timer = setTimeout(() => {
+      setOrderSuccess(null);
+      setTrackingCodeOpen(false);
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [orderSuccess, pagamentoConfirmado]);
 
   const load = useCallback(async () => {
     if (retryTimerRef.current) {
@@ -1188,24 +1205,46 @@ export function Vitrine({
           setOrderSuccess(null);
           setTrackingCodeOpen(false);
         }}
-        title="Pedido recebido"
+        title={pagamentoConfirmado
+          ? 'Pagamento confirmado'
+          : pagamentoAutomaticoPendente
+            ? 'Pagamento pendente'
+            : 'Pedido recebido'}
         compact
         testID="order-success-sheet"
       >
         <View style={styles.successContent}>
           <View style={styles.successIcon}>
-            <Feather name="check" size={30} color={COLORS.ink} />
+            <Feather name={pagamentoAutomaticoPendente ? 'credit-card' : 'check'} size={30} color={COLORS.ink} />
           </View>
           <Text style={styles.successEyebrow}>
-            {manualPixCode ? 'PEDIDO REGISTRADO' : 'OBRIGADO PELA SUA COMPRA'}
+            {pagamentoConfirmado
+              ? 'PAGAMENTO APROVADO'
+              : pagamentoAutomaticoPendente
+                ? 'PEDIDO CRIADO'
+                : manualPixCode
+                  ? 'PEDIDO REGISTRADO'
+                  : 'OBRIGADO PELA SUA COMPRA'}
           </Text>
           <Text style={styles.successTitle}>
-            {manualPixCode ? 'Agora, conclua o pagamento' : 'Seu pedido foi recebido!'}
+            {pagamentoConfirmado
+              ? 'Tudo certo com seu pagamento!'
+              : pagamentoAutomaticoPendente
+                ? 'Conclua o pagamento na InfinitePay'
+                : manualPixCode
+                  ? 'Agora, conclua o pagamento'
+                  : 'Seu pedido foi recebido!'}
           </Text>
           {!!successOrder?.seq && (
             <Text style={styles.successOrderNumber}>PEDIDO Nº {padSeq(successOrder.seq)}</Text>
           )}
-          <Text style={styles.successText}>A {currentStore.nomeLoja} agradece por fazer parte deste momento.</Text>
+          <Text style={styles.successText}>
+            {pagamentoAutomaticoPendente
+              ? 'Seu pedido está reservado e aguardando a confirmação do pagamento.'
+              : pagamentoConfirmado
+                ? `A ${currentStore.nomeLoja} já recebeu a confirmação e dará continuidade ao pedido.`
+                : `A ${currentStore.nomeLoja} agradece por fazer parte deste momento.`}
+          </Text>
           {!!manualPixCode && (
             <View style={styles.pixCard}>
               <View style={styles.pixHeading}>
@@ -1247,14 +1286,14 @@ export function Vitrine({
               <Text style={styles.successNextText}>{orderSuccess}</Text>
             </View>
           )}
-          {!!successOrder?.pagamento?.checkoutUrl && successOrder.pagamento.status !== 'pago' && (
+          {pagamentoAutomaticoPendente && (
             <Pressable
               onPress={() => void Linking.openURL(successOrder.pagamento!.checkoutUrl!)}
-              style={styles.copyPixButton}
+              style={[styles.copyPixButton, styles.paymentContinueButton]}
               testID="continue-infinitepay"
             >
               <Feather name="external-link" size={16} color={COLORS.ink} />
-              <Text style={styles.copyPixText}>Continuar pagamento na InfinitePay</Text>
+              <Text style={styles.copyPixText}>Pagar com InfinitePay</Text>
             </Pressable>
           )}
           {!!successOrder?.codigoAcompanhamento && (
@@ -1296,7 +1335,7 @@ export function Vitrine({
             </View>
           )}
           <View style={{ width: '100%', gap: 8 }}>
-            {!!successOrder?.codigoAcompanhamento && (
+            {!!successOrder?.codigoAcompanhamento && !pagamentoAutomaticoPendente && (
               <SecondaryButton
                 label="Acompanhar meu pedido"
                 onPress={() => {
@@ -1307,7 +1346,7 @@ export function Vitrine({
               />
             )}
             <PrimaryButton
-              label="Voltar à vitrine"
+              label={pagamentoConfirmado ? 'Fechar agora' : 'Voltar à vitrine'}
               onPress={() => {
                 setOrderSuccess(null);
                 setTrackingCodeOpen(false);
@@ -1463,6 +1502,7 @@ const styles = StyleSheet.create({
   qrFrame: { alignSelf: 'center', backgroundColor: '#FFFFFF', padding: 12, borderRadius: RADIUS.md, marginBottom: SPACING.md },
   pixHint: { color: COLORS.muted, fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: SPACING.md },
   copyPixButton: { minHeight: 46, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  paymentContinueButton: { width: '100%', paddingHorizontal: SPACING.md, marginBottom: SPACING.md },
   copyPixText: { color: COLORS.ink, fontSize: 14, fontWeight: '700' },
   manualConfirmation: { color: COLORS.muted, fontSize: 10, textAlign: 'center', marginTop: 10 },
   successNextText: { flex: 1, color: COLORS.bone, fontSize: 12, lineHeight: 18 },

@@ -292,7 +292,7 @@ export function CheckoutSheet({
       const order = await createCompra(payload);
       await storage.setItem(CUSTOMER_KEY, JSON.stringify(form));
       const paymentMessage = order.pagamento?.checkoutUrl
-        ? 'Você será direcionado ao ambiente seguro da InfinitePay. Após o pagamento, volte automaticamente para conferir a confirmação.'
+        ? 'Seu pedido está salvo. Escolha Pix ou cartão na InfinitePay; após a aprovação, a confirmação será automática.'
         : order.pagamento?.pixCopiaECola
           ? 'Pague pelo QR Code ou Pix Copia e Cola. Assim que você concluir, confirmaremos o recebimento e iniciaremos o preparo.'
         : order.pagamento?.status === 'gateway_nao_configurado'
@@ -638,7 +638,7 @@ export function CheckoutSheet({
                 label={loading
                   ? 'Abrindo pagamento…'
                   : cartaoOnlineAtivo
-                    ? `Ir para pagamento · ${brl(total)}`
+                    ? `Pagar · ${brl(total)}`
                     : `Finalizar · ${brl(total)}`}
                 onPress={submit}
                 disabled={!complete || loading}
