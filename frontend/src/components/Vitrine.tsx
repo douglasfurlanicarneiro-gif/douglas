@@ -573,7 +573,7 @@ export function Vitrine({
                     <Feather name="compass" size={19} color={COLORS.gold} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.quizTitle}>Encontre sua essência</Text>
+                    <Text style={styles.quizTitle}>Encontre seu perfume</Text>
                     <Text style={styles.quizSubtitle}>Uma seleção personalizada em poucos passos</Text>
                   </View>
                   <Feather name="chevron-right" size={18} color={COLORS.gold} />

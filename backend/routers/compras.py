@@ -168,16 +168,7 @@ async def _criar_compra(payload: CompraIn):
                 status_code=400,
                 detail="A opção de entrega escolhida não está mais disponível. Calcule novamente.",
             )
-        opcao_prioritaria = min(
-            opcoes_frete,
-            key=lambda opcao: (opcao["prazoDias"], opcao["preco"]),
-        )
-        nome_exibicao = (
-            "Entrega Prioritária"
-            if len(opcoes_frete) > 1
-            and escolha["serviceId"] == opcao_prioritaria["serviceId"]
-            else "Entrega Padrão"
-        )
+        nome_exibicao = escolha.get("nomeExibicao", "Entrega Padrão")
         doc["frete"] = escolha["preco"]
         doc["entrega"] = {
             **escolha,

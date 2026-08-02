@@ -67,11 +67,56 @@ def test_cotacao_exibe_preco_final_prazo_e_filtra_transportadora(monkeypatch):
             "transportadora": "Jadlog",
             "servico": ".Package",
             "precoTransportadora": 18.5,
+            "prazoTransportadora": 4,
+            "categoriaFrete": "padrao",
+            "nomeExibicao": "Entrega Padrão",
             "taxaEmbalagem": 5.0,
+            "tipoAjuste": "valor",
+            "valorAjuste": 0.0,
             "preco": 23.5,
+            "freteGratis": False,
             "prazoDias": 4,
         }
     ]
+
+
+def test_cotacao_aplica_regras_independentes_por_modelo(monkeypatch):
+    async def fake_config(_db):
+        return {
+            "cepOrigem": "03069000",
+            "taxaEmbalagem": 5.0,
+            "freteGratisAcima": 0,
+            "ajustePadraoTipo": "valor",
+            "ajustePadraoValor": 4.0,
+            "prazoPadraoDias": 8,
+            "ajustePrioritarioTipo": "percentual",
+            "ajustePrioritarioValor": 10.0,
+            "prazoPrioritarioDias": 3,
+        }
+
+    async def fake_token(_db):
+        return "token-seguro"
+
+    async def fake_request(*_args, **_kwargs):
+        return FakeResponse([
+            {"id": 1, "name": "Econômico", "price": "20.00", "delivery_time": 7, "company": {"name": "Jadlog"}},
+            {"id": 2, "name": "Expresso", "price": "30.00", "delivery_time": 2, "company": {"name": "Jadlog"}},
+        ])
+
+    monkeypatch.setattr(melhor_envio, "configuracao_frete", fake_config)
+    monkeypatch.setattr(melhor_envio, "obter_access_token", fake_token)
+    monkeypatch.setattr(melhor_envio, "_run_request", fake_request)
+
+    result = asyncio.run(melhor_envio.cotar_frete(
+        object(),
+        cep_destino="01310-100",
+        itens=[{"perfumeId": "produto-1", "ml": 50, "quantidade": 1, "precoUnitario": 80}],
+    ))
+    por_categoria = {item["categoriaFrete"]: item for item in result}
+    assert por_categoria["padrao"]["preco"] == 29.0
+    assert por_categoria["padrao"]["prazoDias"] == 8
+    assert por_categoria["prioritaria"]["preco"] == 38.0
+    assert por_categoria["prioritaria"]["prazoDias"] == 3
 
 
 def test_dimensoes_aumentam_conforme_tamanho():

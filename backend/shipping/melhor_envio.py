@@ -70,6 +70,12 @@ async def configuracao_frete(db) -> dict[str, Any]:
         ),
         "cepOrigem": str((saved or {}).get("cepOrigem", MELHOR_ENVIO_FROM_CEP)),
         "freteGratisAcima": round(float((saved or {}).get("freteGratisAcima", 0)), 2),
+        "ajustePadraoTipo": str((saved or {}).get("ajustePadraoTipo", "valor")),
+        "ajustePadraoValor": round(float((saved or {}).get("ajustePadraoValor", 0)), 2),
+        "prazoPadraoDias": int((saved or {}).get("prazoPadraoDias", 0)),
+        "ajustePrioritarioTipo": str((saved or {}).get("ajustePrioritarioTipo", "valor")),
+        "ajustePrioritarioValor": round(float((saved or {}).get("ajustePrioritarioValor", 0)), 2),
+        "prazoPrioritarioDias": int((saved or {}).get("prazoPrioritarioDias", 0)),
     }
 
 
@@ -79,6 +85,12 @@ async def salvar_configuracao_frete(
     taxa_embalagem: float,
     cep_origem: str,
     frete_gratis_acima: float = 0,
+    ajuste_padrao_tipo: str = "valor",
+    ajuste_padrao_valor: float = 0,
+    prazo_padrao_dias: int = 0,
+    ajuste_prioritario_tipo: str = "valor",
+    ajuste_prioritario_valor: float = 0,
+    prazo_prioritario_dias: int = 0,
 ) -> dict[str, Any]:
     await db.configuracoes.update_one(
         {"_id": "frete"},
@@ -87,6 +99,12 @@ async def salvar_configuracao_frete(
                 "taxaEmbalagem": round(taxa_embalagem, 2),
                 "cepOrigem": cep_origem,
                 "freteGratisAcima": round(frete_gratis_acima, 2),
+                "ajustePadraoTipo": ajuste_padrao_tipo,
+                "ajustePadraoValor": round(ajuste_padrao_valor, 2),
+                "prazoPadraoDias": prazo_padrao_dias,
+                "ajustePrioritarioTipo": ajuste_prioritario_tipo,
+                "ajustePrioritarioValor": round(ajuste_prioritario_valor, 2),
+                "prazoPrioritarioDias": prazo_prioritario_dias,
                 "atualizadoEm": datetime.now(timezone.utc).isoformat(),
             }
         },
@@ -315,7 +333,7 @@ async def cotar_frete(
     ), 2)
     limite_gratis = round(float(config.get("freteGratisAcima", 0)), 2)
     frete_gratis = limite_gratis > 0 and subtotal >= limite_gratis
-    opcoes: list[dict[str, Any]] = []
+    opcoes_base: list[dict[str, Any]] = []
     for raw in response.json():
         if raw.get("error"):
             continue
@@ -330,18 +348,48 @@ async def cotar_frete(
             or raw.get("delivery_time")
             or 0
         )
-        opcoes.append(
+        opcoes_base.append(
             {
                 "serviceId": int(raw["id"]),
                 "transportadora": empresa,
                 "servico": str(raw.get("name") or "Entrega"),
                 "precoTransportadora": round(preco_transportadora, 2),
-                "taxaEmbalagem": taxa,
-                "preco": 0.0 if frete_gratis else round(preco_transportadora + taxa, 2),
-                "freteGratis": frete_gratis,
-                "prazoDias": prazo,
+                "prazoTransportadora": prazo,
             }
         )
+
+    prioritario_id = None
+    if len(opcoes_base) > 1:
+        prioritario_id = min(
+            opcoes_base,
+            key=lambda item: (item["prazoTransportadora"], item["precoTransportadora"]),
+        )["serviceId"]
+
+    opcoes: list[dict[str, Any]] = []
+    for opcao in opcoes_base:
+        prioritaria = opcao["serviceId"] == prioritario_id
+        prefixo = "Prioritario" if prioritaria else "Padrao"
+        tipo_ajuste = str(config.get(f"ajuste{prefixo}Tipo", "valor"))
+        valor_ajuste = max(0.0, float(config.get(f"ajuste{prefixo}Valor", 0)))
+        prazo_configurado = max(0, int(config.get(f"prazo{prefixo}Dias", 0)))
+        base_transportadora = float(opcao["precoTransportadora"])
+        acrescimo = (
+            base_transportadora * valor_ajuste / 100
+            if tipo_ajuste == "percentual"
+            else valor_ajuste
+        )
+        preco_final = round(base_transportadora + taxa + acrescimo, 2)
+        opcoes.append({
+            **opcao,
+            "categoriaFrete": "prioritaria" if prioritaria else "padrao",
+            "nomeExibicao": "Entrega Prioritária" if prioritaria else "Entrega Padrão",
+            "taxaEmbalagem": taxa,
+            "tipoAjuste": tipo_ajuste,
+            "valorAjuste": round(valor_ajuste, 2),
+            "preco": 0.0 if frete_gratis else preco_final,
+            "freteGratis": frete_gratis,
+            "prazoDias": prazo_configurado or int(opcao["prazoTransportadora"]),
+        })
     return sorted(opcoes, key=lambda item: (item["preco"], item["prazoDias"]))
 
 

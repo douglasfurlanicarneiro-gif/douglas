@@ -1,5 +1,5 @@
 from html import escape
-from typing import Any
+from typing import Any, Literal
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -37,6 +37,12 @@ class ConfiguracaoFreteIn(BaseModel):
     taxaEmbalagem: float = Field(ge=0, le=1000)
     cepOrigem: str = Field(min_length=8, max_length=9)
     freteGratisAcima: float = Field(default=0, ge=0, le=1_000_000)
+    ajustePadraoTipo: Literal["valor", "percentual"] = "valor"
+    ajustePadraoValor: float = Field(default=0, ge=0, le=100_000)
+    prazoPadraoDias: int = Field(default=0, ge=0, le=90)
+    ajustePrioritarioTipo: Literal["valor", "percentual"] = "valor"
+    ajustePrioritarioValor: float = Field(default=0, ge=0, le=100_000)
+    prazoPrioritarioDias: int = Field(default=0, ge=0, le=90)
 
 
 async def itens_para_cotacao(db, itens: list[ItemFreteIn]) -> list[dict[str, Any]]:
@@ -112,6 +118,12 @@ async def atualizar_configuracao(
         taxa_embalagem=payload.taxaEmbalagem,
         cep_origem=cep,
         frete_gratis_acima=payload.freteGratisAcima,
+        ajuste_padrao_tipo=payload.ajustePadraoTipo,
+        ajuste_padrao_valor=payload.ajustePadraoValor,
+        prazo_padrao_dias=payload.prazoPadraoDias,
+        ajuste_prioritario_tipo=payload.ajustePrioritarioTipo,
+        ajuste_prioritario_valor=payload.ajustePrioritarioValor,
+        prazo_prioritario_dias=payload.prazoPrioritarioDias,
     )
     return {**config, **(await status_integracao(db))}
 

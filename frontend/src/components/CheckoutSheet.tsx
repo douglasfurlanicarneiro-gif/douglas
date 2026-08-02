@@ -79,6 +79,8 @@ export function CheckoutSheet({
   const valorEntrega = tipoEntrega === 'entrega' ? (freteSelecionado?.preco || 0) : 0;
   const total = subtotal + valorEntrega;
   const priorityServiceId = useMemo(() => {
+    const configured = opcoesFrete.find((option) => option.categoriaFrete === 'prioritaria');
+    if (configured) return configured.serviceId;
     if (opcoesFrete.length < 2) return null;
     return opcoesFrete.reduce((fastest, option) => (
       option.prazoDias < fastest.prazoDias
@@ -294,9 +296,9 @@ export function CheckoutSheet({
 
   const optionCard = (opcao: OpcaoFrete) => {
     const active = freteSelecionado?.serviceId === opcao.serviceId;
-    const displayName = opcao.serviceId === priorityServiceId
-      ? 'Entrega Prioritária'
-      : 'Entrega Padrão';
+    const displayName = opcao.nomeExibicao || (
+      opcao.serviceId === priorityServiceId ? 'Entrega Prioritária' : 'Entrega Padrão'
+    );
     return (
       <Pressable
         key={opcao.serviceId}

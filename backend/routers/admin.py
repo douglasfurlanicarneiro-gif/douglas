@@ -123,7 +123,7 @@ async def obter_metricas(_: str = Depends(require_atelie_auth)):
                 chave,
                 {
                     "perfumeId": item.get("perfumeId"),
-                    "nome": item.get("perfumeNome", "Perfume"),
+                    "nome": item.get("perfumeNome") or "Perfume",
                     "quantidade": 0,
                     "faturamento": 0.0,
                 },
@@ -143,6 +143,27 @@ async def obter_metricas(_: str = Depends(require_atelie_auth)):
         key=lambda item: (item["quantidade"], item["faturamento"]),
         reverse=True,
     )[:10]
+    # Pedidos administrativos antigos guardavam somente o perfumeId. Resolva
+    # os nomes em lote para o ranking não aparecer como "Perfume".
+    ids_produtos: list[ObjectId] = []
+    for item in mais_vendidos:
+        perfume_id = item.get("perfumeId")
+        if not perfume_id:
+            continue
+        try:
+            ids_produtos.append(ObjectId(str(perfume_id)))
+        except Exception:
+            continue
+    nomes_por_id = {
+        str(perfume["_id"]): perfume.get("nome", "Perfume")
+        for perfume in await db.perfumes.find(
+            {"_id": {"$in": ids_produtos}},
+            {"nome": 1},
+        ).to_list(len(ids_produtos))
+    } if ids_produtos else {}
+    for item in mais_vendidos:
+        if item.get("nome") == "Perfume" and item.get("perfumeId"):
+            item["nome"] = nomes_por_id.get(str(item["perfumeId"]), "Perfume removido")
     ticket_medio = faturamento / len(validos) if validos else 0
     return {
         "pedidosTotal": len(pedidos),

@@ -201,7 +201,18 @@ export const cotarFrete = (data: {
 });
 export const getConfiguracaoFrete = () =>
   request<ConfiguracaoFrete>('/frete/configuracao', {}, true);
-export const updateConfiguracaoFrete = (data: Pick<ConfiguracaoFrete, 'taxaEmbalagem' | 'cepOrigem' | 'freteGratisAcima'>) =>
+export const updateConfiguracaoFrete = (data: Pick<
+  ConfiguracaoFrete,
+  | 'taxaEmbalagem'
+  | 'cepOrigem'
+  | 'freteGratisAcima'
+  | 'ajustePadraoTipo'
+  | 'ajustePadraoValor'
+  | 'prazoPadraoDias'
+  | 'ajustePrioritarioTipo'
+  | 'ajustePrioritarioValor'
+  | 'prazoPrioritarioDias'
+>) =>
   request<ConfiguracaoFrete>('/frete/configuracao', {
     method: 'PUT',
     body: JSON.stringify(data),

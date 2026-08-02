@@ -957,6 +957,7 @@ export function Atelie({
 }) {
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState('dashboard');
+  const [systemView, setSystemView] = useState<'main' | 'historico' | 'fornecedores'>('main');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
@@ -975,6 +976,12 @@ export function Atelie({
   const [freteFeeInput, setFreteFeeInput] = useState('0,00');
   const [freteCepInput, setFreteCepInput] = useState('');
   const [freteGratisInput, setFreteGratisInput] = useState('0,00');
+  const [fretePadraoTipo, setFretePadraoTipo] = useState<'valor' | 'percentual'>('valor');
+  const [fretePadraoInput, setFretePadraoInput] = useState('0,00');
+  const [fretePadraoPrazoInput, setFretePadraoPrazoInput] = useState('0');
+  const [fretePrioritarioTipo, setFretePrioritarioTipo] = useState<'valor' | 'percentual'>('valor');
+  const [fretePrioritarioInput, setFretePrioritarioInput] = useState('0,00');
+  const [fretePrioritarioPrazoInput, setFretePrioritarioPrazoInput] = useState('0');
   const [savingFrete, setSavingFrete] = useState(false);
   const [priceInputs, setPriceInputs] = useState({ 30: '50,00', 50: '80,00', 100: '120,00' });
   const [savingPrices, setSavingPrices] = useState(false);
@@ -1049,6 +1056,12 @@ export function Atelie({
         setFreteFeeInput(shipping.taxaEmbalagem.toFixed(2).replace('.', ','));
         setFreteCepInput(shipping.cepOrigem);
         setFreteGratisInput(shipping.freteGratisAcima.toFixed(2).replace('.', ','));
+        setFretePadraoTipo(shipping.ajustePadraoTipo || 'valor');
+        setFretePadraoInput(Number(shipping.ajustePadraoValor || 0).toFixed(2).replace('.', ','));
+        setFretePadraoPrazoInput(String(shipping.prazoPadraoDias || 0));
+        setFretePrioritarioTipo(shipping.ajustePrioritarioTipo || 'valor');
+        setFretePrioritarioInput(Number(shipping.ajustePrioritarioValor || 0).toFixed(2).replace('.', ','));
+        setFretePrioritarioPrazoInput(String(shipping.prazoPrioritarioDias || 0));
       }
     } catch (err) { console.error(err); }
     finally { setLoading(false); setRefreshing(false); }
@@ -1059,8 +1072,14 @@ export function Atelie({
   const saveFreteConfig = async () => {
     const fee = Number(freteFeeInput.replace(',', '.'));
     const freeAbove = Number(freteGratisInput.replace(',', '.'));
+    const padraoValue = Number(fretePadraoInput.replace(',', '.'));
+    const padraoDeadline = Number(fretePadraoPrazoInput);
+    const priorityValue = Number(fretePrioritarioInput.replace(',', '.'));
+    const priorityDeadline = Number(fretePrioritarioPrazoInput);
     const cep = freteCepInput.replace(/\D/g, '');
-    if (!Number.isFinite(fee) || fee < 0 || !Number.isFinite(freeAbove) || freeAbove < 0 || cep.length !== 8) {
+    const invalidNumbers = [fee, freeAbove, padraoValue, padraoDeadline, priorityValue, priorityDeadline]
+      .some((value) => !Number.isFinite(value) || value < 0);
+    if (invalidNumbers || !Number.isInteger(padraoDeadline) || !Number.isInteger(priorityDeadline) || cep.length !== 8) {
       setSheet({ type: 'info', label: 'Informe um CEP válido e valores de frete iguais ou maiores que zero.' });
       return;
     }
@@ -1070,11 +1089,23 @@ export function Atelie({
         taxaEmbalagem: fee,
         cepOrigem: cep,
         freteGratisAcima: freeAbove,
+        ajustePadraoTipo: fretePadraoTipo,
+        ajustePadraoValor: padraoValue,
+        prazoPadraoDias: padraoDeadline,
+        ajustePrioritarioTipo: fretePrioritarioTipo,
+        ajustePrioritarioValor: priorityValue,
+        prazoPrioritarioDias: priorityDeadline,
       });
       setFreteConfig(updated);
       setFreteFeeInput(updated.taxaEmbalagem.toFixed(2).replace('.', ','));
       setFreteCepInput(updated.cepOrigem);
       setFreteGratisInput(updated.freteGratisAcima.toFixed(2).replace('.', ','));
+      setFretePadraoTipo(updated.ajustePadraoTipo);
+      setFretePadraoInput(updated.ajustePadraoValor.toFixed(2).replace('.', ','));
+      setFretePadraoPrazoInput(String(updated.prazoPadraoDias));
+      setFretePrioritarioTipo(updated.ajustePrioritarioTipo);
+      setFretePrioritarioInput(updated.ajustePrioritarioValor.toFixed(2).replace('.', ','));
+      setFretePrioritarioPrazoInput(String(updated.prazoPrioritarioDias));
       setSheet({ type: 'info', label: 'Configuração de entrega salva. As próximas cotações já usarão esses valores.' });
     } catch {
       setSheet({ type: 'info', label: 'Não foi possível salvar a configuração de entrega.' });
@@ -1426,7 +1457,7 @@ export function Atelie({
         <View style={{ padding: SPACING.lg }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SPACING.lg }}>
             <View style={{ width: '48%' }}><StatCard label="Contratipos" value={perfumes.length} icon="droplet" /></View>
-            <View style={{ width: '48%' }}><StatCard label="Estoque baixo" value={estoqueBaixo} icon="alert-triangle" alert={estoqueBaixo > 0} /></View>
+            <View style={{ width: '48%' }}><StatCard label="Estoque baixo" value={estoqueBaixo} icon="alert-triangle" /></View>
             <View style={{ width: '48%' }}><StatCard label="Aguardando pagamento" value={pendentes} icon="clipboard" /></View>
             <View style={{ width: '48%' }}><StatCard label="Nota média" value={notaMedia} icon="star" /></View>
           </View>
@@ -1823,6 +1854,71 @@ export function Atelie({
         (total, perfume) => total + Math.max(0, resumoDe(perfume.id).saldoAtualMl),
         0,
       );
+
+      if (systemView === 'historico') {
+        return (
+          <View style={styles.systemPage}>
+            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}>
+              <Feather name="arrow-left" size={16} color={COLORS.gold} />
+              <Text style={styles.systemBackText}>Voltar ao Sistema</Text>
+            </Pressable>
+            <SystemCard icon="clock" title="Histórico de operações" subtitle="Publicações e ajustes registrados pelo sistema.">
+              {!catalogoEstoque?.historico.length && (
+                <Text style={styles.catalogHistoryEmpty}>Nenhuma operação manual registrada ainda.</Text>
+              )}
+              {catalogoEstoque?.historico.map((operacao) => (
+                <View key={operacao.id} style={styles.catalogHistoryRow}>
+                  <View style={styles.catalogHistoryIcon}>
+                    <Feather
+                      name={operacao.quantidadeMl > 0 ? 'activity' : 'check-circle'}
+                      size={13}
+                      color={COLORS.gold}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.catalogHistoryTitle}>{operacao.titulo}</Text>
+                    <Text style={styles.catalogHistoryDetails}>{operacao.detalhes}</Text>
+                    <Text style={styles.catalogHistoryDate}>{fmtDate(operacao.data)}</Text>
+                  </View>
+                </View>
+              ))}
+            </SystemCard>
+          </View>
+        );
+      }
+
+      if (systemView === 'fornecedores') {
+        return (
+          <View style={styles.systemPage}>
+            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}>
+              <Feather name="arrow-left" size={16} color={COLORS.gold} />
+              <Text style={styles.systemBackText}>Voltar ao Sistema</Text>
+            </Pressable>
+            <SystemCard icon="archive" title="Fornecedores" subtitle="Importe e mantenha seu catálogo sincronizado.">
+              <View style={styles.supplierActive}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.supplierName}>Nova Essência</Text>
+                  <Text style={styles.supplierMeta}>{PRESET_FORNECEDOR.length} fragrâncias disponíveis</Text>
+                </View>
+                <View style={styles.connectedPill}><Text style={styles.connectedPillText}>ATIVO</Text></View>
+              </View>
+              <SystemAction
+                icon="download-cloud"
+                title="Importar todos os perfumes"
+                subtitle="Adiciona somente os itens que ainda não existem."
+                onPress={() => setSheet({
+                  type: 'confirm',
+                  label: `Importar e sincronizar ${PRESET_FORNECEDOR.length} fragrâncias da Nova Essência? Itens existentes serão preservados.`,
+                  onConfirm: doImport,
+                  confirmLabel: 'Sincronizar catálogo',
+                })}
+              />
+              <SystemAction icon="plus-circle" title="Essencial" subtitle="Novo fornecedor poderá ser conectado aqui." disabled badge="PLANEJADO" />
+              <SystemAction icon="plus-circle" title="Casa das Essências" subtitle="Novo fornecedor poderá ser conectado aqui." disabled badge="PLANEJADO" />
+            </SystemCard>
+          </View>
+        );
+      }
       return (
         <View style={styles.systemPage}>
           <View style={styles.systemHero}>
@@ -1925,26 +2021,13 @@ export function Atelie({
                 confirmLabel: 'Publicar vitrine',
               })}
             />
-            <Text style={[styles.systemFieldLabel, { marginTop: SPACING.md }]}>HISTÓRICO DE OPERAÇÕES</Text>
-            {!catalogoEstoque?.historico.length && (
-              <Text style={styles.catalogHistoryEmpty}>Nenhuma operação manual registrada ainda.</Text>
-            )}
-            {catalogoEstoque?.historico.slice(0, 6).map((operacao) => (
-              <View key={operacao.id} style={styles.catalogHistoryRow}>
-                <View style={styles.catalogHistoryIcon}>
-                  <Feather
-                    name={operacao.quantidadeMl > 0 ? 'activity' : 'check-circle'}
-                    size={13}
-                    color={COLORS.gold}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.catalogHistoryTitle}>{operacao.titulo}</Text>
-                  <Text style={styles.catalogHistoryDetails}>{operacao.detalhes}</Text>
-                  <Text style={styles.catalogHistoryDate}>{fmtDate(operacao.data)}</Text>
-                </View>
-              </View>
-            ))}
+            <SystemAction
+              icon="clock"
+              title="Abrir histórico de operações"
+              subtitle="Consulte publicações e ajustes em uma página separada."
+              badge={catalogoEstoque?.historico.length ? String(catalogoEstoque.historico.length) : undefined}
+              onPress={() => setSystemView('historico')}
+            />
           </SystemCard>
 
           <SystemCard icon="dollar-sign" title="Preços" subtitle="Defina os valores e aplique em todo o catálogo.">
@@ -2015,6 +2098,38 @@ export function Atelie({
             <Field label="Frete grátis acima de (R$) · zero desativa">
               <TInput keyboardType="decimal-pad" value={freteGratisInput} onChangeText={setFreteGratisInput} placeholder="0,00" />
             </Field>
+            <View style={styles.shippingRuleCard}>
+              <Text style={styles.shippingRuleTitle}>Entrega Padrão</Text>
+              <Text style={styles.shippingRuleHint}>Defina um acréscimo sobre o valor da transportadora e o prazo mostrado ao cliente.</Text>
+              <View style={styles.shippingTypeRow}>
+                <Pressable onPress={() => setFretePadraoTipo('valor')} style={[styles.shippingTypeButton, fretePadraoTipo === 'valor' && styles.shippingTypeButtonActive]}>
+                  <Text style={[styles.shippingTypeText, fretePadraoTipo === 'valor' && styles.shippingTypeTextActive]}>Valor (R$)</Text>
+                </Pressable>
+                <Pressable onPress={() => setFretePadraoTipo('percentual')} style={[styles.shippingTypeButton, fretePadraoTipo === 'percentual' && styles.shippingTypeButtonActive]}>
+                  <Text style={[styles.shippingTypeText, fretePadraoTipo === 'percentual' && styles.shippingTypeTextActive]}>Percentual (%)</Text>
+                </Pressable>
+              </View>
+              <View style={styles.systemFieldGrid}>
+                <View style={{ flex: 1 }}><Field label="Acréscimo"><TInput keyboardType="decimal-pad" value={fretePadraoInput} onChangeText={setFretePadraoInput} placeholder="0,00" /></Field></View>
+                <View style={{ flex: 1 }}><Field label="Prazo exibido · 0 usa transportadora"><TInput keyboardType="numeric" value={fretePadraoPrazoInput} onChangeText={setFretePadraoPrazoInput} placeholder="0" /></Field></View>
+              </View>
+            </View>
+            <View style={styles.shippingRuleCard}>
+              <Text style={styles.shippingRuleTitle}>Entrega Prioritária</Text>
+              <Text style={styles.shippingRuleHint}>A opção mais rápida recebe suas próprias regras de preço e prazo.</Text>
+              <View style={styles.shippingTypeRow}>
+                <Pressable onPress={() => setFretePrioritarioTipo('valor')} style={[styles.shippingTypeButton, fretePrioritarioTipo === 'valor' && styles.shippingTypeButtonActive]}>
+                  <Text style={[styles.shippingTypeText, fretePrioritarioTipo === 'valor' && styles.shippingTypeTextActive]}>Valor (R$)</Text>
+                </Pressable>
+                <Pressable onPress={() => setFretePrioritarioTipo('percentual')} style={[styles.shippingTypeButton, fretePrioritarioTipo === 'percentual' && styles.shippingTypeButtonActive]}>
+                  <Text style={[styles.shippingTypeText, fretePrioritarioTipo === 'percentual' && styles.shippingTypeTextActive]}>Percentual (%)</Text>
+                </Pressable>
+              </View>
+              <View style={styles.systemFieldGrid}>
+                <View style={{ flex: 1 }}><Field label="Acréscimo"><TInput keyboardType="decimal-pad" value={fretePrioritarioInput} onChangeText={setFretePrioritarioInput} placeholder="0,00" /></Field></View>
+                <View style={{ flex: 1 }}><Field label="Prazo exibido · 0 usa transportadora"><TInput keyboardType="numeric" value={fretePrioritarioPrazoInput} onChangeText={setFretePrioritarioPrazoInput} placeholder="0" /></Field></View>
+              </View>
+            </View>
             <Pressable onPress={saveFreteConfig} disabled={savingFrete} style={styles.systemPrimaryButton}>
               <Feather name="save" size={15} color={COLORS.ink} />
               <Text style={styles.systemPrimaryText}>{savingFrete ? 'Salvando…' : 'Salvar frete'}</Text>
@@ -2025,26 +2140,12 @@ export function Atelie({
           </SystemCard>
 
           <SystemCard icon="archive" title="Fornecedores" subtitle="Importe e mantenha seu catálogo sincronizado.">
-            <View style={styles.supplierActive}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.supplierName}>Nova Essência</Text>
-                <Text style={styles.supplierMeta}>{PRESET_FORNECEDOR.length} fragrâncias disponíveis</Text>
-              </View>
-              <View style={styles.connectedPill}><Text style={styles.connectedPillText}>ATIVO</Text></View>
-            </View>
             <SystemAction
-              icon="download-cloud"
-              title="Importar todos os perfumes"
-              subtitle="Adiciona somente os itens que ainda não existem."
-              onPress={() => setSheet({
-                type: 'confirm',
-                label: `Importar e sincronizar ${PRESET_FORNECEDOR.length} fragrâncias da Nova Essência? Itens existentes serão preservados.`,
-                onConfirm: doImport,
-                confirmLabel: 'Sincronizar catálogo',
-              })}
+              icon="external-link"
+              title="Abrir fornecedores"
+              subtitle="Consulte e sincronize fornecedores em uma página separada."
+              onPress={() => setSystemView('fornecedores')}
             />
-            <SystemAction icon="plus-circle" title="Essencial" subtitle="Novo fornecedor poderá ser conectado aqui." disabled badge="PLANEJADO" />
-            <SystemAction icon="plus-circle" title="Casa das Essências" subtitle="Novo fornecedor poderá ser conectado aqui." disabled badge="PLANEJADO" />
           </SystemCard>
 
           <SystemCard icon="database" title="Base de dados" subtitle="Backup e limpezas protegidas por confirmação.">
@@ -2150,9 +2251,27 @@ export function Atelie({
           <SystemCard icon="zap" title="Automações" subtitle="Rotinas operacionais em um único lugar.">
             <SystemAction icon="percent" title="Recalcular preços" subtitle="Preenche somente preços ausentes com o padrão atual." onPress={doPadronizar} />
             <SystemAction icon="refresh-cw" title="Reimportar fornecedores" subtitle="Sincroniza novamente a Nova Essência." onPress={doImport} />
-            <SystemAction icon="package" title="Atualizar estoque" subtitle="Automação reservada para a próxima fase do estoque." disabled badge="PLANEJADO" />
-            <SystemAction icon="image" title="Corrigir imagens" subtitle="Auditoria automática de fotos ausentes." disabled badge="PLANEJADO" />
-            <SystemAction icon="tag" title="Gerar etiquetas" subtitle="Etiquetas prontas para impressão por pedido." disabled badge="PLANEJADO" />
+            <SystemAction
+              icon="package"
+              title="Como funcionará Atualizar estoque"
+              subtitle="Confira o fluxo planejado para conferência e reposição."
+              badge="ENTENDA"
+              onPress={() => setSheet({ type: 'info', label: 'Atualizar estoque permitirá conferir os saldos atuais, informar a quantidade física encontrada e registrar automaticamente apenas a diferença como entrada ou saída, preservando todo o histórico.' })}
+            />
+            <SystemAction
+              icon="image"
+              title="Como funcionará Corrigir imagens"
+              subtitle="Confira a auditoria planejada para o catálogo."
+              badge="ENTENDA"
+              onPress={() => setSheet({ type: 'info', label: 'Corrigir imagens mostrará perfumes sem foto ou com endereço inválido. Você poderá abrir cada item, trocar a imagem e visualizar o resultado antes de publicar na vitrine.' })}
+            />
+            <SystemAction
+              icon="tag"
+              title="Como funcionará Gerar etiquetas"
+              subtitle="Confira o modelo planejado para produção e envio."
+              badge="ENTENDA"
+              onPress={() => setSheet({ type: 'info', label: 'Gerar etiquetas criará arquivos prontos para impressão a partir do pedido, com número, cliente, perfume, volume e quantidade. A etiqueta de transporte continuará sendo gerada pelo Melhor Envio quando essa função estiver habilitada.' })}
+            />
           </SystemCard>
         </View>
       );
@@ -2200,7 +2319,7 @@ export function Atelie({
         {TABS.map((t) => {
           const active = tab === t.id;
           return (
-            <Pressable key={t.id} onPress={() => setTab(t.id)} style={styles.tabItem} testID={`tab-${t.id}`}>
+            <Pressable key={t.id} onPress={() => { setTab(t.id); setSystemView('main'); }} style={styles.tabItem} testID={`tab-${t.id}`}>
               <Feather name={t.icon} size={18} color={active ? COLORS.gold : COLORS.muted} />
               <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: 10, marginTop: 2 }}>{t.label}</Text>
             </Pressable>
@@ -2262,6 +2381,14 @@ const styles = StyleSheet.create({
   shippingStatus: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border },
   shippingStatusDot: { width: 6, height: 6, borderRadius: 3 },
   shippingHint: { color: COLORS.muted, fontSize: 11, lineHeight: 16, marginVertical: SPACING.md },
+  shippingRuleCard: { padding: 12, marginBottom: SPACING.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  shippingRuleTitle: { color: COLORS.bone, fontSize: 13, fontWeight: '700' },
+  shippingRuleHint: { color: COLORS.muted, fontSize: 10, lineHeight: 14, marginTop: 2, marginBottom: 9 },
+  shippingTypeRow: { flexDirection: 'row', gap: 7, marginBottom: 9 },
+  shippingTypeButton: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border },
+  shippingTypeButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
+  shippingTypeText: { color: COLORS.muted, fontSize: 10, fontWeight: '600' },
+  shippingTypeTextActive: { color: COLORS.ink },
   shippingFields: { flexDirection: 'row', gap: 8 },
   shippingFieldLabel: { color: COLORS.muted, fontSize: 9, letterSpacing: 0.8, marginBottom: 5 },
   shippingSaveButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 11, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, marginTop: SPACING.sm },
@@ -2270,6 +2397,8 @@ const styles = StyleSheet.create({
   shippingConnectText: { color: COLORS.gold, fontSize: 12 },
   shippingEnvironment: { color: COLORS.muted, fontSize: 9, textAlign: 'center', marginTop: 8 },
   systemPage: { padding: SPACING.lg },
+  systemBackButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 7, paddingVertical: 9, paddingHorizontal: 11, marginBottom: SPACING.md, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  systemBackText: { color: COLORS.gold, fontSize: 11, fontWeight: '600' },
   systemHero: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   systemHeroIcon: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface },
   systemEyebrow: { color: COLORS.gold, fontSize: 9, letterSpacing: 1.4 },

@@ -147,6 +147,7 @@ export type CompraItem = {
 
 export type OpcaoFrete = {
   tipo?: 'entrega' | 'retirada';
+  categoriaFrete?: 'padrao' | 'prioritaria';
   nomeExibicao?: string;
   serviceId: number;
   transportadora: string;
@@ -155,6 +156,9 @@ export type OpcaoFrete = {
   taxaEmbalagem: number;
   preco: number;
   prazoDias: number;
+  prazoTransportadora?: number;
+  tipoAjuste?: 'valor' | 'percentual';
+  valorAjuste?: number;
 };
 
 export type Compra = {
@@ -239,6 +243,12 @@ export type ConfiguracaoFrete = {
   taxaEmbalagem: number;
   cepOrigem: string;
   freteGratisAcima: number;
+  ajustePadraoTipo: 'valor' | 'percentual';
+  ajustePadraoValor: number;
+  prazoPadraoDias: number;
+  ajustePrioritarioTipo: 'valor' | 'percentual';
+  ajustePrioritarioValor: number;
+  prazoPrioritarioDias: number;
   integrado: boolean;
   aplicativoConfigurado: boolean;
   ambiente: 'sandbox' | 'producao';

@@ -277,7 +277,7 @@ export function QuizSheet({
     .slice(0, 3), [familia, ocasiao, perfumes]);
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title="Encontre sua essência">
+    <BottomSheet visible={visible} onClose={onClose} title="Encontre seu perfume">
       <View>
         <Text style={styles.quizLead}>
           Responda duas perguntas e descubra fragrâncias que combinam com o seu momento.
