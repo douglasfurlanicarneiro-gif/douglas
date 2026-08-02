@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -29,6 +29,11 @@ const ORDERS_INITIAL_VERSION = 2;
 const CART_KEY = 'customer-cart-v1';
 const VITRINE_CACHE_KEY = 'storefront-snapshot-v1';
 type SavedCartLine = { perfumeId: string; ml: number; quantidade: number };
+type ContactFallback = {
+  channel: 'WhatsApp' | 'Instagram';
+  webUrl: string;
+  copyValue: string;
+};
 const PRODUCT_CARD_COLORS = {
   background: '#F3EDE3',
   imageBackground: '#EAE0D2',
@@ -188,6 +193,10 @@ export function Vitrine({
   const brand = storeNameParts(currentStore.nomeLoja);
   const supportNumber = whatsappNumber(currentStore.whatsapp);
   const instagramUrl = instagramLink(currentStore.instagram);
+  const instagramUsername = currentStore.instagram
+    .replace(/^https?:\/\/(?:www\.)?instagram\.com\//i, '')
+    .replace(/^@/, '')
+    .split(/[/?#]/)[0];
   const [loading, setLoading] = useState(true);
   const [storeLogoFailed, setStoreLogoFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -199,6 +208,7 @@ export function Vitrine({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
+  const [contactFallback, setContactFallback] = useState<ContactFallback | null>(null);
   const [sugestaoOpen, setSugestaoOpen] = useState(false);
   const [reviewItem, setReviewItem] = useState<VitrineItem | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -503,10 +513,81 @@ export function Vitrine({
     Linking.openURL(url).catch(() => setInfo('Não foi possível abrir este canal de contato.'));
   };
 
+  const openContactApp = (fallback: ContactFallback, appUrl: string) => {
+    setContactOpen(false);
+    setContactFallback(fallback);
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        window.location.assign(appUrl);
+      } catch {
+        window.location.assign(fallback.webUrl);
+      }
+      return;
+    }
+
+    Linking.openURL(appUrl)
+      .catch(() => Linking.openURL(fallback.webUrl))
+      .catch(() => {
+        setContactFallback(null);
+        setInfo('Não foi possível abrir este canal de contato.');
+      });
+  };
+
+  const retryContactRedirect = () => {
+    if (!contactFallback) return;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.location.assign(contactFallback.webUrl);
+      return;
+    }
+    Linking.openURL(contactFallback.webUrl)
+      .catch(() => {
+        setContactFallback(null);
+        setInfo('Não foi possível abrir este canal de contato.');
+      });
+  };
+
+  const copyContact = async () => {
+    if (!contactFallback) return;
+    try {
+      await Clipboard.setStringAsync(contactFallback.copyValue);
+      const channel = contactFallback.channel;
+      setContactFallback(null);
+      setInfo(`Contato do ${channel} copiado.`);
+    } catch {
+      setContactFallback(null);
+      setInfo('Não foi possível copiar o contato.');
+    }
+  };
+
   const openStoreWhatsapp = () => {
     if (!supportNumber) return;
     const message = `Olá! Gostaria de falar com a ${currentStore.nomeLoja}.`;
-    openContactUrl(`https://wa.me/${supportNumber}?text=${encodeURIComponent(message)}`);
+    const encodedMessage = encodeURIComponent(message);
+    openContactApp(
+      {
+        channel: 'WhatsApp',
+        webUrl: `https://wa.me/${supportNumber}?text=${encodedMessage}`,
+        copyValue: currentStore.whatsapp || supportNumber,
+      },
+      `whatsapp://send?phone=${supportNumber}&text=${encodedMessage}`,
+    );
+  };
+
+  const openStoreInstagram = () => {
+    if (!instagramUrl) return;
+    if (!instagramUsername) {
+      openContactUrl(instagramUrl);
+      return;
+    }
+    openContactApp(
+      {
+        channel: 'Instagram',
+        webUrl: instagramUrl,
+        copyValue: `@${instagramUsername}`,
+      },
+      `instagram://user?username=${encodeURIComponent(instagramUsername)}`,
+    );
   };
 
   if (loading) {
@@ -835,7 +916,7 @@ export function Vitrine({
         </View>
       </BottomSheet>
 
-      <BottomSheet visible={contactOpen} onClose={() => setContactOpen(false)} title="Fale com a gente" compact testID="contact-sheet">
+      <BottomSheet visible={contactOpen} onClose={() => setContactOpen(false)} title="Fale Conosco" compact testID="contact-sheet">
         <View>
           <Text style={styles.contactIntro}>
             Escolha o melhor canal para conversar com a {currentStore.nomeLoja}.
@@ -851,7 +932,7 @@ export function Vitrine({
             </Pressable>
           )}
           {!!instagramUrl && (
-            <Pressable onPress={() => openContactUrl(instagramUrl)} style={styles.contactAction} testID="contact-instagram">
+            <Pressable onPress={openStoreInstagram} style={styles.contactAction} testID="contact-instagram">
               <View style={styles.contactActionIcon}><Feather name="instagram" size={17} color={COLORS.gold} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.contactActionTitle}>Instagram</Text>
@@ -885,6 +966,24 @@ export function Vitrine({
             </View>
             <Feather name="chevron-right" size={15} color={COLORS.muted} />
           </Pressable>
+        </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={!!contactFallback}
+        onClose={() => setContactFallback(null)}
+        title="Não abriu?"
+        compact
+        testID="contact-fallback-sheet"
+      >
+        <View>
+          <Text style={styles.contactFallbackText}>
+            Se o redirecionamento para o {contactFallback?.channel} não aconteceu, tente novamente ou copie o contato.
+          </Text>
+          <View style={styles.contactFallbackActions}>
+            <SecondaryButton label="Copiar contato" onPress={() => { void copyContact(); }} />
+            <PrimaryButton label="Tentar novamente" onPress={retryContactRedirect} testID="contact-retry" />
+          </View>
         </View>
       </BottomSheet>
 
@@ -1101,6 +1200,8 @@ const styles = StyleSheet.create({
   contactActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   contactActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
   contactActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
+  contactFallbackText: { color: COLORS.bone, fontSize: 12, lineHeight: 18, marginBottom: SPACING.lg },
+  contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
     backgroundColor: PRODUCT_CARD_COLORS.background,
     borderWidth: 1,

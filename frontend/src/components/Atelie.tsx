@@ -2387,7 +2387,7 @@ export function Atelie({
               <View style={{ flex: 1 }}><Field label="Instagram"><TInput value={storeConfig.instagram} onChangeText={(value) => setStoreField('instagram', value)} autoCapitalize="none" /></Field></View>
             </View>
             <Field label="E-mail"><TInput value={storeConfig.email} onChangeText={(value) => setStoreField('email', value)} keyboardType="email-address" autoCapitalize="none" /></Field>
-            <Text style={styles.storeConfigHelp}>WhatsApp, Instagram e e-mail preenchidos aparecem em “Fale com a gente” para o cliente.</Text>
+            <Text style={styles.storeConfigHelp}>WhatsApp, Instagram e e-mail preenchidos aparecem em “Fale Conosco” para o cliente.</Text>
             <Field label="Chave Pix"><TInput value={storeConfig.pix} onChangeText={(value) => setStoreField('pix', value)} autoCapitalize="none" /></Field>
             <Text style={styles.storeConfigHelp}>Usada para gerar o QR Code e o Pix Copia e Cola depois que o cliente confirma o pedido.</Text>
             <Field label="CNPJ (opcional)"><TInput value={storeConfig.cnpj} onChangeText={(value) => setStoreField('cnpj', value)} keyboardType="numeric" /></Field>
