@@ -31,6 +31,12 @@ def test_valores_e_itens_sao_enviados_em_centavos():
     ]
 
 
+def test_telefone_brasileiro_e_enviado_no_formato_internacional():
+    assert infinitepay.normalizar_telefone("(11) 99999-8877") == "+5511999998877"
+    assert infinitepay.normalizar_telefone("+55 11 99999-8877") == "+5511999998877"
+    assert infinitepay.normalizar_telefone("123") == ""
+
+
 def test_checkout_usa_host_seguro_e_remove_cifrao_da_tag(monkeypatch):
     recebido = {}
 

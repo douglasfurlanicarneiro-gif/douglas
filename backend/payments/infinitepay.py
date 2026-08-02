@@ -27,6 +27,16 @@ def normalizar_handle(valor: str | None) -> str:
     return (valor or "").strip().lstrip("$").strip()
 
 
+def normalizar_telefone(valor: str | None) -> str:
+    """Converte celular brasileiro para o formato internacional aceito no checkout."""
+    digitos = "".join(caractere for caractere in (valor or "") if caractere.isdigit())
+    if len(digitos) in {10, 11}:
+        digitos = f"55{digitos}"
+    if len(digitos) in {12, 13} and digitos.startswith("55"):
+        return f"+{digitos}"
+    return ""
+
+
 def valor_em_centavos(valor: float | int | Decimal) -> int:
     return int(
         (Decimal(str(valor)) * Decimal("100")).quantize(
@@ -70,8 +80,14 @@ async def _post_json(caminho: str, payload: dict[str, Any]) -> dict[str, Any]:
         ) from exc
 
     if resposta.status_code < 200 or resposta.status_code >= 300:
+        if caminho.strip("/") == "links" and resposta.status_code in {400, 401, 403}:
+            raise InfinitePayError(
+                "A InfinitePay recusou a criação do checkout. Confira se o "
+                "Checkout Integrado está habilitado na sua conta e se a "
+                "InfiniteTag foi digitada corretamente."
+            )
         raise InfinitePayError(
-            "Nao foi possivel iniciar ou confirmar o pagamento na InfinitePay."
+            "Não foi possível iniciar ou confirmar o pagamento na InfinitePay."
         )
     try:
         dados = resposta.json()
@@ -144,7 +160,7 @@ class InfinitePayProvider(PaymentProvider):
         customer = {
             "name": str(cliente.get("nome", "")).strip(),
             "email": str(cliente.get("email", "")).strip(),
-            "phone_number": str(cliente.get("telefone", "")).strip(),
+            "phone_number": normalizar_telefone(str(cliente.get("telefone", ""))),
         }
         if all(customer.values()):
             payload["customer"] = customer
