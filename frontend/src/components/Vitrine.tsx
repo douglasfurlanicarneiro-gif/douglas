@@ -34,6 +34,36 @@ type ContactFallback = {
   webUrl: string;
   copyValue: string;
 };
+const FAQ_ITEMS = [
+  {
+    question: 'O que é um perfume contratipo?',
+    answer: 'É uma criação inspirada no perfil olfativo de uma fragrância conhecida, produzida por uma marca independente. Não se trata do perfume original nem possui vínculo com a marca de referência.',
+  },
+  {
+    question: 'Qual é o prazo de preparação e entrega?',
+    answer: 'Após a confirmação do pagamento, seu pedido entra em preparação. No carrinho, depois de informar o CEP, você verá o prazo estimado de cada modalidade de entrega antes de pagar.',
+  },
+  {
+    question: 'Como o frete é calculado?',
+    answer: 'O valor é calculado conforme o CEP, os itens do pedido e a modalidade escolhida. Todas as opções disponíveis aparecem no carrinho antes do pagamento.',
+  },
+  {
+    question: 'Como acompanho meu pedido?',
+    answer: 'Abra a opção Pedidos na vitrine para consultar o andamento. A loja também poderá enviar as principais atualizações pelo WhatsApp informado na compra.',
+  },
+  {
+    question: 'Como funciona a retirada combinada?',
+    answer: 'Escolha Retirada Combinada no carrinho. Depois da confirmação, nossa equipe entrará em contato para combinar o local e o melhor horário.',
+  },
+  {
+    question: 'Quais formas de pagamento são aceitas?',
+    answer: 'As formas disponíveis, como Pix ou cartão, são apresentadas durante a finalização do pedido.',
+  },
+  {
+    question: 'Preciso solicitar uma troca ou devolução. O que faço?',
+    answer: 'Entre em contato pelo WhatsApp e informe o número do pedido. Nossa equipe analisará o caso e passará todas as orientações aplicáveis.',
+  },
+];
 const PRODUCT_CARD_COLORS = {
   background: '#F3EDE3',
   imageBackground: '#EAE0D2',
@@ -210,6 +240,8 @@ export function Vitrine({
   const [contactOpen, setContactOpen] = useState(false);
   const [contactFallback, setContactFallback] = useState<ContactFallback | null>(null);
   const [sugestaoOpen, setSugestaoOpen] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
+  const [faqExpanded, setFaqExpanded] = useState<number | null>(0);
   const [reviewItem, setReviewItem] = useState<VitrineItem | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [orderSuccess, setOrderSuccess] = useState<string | null>(null);
@@ -941,16 +973,6 @@ export function Vitrine({
               <Feather name="arrow-up-right" size={15} color={COLORS.muted} />
             </Pressable>
           )}
-          {!!currentStore.email && (
-            <Pressable onPress={() => openContactUrl(`mailto:${currentStore.email}`)} style={styles.contactAction} testID="contact-email">
-              <View style={styles.contactActionIcon}><Feather name="mail" size={17} color={COLORS.gold} /></View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.contactActionTitle}>E-mail</Text>
-                <Text style={styles.contactActionSubtitle}>{currentStore.email}</Text>
-              </View>
-              <Feather name="arrow-up-right" size={15} color={COLORS.muted} />
-            </Pressable>
-          )}
           <Pressable
             onPress={() => {
               setContactOpen(false);
@@ -961,10 +983,66 @@ export function Vitrine({
           >
             <View style={styles.contactActionIcon}><Feather name="star" size={17} color={COLORS.gold} /></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.contactActionTitle}>Sugerir uma fragrância</Text>
+              <Text style={styles.contactActionTitle}>Sugestões</Text>
               <Text style={styles.contactActionSubtitle}>Conte qual perfume você gostaria de encontrar</Text>
             </View>
             <Feather name="chevron-right" size={15} color={COLORS.muted} />
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              setContactOpen(false);
+              setFaqOpen(true);
+            }}
+            style={styles.contactAction}
+            testID="contact-faq"
+          >
+            <View style={styles.contactActionIcon}><Feather name="help-circle" size={17} color={COLORS.gold} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.contactActionTitle}>Dúvidas e prazos</Text>
+              <Text style={styles.contactActionSubtitle}>Entrega, pagamento, acompanhamento e trocas</Text>
+            </View>
+            <Feather name="chevron-right" size={15} color={COLORS.muted} />
+          </Pressable>
+        </View>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={faqOpen}
+        onClose={() => setFaqOpen(false)}
+        title="Dúvidas e prazos"
+        testID="faq-sheet"
+      >
+        <View>
+          <Text style={styles.faqIntro}>Toque em uma pergunta para consultar a resposta.</Text>
+          {FAQ_ITEMS.map((item, index) => {
+            const expanded = faqExpanded === index;
+            return (
+              <Pressable
+                key={item.question}
+                onPress={() => setFaqExpanded(expanded ? null : index)}
+                style={[styles.faqItem, expanded && styles.faqItemExpanded]}
+                accessibilityRole="button"
+                accessibilityState={{ expanded }}
+                testID={`faq-item-${index}`}
+              >
+                <View style={styles.faqQuestionRow}>
+                  <Text style={styles.faqQuestion}>{item.question}</Text>
+                  <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={COLORS.gold} />
+                </View>
+                {expanded && <Text style={styles.faqAnswer}>{item.answer}</Text>}
+              </Pressable>
+            );
+          })}
+          <Pressable
+            onPress={() => {
+              setFaqOpen(false);
+              setContactOpen(true);
+            }}
+            style={styles.faqBack}
+            testID="faq-back-contact"
+          >
+            <Feather name="message-circle" size={15} color={COLORS.gold} />
+            <Text style={styles.faqBackText}>Ainda precisa de ajuda? Voltar para Fale Conosco</Text>
           </Pressable>
         </View>
       </BottomSheet>
@@ -1200,6 +1278,14 @@ const styles = StyleSheet.create({
   contactActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   contactActionTitle: { color: COLORS.bone, fontSize: 12, fontWeight: '700' },
   contactActionSubtitle: { color: COLORS.muted, fontSize: 9, lineHeight: 13, marginTop: 2 },
+  faqIntro: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginBottom: SPACING.md },
+  faqItem: { padding: 13, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  faqItemExpanded: { borderColor: COLORS.gold + '77', backgroundColor: COLORS.surfaceRaised },
+  faqQuestionRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  faqQuestion: { flex: 1, color: COLORS.bone, fontSize: 12, fontWeight: '700' },
+  faqAnswer: { color: COLORS.muted, fontSize: 11, lineHeight: 17, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+  faqBack: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 13, marginTop: SPACING.sm },
+  faqBackText: { color: COLORS.gold, fontSize: 11, fontWeight: '600', textAlign: 'center' },
   contactFallbackText: { color: COLORS.bone, fontSize: 12, lineHeight: 18, marginBottom: SPACING.lg },
   contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
