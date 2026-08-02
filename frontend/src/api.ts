@@ -115,7 +115,7 @@ export const login = (usuario: string, senha: string) =>
   request<{ ok: boolean; token?: string }>('/auth/login', { method: 'POST', body: JSON.stringify({ usuario, senha }) });
 
 // Perfumes
-export const listPerfumes = () => request<Perfume[]>('/perfumes');
+export const listPerfumes = () => request<Perfume[]>('/perfumes', {}, true);
 export const createPerfume = (data: Omit<Perfume, 'id' | 'seq'>) => request<Perfume>('/perfumes', { method: 'POST', body: JSON.stringify(data) }, true);
 export const updatePerfume = (id: string, data: Partial<Perfume>) => request<Perfume>(`/perfumes/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
 export const deletePerfume = (id: string) => request<{ status: string }>(`/perfumes/${id}`, { method: 'DELETE' }, true);

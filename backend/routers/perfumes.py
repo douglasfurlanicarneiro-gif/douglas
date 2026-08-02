@@ -156,7 +156,7 @@ def _oid(perfume_id: str) -> ObjectId:
 
 
 @router.get("")
-async def listar_perfumes():
+async def listar_perfumes(_: str = Depends(require_atelie_auth)):
     db = get_db()
     await _garantir_metadados_padronizados(db)
     perfumes = await db.perfumes.find().sort("seq", 1).to_list(2000)

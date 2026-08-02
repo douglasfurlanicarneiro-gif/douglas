@@ -48,10 +48,9 @@ class TestPublic:
         assert "atualizadoEm" in d and "itens" in d
         assert isinstance(d["itens"], list)
 
-    def test_perfumes_list_public(self, s):
+    def test_perfumes_list_is_private(self, s):
         r = s.get(f"{API}/perfumes")
-        assert r.status_code == 200
-        assert isinstance(r.json(), list)
+        assert r.status_code == 401
 
     def test_estoque_public(self, s):
         r = s.get(f"{API}/estoque")
@@ -95,7 +94,8 @@ class TestFullFlow:
         TestFullFlow.created["perfume_id"] = d["id"]
 
         # verify persistence
-        r2 = s.get(f"{API}/perfumes")
+        r2 = s.get(f"{API}/perfumes", headers=AUTH)
+        assert r2.status_code == 200
         assert any(p["id"] == d["id"] for p in r2.json())
 
     def test_bulk_import(self, s):
@@ -212,7 +212,7 @@ class TestFullFlow:
         if pid_p:
             s.delete(f"{API}/pedidos/{pid_p}", headers=AUTH)
         # delete TEST_ perfumes
-        perfumes = s.get(f"{API}/perfumes").json()
+        perfumes = s.get(f"{API}/perfumes", headers=AUTH).json()
         for p in perfumes:
             if p["nome"].startswith("TEST_"):
                 s.delete(f"{API}/perfumes/{p['id']}", headers=AUTH)

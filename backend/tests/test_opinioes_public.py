@@ -24,10 +24,10 @@ def s():
 
 @pytest.fixture(scope="module")
 def perfume_id(s):
-    """Pick any existing perfume from the catalog."""
-    r = s.get(f"{API}/perfumes")
+    """Pick any existing perfume from the public storefront projection."""
+    r = s.get(f"{API}/vitrine")
     assert r.status_code == 200
-    perfumes = r.json()
+    perfumes = r.json()["itens"]
     assert len(perfumes) > 0, "Need at least one perfume in DB"
     return perfumes[0]["id"]
 
@@ -94,8 +94,12 @@ class TestRegression:
         assert r.status_code == 200
         assert "itens" in r.json()
 
-    def test_perfumes_public(self, s):
+    def test_admin_catalog_requires_token(self, s):
         r = s.get(f"{API}/perfumes")
+        assert r.status_code == 401
+
+    def test_admin_catalog_with_token(self, s):
+        r = s.get(f"{API}/perfumes", headers=AUTH)
         assert r.status_code == 200
         assert isinstance(r.json(), list)
 
@@ -120,8 +124,8 @@ class TestRegression:
         s.delete(f"{API}/sugestoes/{sid}", headers=AUTH)
 
     def test_compras_public_post(self, s):
-        r = s.get(f"{API}/perfumes")
-        pid = r.json()[0]["id"]
+        r = s.get(f"{API}/vitrine")
+        pid = r.json()["itens"][0]["id"]
         r2 = s.post(f"{API}/compras", json={
             "perfumeId": pid, "perfumeNome": "TEST_x", "ml": 50, "preco": 100.0,
             "cliente": "TEST_reg", "contato": "999"
