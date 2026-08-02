@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
 import { storage } from '../utils/storage';
@@ -50,7 +50,8 @@ type Props = {
   onClose: () => void;
   onChangeQuantity: (index: number, quantity: number) => void;
   onRemove: (index: number) => void;
-  onSuccess: (order: Compra, message: string) => void;
+  onSuccess: (order: Compra, message: string) => void | Promise<void>;
+  cartaoOnlineAtivo: boolean;
 };
 
 export function CheckoutSheet({
@@ -60,6 +61,7 @@ export function CheckoutSheet({
   onChangeQuantity,
   onRemove,
   onSuccess,
+  cartaoOnlineAtivo,
 }: Props) {
   const [form, setForm] = useState<CustomerForm>(EMPTY_FORM);
   const [step, setStep] = useState<CheckoutStep>('dados');
@@ -79,6 +81,14 @@ export function CheckoutSheet({
   );
   const valorEntrega = tipoEntrega === 'entrega' ? (freteSelecionado?.preco || 0) : 0;
   const total = subtotal + valorEntrega;
+
+  useEffect(() => {
+    if (!cartaoOnlineAtivo) {
+      setForm((current) => current.formaPagamento === 'cartao'
+        ? { ...current, formaPagamento: 'pix' }
+        : current);
+    }
+  }, [cartaoOnlineAtivo]);
   const priorityServiceId = useMemo(() => {
     const configured = opcoesFrete.find((option) => option.categoriaFrete === 'prioritaria');
     if (configured) return configured.serviceId;
@@ -239,7 +249,11 @@ export function CheckoutSheet({
     ? true
     : Boolean(enderecoCompleto && freteSelecionado);
 
-  const complete = Boolean(dadosCompletos && entregaCompleta);
+  const complete = Boolean(
+    dadosCompletos
+    && entregaCompleta
+    && (form.formaPagamento !== 'cartao' || cartaoOnlineAtivo)
+  );
 
   const selectDeliveryType = (type: DeliveryType) => {
     setTipoEntrega(type);
@@ -277,12 +291,31 @@ export function CheckoutSheet({
       };
       const order = await createCompra(payload);
       await storage.setItem(CUSTOMER_KEY, JSON.stringify(form));
-      const paymentMessage = order.pagamento?.pixCopiaECola
-        ? 'Pague pelo QR Code ou Pix Copia e Cola. Assim que você concluir, confirmaremos o recebimento e iniciaremos o preparo.'
+      const paymentMessage = order.pagamento?.checkoutUrl
+        ? 'Você será direcionado ao ambiente seguro da InfinitePay. Após o pagamento, volte automaticamente para conferir a confirmação.'
+        : order.pagamento?.pixCopiaECola
+          ? 'Pague pelo QR Code ou Pix Copia e Cola. Assim que você concluir, confirmaremos o recebimento e iniciaremos o preparo.'
         : order.pagamento?.status === 'gateway_nao_configurado'
           ? 'Nossa equipe entrará em contato pelo WhatsApp para combinar o pagamento e os próximos passos.'
           : 'Em breve você receberá pelo WhatsApp a confirmação do pedido e os próximos passos.';
-      onSuccess(order, paymentMessage);
+      await onSuccess(order, paymentMessage);
+      if (order.pagamento?.checkoutUrl) {
+        const checkoutUrl = order.pagamento.checkoutUrl;
+        const parsed = new URL(checkoutUrl);
+        const host = parsed.hostname.toLowerCase();
+        const seguro = parsed.protocol === 'https:' && (
+          host === 'infinitepay.com.br'
+          || host.endsWith('.infinitepay.com.br')
+          || host === 'infinitepay.io'
+          || host.endsWith('.infinitepay.io')
+        );
+        if (!seguro) throw new Error('Endereço de pagamento inválido.');
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.location.assign(checkoutUrl);
+        } else {
+          await Linking.openURL(checkoutUrl);
+        }
+      }
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Não foi possível finalizar o pedido.');
     } finally {
@@ -556,6 +589,7 @@ export function CheckoutSheet({
                   return (
                     <Pressable
                       key={method}
+                      disabled={method === 'cartao' && !cartaoOnlineAtivo}
                       onPress={() => setForm({ ...form, formaPagamento: method })}
                       style={{
                         flex: 1,
@@ -565,6 +599,7 @@ export function CheckoutSheet({
                         borderWidth: 1,
                         borderColor: active ? COLORS.gold : COLORS.border,
                         backgroundColor: active ? COLORS.gold : COLORS.surface,
+                        opacity: method === 'cartao' && !cartaoOnlineAtivo ? 0.45 : 1,
                       }}
                     >
                       <Text style={{ color: active ? COLORS.ink : COLORS.muted }}>{method === 'pix' ? 'Pix' : 'Cartão'}</Text>
@@ -573,6 +608,17 @@ export function CheckoutSheet({
                 })}
               </View>
             </Field>
+            {!cartaoOnlineAtivo && (
+              <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: -8, marginBottom: SPACING.md }}>
+                O cartão será liberado assim que a loja concluir a ativação da InfinitePay.
+              </Text>
+            )}
+            {cartaoOnlineAtivo && form.formaPagamento === 'cartao' && (
+              <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
+                <Text style={{ color: COLORS.bone, fontSize: 12, fontWeight: '600' }}>Pagamento seguro pela InfinitePay</Text>
+                <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 4 }}>Os dados do cartão serão informados diretamente no ambiente da InfinitePay.</Text>
+              </View>
+            )}
             <Field label="Observações (opcional)"><TInput multiline style={{ minHeight: 72, textAlignVertical: 'top' }} value={form.observacoes} onChangeText={(observacoes) => setForm({ ...form, observacoes })} /></Field>
 
             <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>

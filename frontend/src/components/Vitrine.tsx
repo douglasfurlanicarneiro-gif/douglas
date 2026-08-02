@@ -8,7 +8,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { COLORS, SPACING, RADIUS, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton, Chip, Stars } from './atoms';
-import { createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
+import { confirmarPagamentoInfinitePay, createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
 import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
 import { storage } from '../utils/storage';
@@ -498,14 +498,68 @@ export function Vitrine({
     + (ocasiaoAtiva !== 'Todas' ? 1 : 0)
     + (disponibilidadeAtiva === 'encomenda' ? 1 : 0);
 
-  const saveOrderCode = (order: Compra) => {
+  const saveOrderCode = async (order: Compra) => {
     if (!order.codigoAcompanhamento) return;
-    setOrderCodes((current) => {
-      const next = [order.codigoAcompanhamento!, ...current.filter((code) => code !== order.codigoAcompanhamento)].slice(0, 30);
-      storage.setItem(ordersKeyRef.current, JSON.stringify(next));
-      return next;
-    });
+    const next = [
+      order.codigoAcompanhamento,
+      ...orderCodes.filter((code) => code !== order.codigoAcompanhamento),
+    ].slice(0, 30);
+    setOrderCodes(next);
+    await storage.setItem(ordersKeyRef.current, JSON.stringify(next));
   };
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('pagamento') !== 'infinitepay') return;
+    const orderNsu = params.get('order_nsu') || '';
+    const transactionNsu = params.get('transaction_nsu') || '';
+    const slug = params.get('slug') || '';
+    if (!orderNsu || !transactionNsu || !slug) {
+      setInfo('O retorno da InfinitePay veio incompleto. Seu pedido continua salvo e pode ser consultado em Pedidos.');
+      return;
+    }
+
+    let cancelled = false;
+    const confirmar = async () => {
+      let lastError: unknown;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          const response = await confirmarPagamentoInfinitePay({ orderNsu, transactionNsu, slug });
+          if (cancelled) return;
+          const order = response.pedido;
+          await syncOrdersStorage(false);
+          if (order.codigoAcompanhamento) {
+            const saved = await storage.getItem(ordersKeyRef.current, '');
+            let current: string[] = [];
+            try { current = saved ? JSON.parse(saved) : []; } catch { current = []; }
+            const next = [order.codigoAcompanhamento, ...current.filter((code) => code !== order.codigoAcompanhamento)].slice(0, 30);
+            setOrderCodes(next);
+            await storage.setItem(ordersKeyRef.current, JSON.stringify(next));
+          }
+          setSuccessOrder(order);
+          setOrderSuccess('Pagamento confirmado pela InfinitePay. Seu pedido já está liberado para o preparo.');
+          const cleaned = new URL(window.location.href);
+          ['pagamento', 'receipt_url', 'order_nsu', 'slug', 'capture_method', 'transaction_nsu']
+            .forEach((key) => cleaned.searchParams.delete(key));
+          window.history.replaceState({}, '', `${cleaned.pathname}${cleaned.search}${cleaned.hash}`);
+          return;
+        } catch (cause) {
+          lastError = cause;
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)));
+          }
+        }
+      }
+      if (!cancelled) {
+        setInfo(lastError instanceof ApiError
+          ? `O pagamento ainda não pôde ser confirmado: ${lastError.message} Você pode atualizar a página ou consultar Pedidos.`
+          : 'O pagamento ainda não pôde ser confirmado. Atualize a página ou consulte Pedidos em instantes.');
+      }
+    };
+    void confirmar();
+    return () => { cancelled = true; };
+  }, [syncOrdersStorage]);
 
   const addOrderCode = (code: string) => {
     setOrderCodes((current) => {
@@ -878,6 +932,7 @@ export function Vitrine({
       <CheckoutSheet
         visible={cartOpen}
         items={cart}
+        cartaoOnlineAtivo={currentStore.cartaoOnlineAtivo}
         onClose={() => setCartOpen(false)}
         onChangeQuantity={(index, quantity) => setCart((current) => (
           quantity <= 0
@@ -885,10 +940,10 @@ export function Vitrine({
             : current.map((line, lineIndex) => lineIndex === index ? { ...line, quantidade: Math.min(quantity, 20) } : line)
         ))}
         onRemove={(index) => setCart((current) => current.filter((_, lineIndex) => lineIndex !== index))}
-        onSuccess={(order, message) => {
+        onSuccess={async (order, message) => {
           setCart([]);
           setCartOpen(false);
-          saveOrderCode(order);
+          await saveOrderCode(order);
           setSuccessOrder(order);
           setPixCopied(false);
           setTrackingCodeOpen(false);
@@ -1191,6 +1246,16 @@ export function Vitrine({
               <Feather name="message-circle" size={18} color={COLORS.gold} />
               <Text style={styles.successNextText}>{orderSuccess}</Text>
             </View>
+          )}
+          {!!successOrder?.pagamento?.checkoutUrl && successOrder.pagamento.status !== 'pago' && (
+            <Pressable
+              onPress={() => void Linking.openURL(successOrder.pagamento!.checkoutUrl!)}
+              style={styles.copyPixButton}
+              testID="continue-infinitepay"
+            >
+              <Feather name="external-link" size={16} color={COLORS.ink} />
+              <Text style={styles.copyPixText}>Continuar pagamento na InfinitePay</Text>
+            </Pressable>
           )}
           {!!successOrder?.codigoAcompanhamento && (
             <View style={styles.trackingAccess}>

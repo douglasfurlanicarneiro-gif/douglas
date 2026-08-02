@@ -56,3 +56,20 @@ MELHOR_ENVIO_ALLOWED_COMPANIES = [
     if item.strip()
 ]
 FRETE_TAXA_EMBALAGEM = float(os.getenv("FRETE_TAXA_EMBALAGEM", "0"))
+
+# --- Pagamentos / InfinitePay ---
+# A InfiniteTag pode ser cadastrada pelo painel. A variavel serve como fallback
+# para instalacoes que prefiram manter essa configuracao no Render.
+INFINITEPAY_HANDLE = os.getenv("INFINITEPAY_HANDLE", "").strip().lstrip("$")
+INFINITEPAY_API_URL = os.getenv(
+    "INFINITEPAY_API_URL",
+    "https://api.checkout.infinitepay.io",
+).rstrip("/")
+PUBLIC_API_URL = os.getenv(
+    "PUBLIC_API_URL",
+    "https://lessence-furlani-api.onrender.com",
+).rstrip("/")
+STOREFRONT_URL = os.getenv(
+    "STOREFRONT_URL",
+    "https://lessence-furlani-vitrine.onrender.com",
+).rstrip("/")

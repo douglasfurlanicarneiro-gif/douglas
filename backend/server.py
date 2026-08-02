@@ -17,22 +17,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from availability import ensure_initial_ready_delivery
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
 from database import get_db
-from routers import (
-    acompanhamento,
-    admin,
-    auth,
-    catalogo_estoque,
-    cep,
-    clientes,
-    compras,
-    frete,
-    movimentos,
-    opinioes,
-    pedidos,
-    perfumes,
-    sugestoes,
-    vitrine,
-)
+from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
+                     clientes, compras, frete, movimentos, opinioes,
+                     pagamentos, pedidos, perfumes, sugestoes, vitrine)
 from security import hash_password
 
 logging.basicConfig(level=logging.INFO)
@@ -68,6 +55,7 @@ async def _criar_indices():
     await db.admins.create_index("usuario", unique=True)
     await db.pedidos.create_index("seq")
     await db.pedidos.create_index("status")
+    await db.pedidos.create_index("pagamento.transactionNsu", sparse=True)
     await db.pedidos.create_index(
         "codigoAcompanhamento",
         unique=True,
@@ -148,6 +136,7 @@ app.include_router(perfumes.router)
 app.include_router(movimentos.router)
 app.include_router(pedidos.router)
 app.include_router(opinioes.router)
+app.include_router(pagamentos.router)
 app.include_router(sugestoes.router)
 app.include_router(compras.router)
 app.include_router(frete.router)

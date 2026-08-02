@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
 import secrets
+from datetime import datetime, timezone
 from typing import Literal, Optional
 
 from bson import ObjectId
@@ -7,14 +7,13 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
+from config import INFINITEPAY_HANDLE
 from database import get_db
 from locks import stock_lock
+from payments.base import PaymentProviderError
 from payments.service import iniciar_pagamento
-from routers.pedidos import (
-    ItemPedido,
-    _aplicar_saida_estoque,
-    _reverter_movimentos_do_pedido,
-)
+from routers.pedidos import (ItemPedido, _aplicar_saida_estoque,
+                             _reverter_movimentos_do_pedido)
 from security import require_atelie_auth
 from shipping.melhor_envio import MelhorEnvioError, cotar_frete
 from utils import next_seq, serialize
@@ -198,6 +197,16 @@ async def _criar_compra(payload: CompraIn):
     doc["codigoAcompanhamento"] = secrets.token_urlsafe(12)
     doc["historicoStatus"] = [{"status": "pendente", "data": agora}]
 
+    config_loja = await db.configuracoes.find_one({"_id": "loja"}) or {}
+    if payload.formaPagamento == "cartao" and not (
+        str(config_loja.get("infinitePayHandle", "")).strip().lstrip("$")
+        or INFINITEPAY_HANDLE
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail="O pagamento por cartão ainda não foi ativado pela loja.",
+        )
+
     # Salva/atualiza o cadastro do cliente por telefone/whatsapp, pra próxima
     # compra vir com os campos pré-preenchidos (o app consulta isso por
     # GET /api/clientes/por-contato/{contato} antes de abrir o formulário).
@@ -230,16 +239,30 @@ async def _criar_compra(payload: CompraIn):
     # físico. A saída será lançada quando o status mudar para "preparando".
 
     if payload.formaPagamento:
-        config_loja = await db.configuracoes.find_one({"_id": "loja"}) or {}
-        pagamento = await iniciar_pagamento(
-            payload.formaPagamento,
-            pedido_id,
-            doc["total"],
-            {
-                "pix": config_loja.get("pix", ""),
-                "nomeLoja": config_loja.get("nomeLoja", "L’Essence Furlani"),
-            },
-        )
+        try:
+            pagamento = await iniciar_pagamento(
+                payload.formaPagamento,
+                pedido_id,
+                doc["total"],
+                {
+                    "pix": config_loja.get("pix", ""),
+                    "nomeLoja": config_loja.get("nomeLoja", "L’Essence Furlani"),
+                    "infinitePayHandle": config_loja.get("infinitePayHandle", ""),
+                    "itens": itens_doc,
+                    "frete": doc["frete"],
+                    "cliente": {
+                        "nome": payload.nomeCompleto or payload.cliente,
+                        "email": str(payload.email or ""),
+                        "telefone": payload.whatsapp or payload.telefone or payload.contato,
+                    },
+                    "endereco": payload.endereco.model_dump() if payload.endereco else {},
+                },
+            )
+        except PaymentProviderError as exc:
+            # Não deixa pedido pendente ou reserva fantasma quando o gateway
+            # falha antes de apresentar o checkout ao cliente.
+            await db.pedidos.delete_one({"_id": resultado.inserted_id})
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
         await db.pedidos.update_one({"_id": resultado.inserted_id}, {"$set": {"pagamento": pagamento}})
 
     nova = await db.pedidos.find_one({"_id": resultado.inserted_id})

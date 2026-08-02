@@ -7,6 +7,7 @@ export const DEFAULT_STORE_CONFIG: ConfiguracoesLojaPublicas = {
   instagram: '',
   email: '',
   pix: '',
+  cartaoOnlineAtivo: false,
 };
 
 export function publicStoreConfig(
@@ -19,6 +20,9 @@ export function publicStoreConfig(
     instagram: config?.instagram?.trim() || '',
     email: config?.email?.trim() || '',
     pix: config?.pix?.trim() || '',
+    cartaoOnlineAtivo: 'cartaoOnlineAtivo' in (config || {})
+      ? Boolean((config as Partial<ConfiguracoesLojaPublicas>).cartaoOnlineAtivo)
+      : Boolean((config as Partial<ConfiguracoesLoja> | null | undefined)?.infinitePayHandle?.trim()),
   };
 }
 

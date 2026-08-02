@@ -10,6 +10,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
+from config import INFINITEPAY_HANDLE
 from database import get_db
 from locks import stock_lock
 from payments.pix import PIX_KEY
@@ -27,6 +28,7 @@ class ConfiguracoesLojaIn(BaseModel):
     instagram: str = Field(default="", max_length=120)
     email: str = Field(default="", max_length=160)
     pix: str = Field(default="", max_length=160)
+    infinitePayHandle: str = Field(default="", max_length=120)
     cnpj: str = Field(default="", max_length=30)
     margemLucro: float = Field(default=0, ge=0, le=10000)
 
@@ -38,6 +40,7 @@ class ConfiguracoesLojaPublica(BaseModel):
     instagram: str
     email: str
     pix: str
+    cartaoOnlineAtivo: bool
 
 
 def _configuracoes_completas(doc: dict | None = None) -> dict:
@@ -187,6 +190,10 @@ async def obter_configuracoes(_: str = Depends(require_atelie_auth)):
         or os.getenv("WHATSAPP_NUMBER", "").strip()
     )
     dados["pix"] = str(dados["pix"]).strip() or PIX_KEY
+    dados["infinitePayHandle"] = (
+        str(dados["infinitePayHandle"]).strip().lstrip("$")
+        or INFINITEPAY_HANDLE
+    )
     return ConfiguracoesLojaIn(**dados).model_dump()
 
 
@@ -205,6 +212,10 @@ async def obter_configuracoes_publicas():
         instagram=str(dados["instagram"]).strip(),
         email=str(dados["email"]).strip(),
         pix=str(dados["pix"]).strip() or PIX_KEY,
+        cartaoOnlineAtivo=bool(
+            str(dados["infinitePayHandle"]).strip().lstrip("$")
+            or INFINITEPAY_HANDLE
+        ),
     ).model_dump()
 
 
@@ -229,6 +240,10 @@ async def salvar_configuracoes(
         for chave, valor in enviados.items()
     }
     dados["nomeLoja"] = dados["nomeLoja"] or "L’Essence Furlani"
+    # Limpar a InfiniteTag deve realmente desativar o checkout de cartao.
+    dados["infinitePayHandle"] = (
+        str(enviados.get("infinitePayHandle", "")).strip().lstrip("$")
+    )
     dados["atualizadoEm"] = datetime.now(timezone.utc).isoformat()
     await db.configuracoes.update_one(
         {"_id": "loja"},

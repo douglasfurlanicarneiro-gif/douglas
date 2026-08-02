@@ -4,8 +4,13 @@ Trocar de provedor no futuro (Mercado Pago, Stripe, Asaas, PagSeguro...)
 significa só criar uma nova classe que implemente `criar_cobranca` — nenhuma
 rota, tela ou lógica de pedido precisa mudar.
 """
+
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
+
+
+class PaymentProviderError(RuntimeError):
+    """Falha controlada ao conversar com o provedor de pagamento."""
 
 
 class PaymentProvider(ABC):

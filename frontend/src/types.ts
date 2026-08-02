@@ -90,8 +90,16 @@ export type PaymentDetails = {
   metodo: string;
   status: string;
   referencia: string;
+  provedor?: string;
   valor?: number;
   cobrancaId?: string;
+  checkoutUrl?: string;
+  orderNsu?: string;
+  transactionNsu?: string;
+  invoiceSlug?: string;
+  captureMethod?: string;
+  parcelas?: number;
+  pagoEm?: string;
   pixCopiaECola?: string;
   recebedor?: string;
   instituicao?: string;
@@ -262,6 +270,7 @@ export type ConfiguracoesLoja = {
   instagram: string;
   email: string;
   pix: string;
+  infinitePayHandle: string;
   cnpj: string;
   margemLucro: number;
 };
@@ -269,4 +278,11 @@ export type ConfiguracoesLoja = {
 export type ConfiguracoesLojaPublicas = Pick<
   ConfiguracoesLoja,
   'nomeLoja' | 'logoUrl' | 'whatsapp' | 'instagram' | 'email' | 'pix'
->;
+> & {
+  cartaoOnlineAtivo: boolean;
+};
+
+export type ConfirmacaoInfinitePay = {
+  pago: boolean;
+  pedido: Compra;
+};

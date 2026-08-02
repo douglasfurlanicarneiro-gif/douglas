@@ -14,6 +14,7 @@ import type {
   ConfiguracoesLojaPublicas,
   CatalogoEstoqueResumo,
   Sugestao,
+  ConfirmacaoInfinitePay,
 } from './types';
 
 const previewHostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -269,6 +270,14 @@ export const deleteSugestao = (id: string) => request<{ status: string }>(`/suge
 
 // Compras
 export const createCompra = (data: CheckoutPayload) => request<Compra>('/compras', { method: 'POST', body: JSON.stringify(data) });
+export const confirmarPagamentoInfinitePay = (data: {
+  orderNsu: string;
+  transactionNsu: string;
+  slug: string;
+}) => request<ConfirmacaoInfinitePay>('/pagamentos/infinitepay/confirmar', {
+  method: 'POST',
+  body: JSON.stringify(data),
+});
 export const listCompras = () => request<Compra[]>('/compras', {}, true);
 export const deleteCompra = (id: string) => request<{ status: string }>(`/compras/${id}`, { method: 'DELETE' }, true);
 
