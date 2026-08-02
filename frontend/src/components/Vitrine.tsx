@@ -177,10 +177,12 @@ export function Vitrine({
   onAtelieClick,
   storeConfig,
   onRefreshStoreConfig,
+  onReady,
 }: {
   onAtelieClick: () => void;
   storeConfig?: ConfiguracoesLojaPublicas;
   onRefreshStoreConfig?: () => Promise<ConfiguracoesLojaPublicas>;
+  onReady?: () => void;
 }) {
   const currentStore = publicStoreConfig(storeConfig);
   const brand = storeNameParts(currentStore.nomeLoja);
@@ -261,6 +263,9 @@ export function Vitrine({
     };
     start();
   }, [load]);
+  useEffect(() => {
+    if (!loading) onReady?.();
+  }, [loading, onReady]);
   useEffect(() => setStoreLogoFailed(false), [currentStore.logoUrl]);
 
   const syncOrdersStorage = useCallback(async (loadSaved = false) => {

@@ -52,8 +52,17 @@ export default function Index() {
   const [modo, setModo] = useState<'vitrine' | 'atelie'>('vitrine');
   const [pedindoSenha, setPedindoSenha] = useState(false);
   const [checked, setChecked] = useState(false);
-  const [showIntro, setShowIntro] = useState(true);
+  const [showIntro, setShowIntro] = useState(Platform.OS !== 'web');
   const [storeConfig, setStoreConfig] = useState<ConfiguracoesLojaPublicas>(DEFAULT_STORE_CONFIG);
+
+  const finishWebPreloader = useCallback(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const preloader = document.getElementById('brand-preloader');
+    if (!preloader || preloader.dataset.hiding === 'true') return;
+    preloader.dataset.hiding = 'true';
+    preloader.style.opacity = '0';
+    window.setTimeout(() => preloader.remove(), 320);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -93,6 +102,10 @@ export default function Index() {
     favicon?.setAttribute('href', '/favicon-light.png?v=2');
   }, [storeConfig.nomeLoja]);
 
+  useEffect(() => {
+    if (checked && modo === 'atelie') finishWebPreloader();
+  }, [checked, finishWebPreloader, modo]);
+
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -107,6 +120,7 @@ export default function Index() {
             onAtelieClick={() => setPedindoSenha(true)}
             storeConfig={storeConfig}
             onRefreshStoreConfig={refreshStoreConfig}
+            onReady={finishWebPreloader}
           />
         )
       ) : (

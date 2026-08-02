@@ -50,7 +50,7 @@ export default function Root({ children }: PropsWithChildren) {
                 justify-content: center;
                 background: #D5CCBB;
                 overflow: hidden;
-                transition: opacity 180ms ease;
+                transition: opacity 320ms ease;
               }
               #brand-preloader::before {
                 content: "";
@@ -75,16 +75,49 @@ export default function Root({ children }: PropsWithChildren) {
                 pointer-events: none;
               }
               #brand-preloader img {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+              }
+              .brand-preloader-stage {
                 position: relative;
                 z-index: 1;
+                top: -10%;
                 width: 88%;
                 max-width: 520px;
-                height: auto;
-                animation: brand-intro-pulse 1.15s ease-in-out infinite;
+                aspect-ratio: 1;
               }
-              @keyframes brand-intro-pulse {
-                0%, 100% { opacity: .88; transform: scale(.985); filter: brightness(.92); }
-                50% { opacity: 1; transform: scale(1); filter: brightness(1.12); }
+              .brand-preloader-caption {
+                position: absolute;
+                z-index: 1;
+                bottom: 13%;
+                width: 92%;
+                max-width: 500px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                padding: 8px;
+                box-sizing: border-box;
+                color: #8C642B;
+                font-family: Arial, sans-serif;
+                font-size: 12px;
+                line-height: 18px;
+                font-weight: 700;
+                letter-spacing: 2.2px;
+                text-align: center;
+                white-space: nowrap;
+              }
+              .brand-preloader-caption::before,
+              .brand-preloader-caption::after {
+                content: "";
+                flex: 1;
+                max-width: 48px;
+                height: 1px;
+                background: linear-gradient(90deg, rgba(140, 100, 43, 0), rgba(140, 100, 43, .9));
+              }
+              .brand-preloader-caption::after {
+                background: linear-gradient(90deg, rgba(140, 100, 43, .9), rgba(140, 100, 43, 0));
               }
               @keyframes brand-page-shine {
                 0% { opacity: 0; transform: translate3d(-70vw, 0, 0) rotate(9deg) scaleX(.82); }
@@ -94,7 +127,6 @@ export default function Root({ children }: PropsWithChildren) {
               }
               @media (prefers-reduced-motion: reduce) {
                 #brand-preloader::before { animation: none; opacity: 0; }
-                #brand-preloader img { animation: none; }
               }
             `,
           }}
@@ -111,7 +143,10 @@ export default function Root({ children }: PropsWithChildren) {
         }}
       >
         <div id="brand-preloader" aria-hidden="true">
-          <img src="/launch-logo-light.png?v=2" alt="" />
+          <div className="brand-preloader-stage">
+            <img src="/launch-logo-light.png?v=2" alt="" />
+          </div>
+          <div className="brand-preloader-caption">UMA EXPERIÊNCIA EM PERFUMARIA</div>
         </div>
         {children}
       </body>
