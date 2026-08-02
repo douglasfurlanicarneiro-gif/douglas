@@ -83,11 +83,10 @@ export function CheckoutSheet({
   const total = subtotal + valorEntrega;
 
   useEffect(() => {
-    if (!cartaoOnlineAtivo) {
-      setForm((current) => current.formaPagamento === 'cartao'
-        ? { ...current, formaPagamento: 'pix' }
-        : current);
-    }
+    setForm((current) => ({
+      ...current,
+      formaPagamento: cartaoOnlineAtivo ? 'cartao' : 'pix',
+    }));
   }, [cartaoOnlineAtivo]);
   const priorityServiceId = useMemo(() => {
     const configured = opcoesFrete.find((option) => option.categoriaFrete === 'prioritaria');
@@ -127,13 +126,14 @@ export function CheckoutSheet({
           ...EMPTY_FORM,
           ...parsed,
           whatsapp: parsed.whatsapp || parsed.telefone || '',
+          formaPagamento: cartaoOnlineAtivo ? 'cartao' : 'pix',
           endereco: { ...EMPTY_FORM.endereco, ...(parsed.endereco || {}) },
         });
       } catch {
         storage.removeItem(CUSTOMER_KEY);
       }
     });
-  }, []);
+  }, [cartaoOnlineAtivo]);
 
   useEffect(() => {
     if (!visible) return;
@@ -583,40 +583,32 @@ export function CheckoutSheet({
               PAGAMENTO
             </Text>
             <Field label="Forma de pagamento">
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {(['pix', 'cartao'] as const).map((method) => {
-                  const active = form.formaPagamento === method;
-                  return (
-                    <Pressable
-                      key={method}
-                      disabled={method === 'cartao' && !cartaoOnlineAtivo}
-                      onPress={() => setForm({ ...form, formaPagamento: method })}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 12,
-                        alignItems: 'center',
-                        borderRadius: 12,
-                        borderWidth: 1,
-                        borderColor: active ? COLORS.gold : COLORS.border,
-                        backgroundColor: active ? COLORS.gold : COLORS.surface,
-                        opacity: method === 'cartao' && !cartaoOnlineAtivo ? 0.45 : 1,
-                      }}
-                    >
-                      <Text style={{ color: active ? COLORS.ink : COLORS.muted }}>{method === 'pix' ? 'Pix' : 'Cartão'}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <Pressable
+                onPress={() => setForm({ ...form, formaPagamento: cartaoOnlineAtivo ? 'cartao' : 'pix' })}
+                style={{
+                  paddingVertical: 14,
+                  paddingHorizontal: SPACING.md,
+                  alignItems: 'center',
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: COLORS.gold,
+                  backgroundColor: COLORS.gold,
+                }}
+              >
+                <Text style={{ color: COLORS.ink, fontWeight: '600' }}>
+                  {cartaoOnlineAtivo ? 'Pix ou cartão · InfinitePay' : 'Pix'}
+                </Text>
+              </Pressable>
             </Field>
             {!cartaoOnlineAtivo && (
               <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: -8, marginBottom: SPACING.md }}>
-                O cartão será liberado assim que a loja concluir a ativação da InfinitePay.
+                Pagamento por Pix com confirmação manual. O checkout automático está temporariamente indisponível.
               </Text>
             )}
             {cartaoOnlineAtivo && form.formaPagamento === 'cartao' && (
               <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
-                <Text style={{ color: COLORS.bone, fontSize: 12, fontWeight: '600' }}>Pagamento seguro pela InfinitePay</Text>
-                <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 4 }}>Os dados do cartão serão informados diretamente no ambiente da InfinitePay.</Text>
+                <Text style={{ color: COLORS.bone, fontSize: 12, fontWeight: '600' }}>Pagamento automático pela InfinitePay</Text>
+                <Text style={{ color: COLORS.muted, fontSize: 11, marginTop: 4 }}>No ambiente seguro da InfinitePay, escolha Pix ou cartão. A confirmação do pedido será automática.</Text>
               </View>
             )}
             <Field label="Observações (opcional)"><TInput multiline style={{ minHeight: 72, textAlignVertical: 'top' }} value={form.observacoes} onChangeText={(observacoes) => setForm({ ...form, observacoes })} /></Field>
@@ -642,7 +634,15 @@ export function CheckoutSheet({
             {!!error && <Text style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <SecondaryButton label="Voltar" onPress={() => setStep('entrega')} />
-              <PrimaryButton label={loading ? 'Finalizando…' : `Finalizar · ${brl(total)}`} onPress={submit} disabled={!complete || loading} />
+              <PrimaryButton
+                label={loading
+                  ? 'Abrindo pagamento…'
+                  : cartaoOnlineAtivo
+                    ? `Ir para pagamento · ${brl(total)}`
+                    : `Finalizar · ${brl(total)}`}
+                onPress={submit}
+                disabled={!complete || loading}
+              />
             </View>
           </View>
         )}

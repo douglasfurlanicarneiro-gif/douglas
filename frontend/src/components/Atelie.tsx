@@ -2460,7 +2460,7 @@ export function Atelie({
             <Field label="E-mail"><TInput value={storeConfig.email} onChangeText={(value) => setStoreField('email', value)} keyboardType="email-address" autoCapitalize="none" /></Field>
             <Text style={styles.storeConfigHelp}>WhatsApp, Instagram e e-mail preenchidos aparecem em “Fale Conosco” para o cliente.</Text>
             <Field label="Chave Pix"><TInput value={storeConfig.pix} onChangeText={(value) => setStoreField('pix', value)} autoCapitalize="none" /></Field>
-            <Text style={styles.storeConfigHelp}>Usada para gerar o QR Code e o Pix Copia e Cola depois que o cliente confirma o pedido.</Text>
+            <Text style={styles.storeConfigHelp}>Usada somente como contingência manual quando o checkout automático da InfinitePay estiver desativado.</Text>
             <Field label="InfiniteTag da InfinitePay">
               <TInput
                 value={storeConfig.infinitePayHandle}
@@ -2471,7 +2471,7 @@ export function Atelie({
               />
             </Field>
             <Text style={styles.storeConfigHelp}>
-              É o seu nome de usuário no app InfinitePay, sem o símbolo $. Ao salvar, a opção Cartão fica disponível na vitrine.
+              É o seu nome de usuário no app InfinitePay, sem o símbolo $. Ao salvar, Pix e cartão passam a ter confirmação automática.
             </Text>
             <Field label="CNPJ (opcional)"><TInput value={storeConfig.cnpj} onChangeText={(value) => setStoreField('cnpj', value)} keyboardType="numeric" /></Field>
             <Text style={styles.storeConfigHelp}>Fica armazenado para documentos e comprovantes futuros; ainda não é exibido na vitrine.</Text>
