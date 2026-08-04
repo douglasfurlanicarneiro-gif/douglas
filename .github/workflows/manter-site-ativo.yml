@@ -1,31 +1,37 @@
-name: Manter vitrine ativa
+name: Manter API ativa
 
 on:
   schedule:
-    # Executa a cada 10 minutos
     - cron: "7,17,27,37,47,57 * * * *"
 
-  # Permite testar manualmente
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  acessar-vitrine:
+  acessar-api:
     runs-on: ubuntu-latest
     timeout-minutes: 3
 
     steps:
-      - name: Acessar site no Render
+      - name: Acessar API no Render
         run: |
-          curl --location \
-            --fail \
+          HTTP_STATUS=$(curl \
+            --location \
             --silent \
             --show-error \
             --max-time 90 \
             --retry 2 \
             --retry-delay 5 \
             -A "GitHub-Actions-Keep-Alive" \
-            "https://lessence-furlani-vitrine.onrender.com/" \
-            > /dev/null
+            -o /dev/null \
+            -w "%{http_code}" \
+            "https://lessence-furlani-api.onrender.com/")
+
+          echo "Resposta da API: HTTP $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" = "000" ]; then
+            echo "Não foi possível acessar a API."
+            exit 1
+          fi
