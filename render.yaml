@@ -6,28 +6,56 @@ services:
     buildCommand: npm ci && npm run build:web
     staticPublishPath: dist
     autoDeployTrigger: commit
+
     envVars:
       - key: EXPO_PUBLIC_BACKEND_URL
         value: https://lessence-furlani-api.onrender.com
+
+    routes:
+      # Encaminha todas as chamadas da vitrine para a API oficial.
+      - type: rewrite
+        source: /api
+        destination: https://lessence-furlani-api.onrender.com/api
+
+      - type: rewrite
+        source: /api/*
+        destination: https://lessence-furlani-api.onrender.com/api/*
+
+      # Mantém a navegação interna do site funcionando.
+      # Esta regra precisa ficar por último.
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
     headers:
+      # Arquivos gerados pelo Expo podem ficar em cache por bastante tempo.
       - path: /_expo/static/*
         name: Cache-Control
-        value: public, max-age=31536000, immutable
+        value: "public, max-age=31536000, immutable"
+
+      # O manifesto deve ser atualizado quando houver uma nova versão.
       - path: /manifest.json
         name: Cache-Control
-        value: no-cache
+        value: "no-cache"
+
+      # Evita que a página principal fique presa em uma versão antiga.
       - path: /
         name: Cache-Control
-        value: no-cache, no-store, must-revalidate
+        value: "no-cache, no-store, must-revalidate"
+
       - path: /index.html
         name: Cache-Control
-        value: no-cache, no-store, must-revalidate
+        value: "no-cache, no-store, must-revalidate"
+
+      # Cabeçalhos básicos de segurança.
       - path: /*
         name: X-Content-Type-Options
-        value: nosniff
+        value: "nosniff"
+
       - path: /*
         name: Referrer-Policy
-        value: strict-origin-when-cross-origin
+        value: "strict-origin-when-cross-origin"
+
       - path: /*
         name: Permissions-Policy
-        value: camera=(), microphone=(), geolocation=()
+        value: "camera=(), microphone=(), geolocation=()"
