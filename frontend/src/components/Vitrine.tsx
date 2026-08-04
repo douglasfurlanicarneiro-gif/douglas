@@ -606,7 +606,7 @@ export function Vitrine({
   const addOrderCode = (code: string) => {
     setOrderCodes((current) => {
       const next = [code, ...current.filter((saved) => saved !== code)].slice(0, 30);
-      storage.setItem(ordersKeyRef.current, JSON.stringify(next));
+      void storage.setItem(ordersKeyRef.current, next);
       return next;
     });
   };
@@ -614,7 +614,7 @@ export function Vitrine({
   const removeOrderCode = (code: string) => {
     setOrderCodes((current) => {
       const next = current.filter((saved) => saved !== code);
-      storage.setItem(ordersKeyRef.current, JSON.stringify(next));
+      void storage.setItem(ordersKeyRef.current, next);
       return next;
     });
   };
