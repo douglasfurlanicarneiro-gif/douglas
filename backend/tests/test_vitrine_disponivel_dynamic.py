@@ -46,6 +46,12 @@ class TestVitrineShape:
                   "precos", "disponivel"):
             assert k in it, f"Missing field {k} in vitrine item"
 
+    def test_vitrine_nao_expoe_dados_administrativos(self, vitrine_snapshot):
+        it = vitrine_snapshot["itens"][0]
+        for k in ("estoqueAtualMl", "estoqueMinimoMl", "custoEssenciaPorMl",
+                  "concentracaoPercentual", "fornecedorId", "fornecedorCodigo"):
+            assert k not in it, f"Campo administrativo exposto: {k}"
+
 
 # ---- Ready delivery respects stock; made-to-order remains available ----
 class TestVitrineDisponibilidadeReal:
@@ -55,7 +61,7 @@ class TestVitrineDisponibilidadeReal:
         assert ab["disponivel"] is True
 
     def test_pronta_entrega_sem_saldo_fica_indisponivel(self, s, vitrine_snapshot):
-        est = s.get(f"{API}/estoque").json()
+        est = s.get(f"{API}/estoque", headers=AUTH).json()
         sem_saldo = [
             i for i in vitrine_snapshot["itens"]
             if i.get("prontaEntrega") and est.get(i["id"], 0) <= 0
@@ -64,7 +70,7 @@ class TestVitrineDisponibilidadeReal:
         assert all(i["disponivel"] is False for i in sem_saldo)
 
     def test_sob_encomenda_continua_disponivel_sem_saldo(self, s, vitrine_snapshot):
-        est = s.get(f"{API}/estoque").json()
+        est = s.get(f"{API}/estoque", headers=AUTH).json()
         sem_saldo = [
             i for i in vitrine_snapshot["itens"]
             if not i.get("prontaEntrega") and est.get(i["id"], 0) <= 0
@@ -73,7 +79,7 @@ class TestVitrineDisponibilidadeReal:
         assert all(i["disponivel"] is True for i in sem_saldo)
 
     def test_movimentacao_nao_bloqueia_vitrine(self, s, vitrine_snapshot):
-        est = s.get(f"{API}/estoque").json()
+        est = s.get(f"{API}/estoque", headers=AUTH).json()
         target = next((i for i in vitrine_snapshot["itens"]
                        if i.get("prontaEntrega") and est.get(i["id"], 0) == 0), None)
         assert target is not None, "No candidate perfume without stock"

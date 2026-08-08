@@ -52,10 +52,12 @@ class TestPublic:
         r = s.get(f"{API}/perfumes")
         assert r.status_code == 401
 
-    def test_estoque_public(self, s):
+    def test_estoque_is_private(self, s):
         r = s.get(f"{API}/estoque")
-        assert r.status_code == 200
-        assert isinstance(r.json(), dict)
+        assert r.status_code == 401
+        r2 = s.get(f"{API}/estoque", headers=AUTH)
+        assert r2.status_code == 200
+        assert isinstance(r2.json(), dict)
 
 
 # --- Auth guard ---
