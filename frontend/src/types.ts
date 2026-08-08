@@ -21,6 +21,11 @@ export type Perfume = {
   publicavel: boolean;
   disponivel?: boolean;
   prontaEntrega?: boolean;
+  // Campos administrativos. A API pública não os envia na vitrine.
+  custoEssenciaPorMl?: number;
+  concentracaoPercentual?: number;
+  fornecedorId?: string;
+  fornecedorCodigo?: string;
   estoqueAtualMl?: number;
   tamanhosDisponiveisMl?: number[];
 };
@@ -82,6 +87,8 @@ export type PedidoItem = {
   subtotal?: number;
   prontaEntrega?: boolean;
   tipoAtendimento?: 'pronta_entrega' | 'sob_encomenda';
+  custoUnitarioEstimado?: number;
+  lucroUnitarioEstimado?: number;
 };
 
 export type StatusHistoryItem = {
@@ -213,17 +220,149 @@ export type Acompanhamento = {
 };
 
 export type Metricas = {
+  periodo: '7d' | '30d' | 'mes' | 'todos';
   pedidosTotal: number;
   pedidosValidos: number;
+  pedidosPagos: number;
+  pedidosPendentes: number;
+  pedidosCancelados: number;
   pedidosPorStatus: Record<string, number>;
   faturamento: number;
+  receitaConfirmada: number;
+  receitaEntregue: number;
+  aReceber: number;
   ticketMedio: number;
+  custoEstimado: number;
+  lucroEstimado: number;
+  margemEstimada: number;
+  mlVendidos: number;
+  tamanhoMaisVendido?: { ml: number; quantidade: number; faturamento: number } | null;
+  serieDiaria: { data: string; receita: number; lucro: number; pedidos: number; ml: number }[];
   maisVendidos: {
     perfumeId?: string;
     nome: string;
     quantidade: number;
+    ml: number;
     faturamento: number;
+    lucroEstimado: number;
   }[];
+  maisLucrativos: {
+    perfumeId?: string;
+    nome: string;
+    quantidade: number;
+    ml: number;
+    faturamento: number;
+    lucroEstimado: number;
+  }[];
+};
+
+export type CustosConfig = {
+  custoBasePorMl: number;
+  custoValvula: number;
+  custoTampa: number;
+  custoEtiqueta: number;
+  custoEmbalagem: number;
+  outrosPorFrasco: number;
+  taxaPagamentoPercentual: number;
+  concentracaoPadraoPercentual: number;
+  frascos: Record<string, number>;
+};
+
+export type RentabilidadeItem = {
+  perfumeId: string;
+  nome: string;
+  ml: number;
+  preco: number;
+  publicavel: boolean;
+  essenciaMl: number;
+  baseMl: number;
+  custoEssencia: number;
+  custoBase: number;
+  custoFrasco: number;
+  custoFixo: number;
+  custoProducao: number;
+  taxaPagamento: number;
+  custoTotal: number;
+  lucro: number;
+  margemPercentual: number;
+  custoConfigurado: boolean;
+};
+
+export type Fornecedor = {
+  id: string;
+  nome: string;
+  site: string;
+  contato: string;
+  whatsapp: string;
+  email: string;
+  documento: string;
+  pedidoMinimo: number;
+  prazoDias: number;
+  observacoes: string;
+  ativo: boolean;
+  cotacoes?: number;
+  criadoEm?: string;
+  atualizadoEm?: string;
+};
+
+export type CotacaoFornecedor = {
+  id: string;
+  fornecedorId: string;
+  fornecedorNome: string;
+  perfumeId?: string;
+  perfumeNome?: string;
+  produto: string;
+  codigo: string;
+  quantidade: number;
+  unidade: 'ml' | 'g' | 'kg' | 'un';
+  precoTotal: number;
+  frete: number;
+  custoUnitario: number;
+  link: string;
+  observacoes: string;
+  data: string;
+};
+
+export type Insumo = {
+  id: string;
+  nome: string;
+  categoria: 'essencia' | 'base' | 'frasco' | 'valvula' | 'tampa' | 'etiqueta' | 'embalagem' | 'outro';
+  unidade: 'ml' | 'g' | 'un';
+  custoUnitario: number;
+  estoqueMinimo: number;
+  fornecedorId?: string | null;
+  perfumeId?: string | null;
+  tamanhoMl?: number | null;
+  observacoes: string;
+  ativo: boolean;
+  saldoAtual: number;
+  valorEstoque: number;
+};
+
+export type PlanoProducao = {
+  perfumeId: string;
+  perfumeNome: string;
+  ml: number;
+  quantidade: number;
+  volumeTotalMl: number;
+  concentracaoPercentual: number;
+  requisitos: {
+    insumoId: string;
+    nome: string;
+    categoria: string;
+    unidade: string;
+    necessario: number;
+    disponivel: number;
+    suficiente: boolean;
+    custo: number;
+  }[];
+  faltantesConfiguracao: string[];
+  faltantesEstoque: unknown[];
+  custoTotal: number;
+  custoPorFrasco: number;
+  podeProduzir: boolean;
+  producaoId?: string;
+  registrada?: boolean;
 };
 
 export type CheckoutPayload = {

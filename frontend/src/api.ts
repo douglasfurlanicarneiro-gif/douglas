@@ -15,6 +15,12 @@ import type {
   CatalogoEstoqueResumo,
   Sugestao,
   ConfirmacaoInfinitePay,
+  CustosConfig,
+  RentabilidadeItem,
+  Fornecedor,
+  CotacaoFornecedor,
+  Insumo,
+  PlanoProducao,
 } from './types';
 
 const previewHostname = typeof window !== 'undefined' ? window.location.hostname : '';
@@ -158,7 +164,7 @@ export const completarEstoque = (quantidadeMl = 1000) => request<{
   method: 'POST',
   body: JSON.stringify({ quantidadeMl, somentePublicaveis: true }),
 }, true);
-export const getEstoqueMap = () => request<Record<string, number>>('/estoque');
+export const getEstoqueMap = () => request<Record<string, number>>('/estoque', {}, true);
 export const getEstoqueResumo = () =>
   request<import('./types').EstoqueResumo>('/estoque/resumo', {}, true);
 export const conferirEstoque = (data: {
@@ -288,7 +294,7 @@ export const cancelarPedidoCliente = (codigo: string) =>
   request<Acompanhamento>(`/acompanhamento/${encodeURIComponent(codigo)}/cancelar`, {
     method: 'POST',
   });
-export const getMetricas = () => request<Metricas>('/admin/metricas', {}, true);
+export const getMetricas = (periodo: '7d' | '30d' | 'mes' | 'todos' = '30d') => request<Metricas>(`/admin/metricas?periodo=${periodo}`, {}, true);
 export const getOrdersResetVersion = () =>
   request<{ version: number }>('/admin/pedidos/reset-version');
 export const resetAllOrders = () => request<{
@@ -311,6 +317,33 @@ export const limparDados = (recurso: 'opinioes' | 'estoque' | 'catalogo') =>
   request<{ status: string; removidos: number }>(`/admin/dados/${recurso}/limpar`, {
     method: 'POST',
   }, true);
+
+// Custos e rentabilidade
+export const getCustosConfig = () => request<CustosConfig>('/admin/custos', {}, true);
+export const updateCustosConfig = (data: CustosConfig) => request<CustosConfig>('/admin/custos', {
+  method: 'PUT', body: JSON.stringify(data),
+}, true);
+export const getRentabilidade = () => request<{ config: CustosConfig; itens: RentabilidadeItem[] }>('/admin/custos/rentabilidade', {}, true);
+
+// Fornecedores e cotações
+export const listFornecedores = () => request<Fornecedor[]>('/admin/fornecedores', {}, true);
+export const createFornecedor = (data: Omit<Fornecedor, 'id' | 'cotacoes' | 'criadoEm' | 'atualizadoEm'>) => request<Fornecedor>('/admin/fornecedores', { method: 'POST', body: JSON.stringify(data) }, true);
+export const updateFornecedor = (id: string, data: Omit<Fornecedor, 'id' | 'cotacoes' | 'criadoEm' | 'atualizadoEm'>) => request<Fornecedor>(`/admin/fornecedores/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
+export const archiveFornecedor = (id: string) => request<{ status: string }>(`/admin/fornecedores/${id}`, { method: 'DELETE' }, true);
+export const listCotacoes = (fornecedorId: string) => request<CotacaoFornecedor[]>(`/admin/fornecedores/${fornecedorId}/cotacoes`, {}, true);
+export const compareFornecedores = (perfumeId: string) => request<CotacaoFornecedor[]>(`/admin/fornecedores/comparativo/${perfumeId}`, {}, true);
+export const createCotacao = (fornecedorId: string, data: {
+  perfumeId?: string; produto: string; codigo: string; quantidade: number; unidade: 'ml' | 'g' | 'kg' | 'un'; precoTotal: number; frete: number; link: string; observacoes: string; aplicarAoPerfume: boolean;
+}) => request<CotacaoFornecedor>(`/admin/fornecedores/${fornecedorId}/cotacoes`, { method: 'POST', body: JSON.stringify(data) }, true);
+
+// Matérias-primas e produção
+export const listInsumos = () => request<Insumo[]>('/admin/insumos', {}, true);
+export const createInsumo = (data: {
+  nome: string; categoria: Insumo['categoria']; unidade: Insumo['unidade']; custoUnitario: number; estoqueMinimo: number; estoqueInicial: number; fornecedorId?: string | null; perfumeId?: string | null; tamanhoMl?: number | null; observacoes: string; ativo: boolean;
+}) => request<Insumo>('/admin/insumos', { method: 'POST', body: JSON.stringify(data) }, true);
+export const moveInsumo = (id: string, data: { tipo: 'entrada' | 'saida'; quantidade: number; motivo: string }) => request(`/admin/insumos/${id}/movimentos`, { method: 'POST', body: JSON.stringify(data) }, true);
+export const simulateProducao = (data: { perfumeId: string; ml: number; quantidade: number }) => request<PlanoProducao>('/admin/insumos/producao/simular', { method: 'POST', body: JSON.stringify(data) }, true);
+export const registerProducao = (data: { perfumeId: string; ml: number; quantidade: number }) => request<PlanoProducao>('/admin/insumos/producao/registrar', { method: 'POST', body: JSON.stringify(data) }, true);
 
 export async function downloadBackup(): Promise<void> {
   const token = await getToken();
