@@ -990,6 +990,32 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
           </View>
         </View>
       )}
+      {pedidoRecebido && initial?.entrega?.tipo !== 'retirada' && initial?.endereco && (
+        <View style={styles.orderAddressCard}>
+          <View style={styles.orderAddressIcon}>
+            <Feather name="map-pin" size={17} color={COLORS.gold} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderAddressEyebrow}>ENDEREÇO DE ENTREGA</Text>
+            <Text style={styles.orderAddressTitle}>
+              {initial.endereco.endereco}, {initial.endereco.numero}
+              {initial.endereco.complemento ? ` · ${initial.endereco.complemento}` : ''}
+            </Text>
+            <Text style={styles.orderAddressMeta}>
+              {initial.endereco.bairro} · {initial.endereco.cidade}/{initial.endereco.estado}
+            </Text>
+            <Text style={styles.orderAddressMeta}>
+              CEP {String(initial.endereco.cep || '').replace(/\D/g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2')}
+            </Text>
+          </View>
+        </View>
+      )}
+      {pedidoRecebido && initial?.entrega?.tipo === 'entrega' && !initial?.endereco && (
+        <View style={styles.orderAddressWarning}>
+          <Feather name="alert-triangle" size={16} color={COLORS.rust} />
+          <Text style={styles.orderAddressWarningText}>Endereço de entrega não encontrado neste pedido.</Text>
+        </View>
+      )}
       <Field label="Status">
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           {STATUS.map((s) => (
@@ -2858,10 +2884,17 @@ const styles = StyleSheet.create({
   supplierMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   connectedPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.sage + '88' },
   connectedPillText: { color: COLORS.sage, fontSize: FONT_SIZES.caption, fontWeight: '700', letterSpacing: 0.6 },
-  orderDeliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, marginBottom: SPACING.md },
+  orderDeliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, marginBottom: SPACING.sm },
   orderDeliveryIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
   orderDeliveryTitle: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '600' },
   orderDeliveryMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
+  orderAddressCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.gold + '66', borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceRaised, marginBottom: SPACING.md },
+  orderAddressIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
+  orderAddressEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700', letterSpacing: 0.8, marginBottom: 4 },
+  orderAddressTitle: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '600', lineHeight: 20 },
+  orderAddressMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3, lineHeight: 16 },
+  orderAddressWarning: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.rust + '66', borderRadius: RADIUS.md, backgroundColor: COLORS.surface, marginBottom: SPACING.md },
+  orderAddressWarningText: { flex: 1, color: COLORS.rust, fontSize: FONT_SIZES.caption, lineHeight: 16 },
   manualValueCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '88', backgroundColor: COLORS.surfaceRaised },
   manualValueHeading: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 5 },
   manualValueEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700', letterSpacing: 1.2 },
