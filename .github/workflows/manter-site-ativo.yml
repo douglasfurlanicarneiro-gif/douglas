@@ -2,8 +2,10 @@ name: Manter API ativa
 
 on:
   schedule:
+    # Backup automático: tenta acessar a API a cada 10 minutos
     - cron: "7,17,27,37,47,57 * * * *"
 
+  # Permite executar manualmente pelo botão "Run workflow"
   workflow_dispatch:
 
 permissions:
@@ -11,27 +13,43 @@ permissions:
 
 jobs:
   acessar-api:
+    name: Verificar API no Render
     runs-on: ubuntu-latest
     timeout-minutes: 3
 
     steps:
       - name: Acessar API no Render
+        shell: bash
         run: |
+          echo "Verificando API da L'Essence Furlani..."
+
+          CURL_EXIT=0
+
           HTTP_STATUS=$(curl \
             --location \
             --silent \
             --show-error \
             --max-time 90 \
+            --connect-timeout 20 \
             --retry 2 \
             --retry-delay 5 \
+            --retry-all-errors \
             -A "GitHub-Actions-Keep-Alive" \
             -o /dev/null \
             -w "%{http_code}" \
-            "https://lessence-furlani-api.onrender.com/")
+            "https://lessence-furlani-api.onrender.com/") || CURL_EXIT=$?
 
           echo "Resposta da API: HTTP $HTTP_STATUS"
 
-          if [ "$HTTP_STATUS" = "000" ]; then
-            echo "Não foi possível acessar a API."
+          if [ "$CURL_EXIT" -ne 0 ]; then
+            echo "ERRO: não foi possível conectar à API."
             exit 1
           fi
+
+          if [[ "$HTTP_STATUS" =~ ^2[0-9][0-9]$ || "$HTTP_STATUS" =~ ^3[0-9][0-9]$ ]]; then
+            echo "API respondeu corretamente."
+            exit 0
+          fi
+
+          echo "ERRO: API respondeu com HTTP $HTTP_STATUS."
+          exit 1
