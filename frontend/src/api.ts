@@ -341,6 +341,10 @@ export const listInsumos = () => request<Insumo[]>('/admin/insumos', {}, true);
 export const createInsumo = (data: {
   nome: string; categoria: Insumo['categoria']; unidade: Insumo['unidade']; custoUnitario: number; estoqueMinimo: number; estoqueInicial: number; fornecedorId?: string | null; perfumeId?: string | null; tamanhoMl?: number | null; observacoes: string; ativo: boolean;
 }) => request<Insumo>('/admin/insumos', { method: 'POST', body: JSON.stringify(data) }, true);
+export const updateInsumo = (id: string, data: {
+  nome: string; categoria: Insumo['categoria']; unidade: Insumo['unidade']; custoUnitario: number; estoqueMinimo: number; fornecedorId?: string | null; perfumeId?: string | null; tamanhoMl?: number | null; observacoes: string; ativo: boolean;
+}) => request<Insumo>(`/admin/insumos/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
+export const archiveInsumo = (id: string) => request<{ status: string }>(`/admin/insumos/${id}`, { method: 'DELETE' }, true);
 export const moveInsumo = (id: string, data: { tipo: 'entrada' | 'saida'; quantidade: number; motivo: string }) => request(`/admin/insumos/${id}/movimentos`, { method: 'POST', body: JSON.stringify(data) }, true);
 export const simulateProducao = (data: { perfumeId: string; ml: number; quantidade: number }) => request<PlanoProducao>('/admin/insumos/producao/simular', { method: 'POST', body: JSON.stringify(data) }, true);
 export const registerProducao = (data: { perfumeId: string; ml: number; quantidade: number }) => request<PlanoProducao>('/admin/insumos/producao/registrar', { method: 'POST', body: JSON.stringify(data) }, true);
