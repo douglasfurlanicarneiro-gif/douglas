@@ -28,6 +28,16 @@ class ItemPedido(BaseModel):
     lucroUnitarioEstimado: Optional[float] = None
 
 
+class EnderecoPedido(BaseModel):
+    cep: str = Field(min_length=8, max_length=9)
+    endereco: str = Field(min_length=2, max_length=160)
+    numero: str = Field(min_length=1, max_length=20)
+    complemento: str = Field(default="", max_length=120)
+    bairro: str = Field(min_length=2, max_length=100)
+    cidade: str = Field(min_length=2, max_length=100)
+    estado: str = Field(min_length=2, max_length=2)
+
+
 class PedidoIn(BaseModel):
     cliente: str = Field(min_length=2, max_length=120)
     contato: str = Field(default="", max_length=160)
@@ -41,6 +51,7 @@ class PedidoIn(BaseModel):
         "cancelado",
     ] = "pendente"
     observacoes: str = Field(default="", max_length=1000)
+    endereco: Optional[EnderecoPedido] = None
     itens: List[ItemPedido] = Field(min_length=1, max_length=100)
     subtotalTabela: Optional[float] = Field(default=None, ge=0)
     ajusteManual: float = 0
@@ -196,7 +207,9 @@ async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(r
         )
         await _reverter_movimentos_do_pedido(db, pedido_id)
         await _aplicar_saida_estoque(db, pedido_id, itens, payload.status)
-        atualizacao = payload.model_dump()
+        # Campos opcionais não enviados pelo painel (como endereço de pedidos
+        # antigos) não devem ser apagados durante uma simples troca de status.
+        atualizacao = payload.model_dump(exclude_unset=True)
         atualizacao["itens"] = itens
         if payload.status != existente.get("status"):
             historico = existente.get("historicoStatus", [])
