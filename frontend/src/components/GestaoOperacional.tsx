@@ -6,6 +6,7 @@ import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';
 import { COLORS, FONT_SIZES, RADIUS, SPACING, brl } from '../theme';
 import {
   ApiError,
+  archiveInsumo,
   compareFornecedores,
   createCotacao,
   createFornecedor,
@@ -19,6 +20,7 @@ import {
   registerProducao,
   simulateProducao,
   updateCustosConfig,
+  updateInsumo,
 } from '../api';
 import type {
   CotacaoFornecedor,
@@ -214,6 +216,10 @@ export function InsumosView({ perfumes, onChanged }: { perfumes: Perfume[]; onCh
   const [perfumeSearch, setPerfumeSearch] = useState('');
   const [movement, setMovement] = useState<{ id: string; name: string; type: 'entrada' | 'saida' } | null>(null);
   const [movementQty, setMovementQty] = useState('');
+  const [editing, setEditing] = useState<Insumo | null>(null);
+  const [editForm, setEditForm] = useState({ nome: '', custoUnitario: '0', estoqueMinimo: '0', tamanhoMl: '30', perfumeId: '', observacoes: '' });
+  const [editPerfumeSearch, setEditPerfumeSearch] = useState('');
+  const [archiveCandidate, setArchiveCandidate] = useState<Insumo | null>(null);
   const [productionSearch, setProductionSearch] = useState('');
   const [productionPerfumeId, setProductionPerfumeId] = useState('');
   const [productionMl, setProductionMl] = useState('30');
@@ -237,6 +243,11 @@ export function InsumosView({ perfumes, onChanged }: { perfumes: Perfume[]; onCh
     if (!q) return [];
     return perfumes.filter((p) => p.nome.toLowerCase().includes(q)).slice(0, 8);
   }, [perfumeSearch, perfumes]);
+  const editMatchingPerfumes = useMemo(() => {
+    const q = editPerfumeSearch.trim().toLowerCase();
+    if (!q) return [];
+    return perfumes.filter((p) => p.nome.toLowerCase().includes(q)).slice(0, 8);
+  }, [editPerfumeSearch, perfumes]);
   const productionMatches = useMemo(() => {
     const q = productionSearch.trim().toLowerCase();
     if (!q) return [];
@@ -274,6 +285,77 @@ export function InsumosView({ perfumes, onChanged }: { perfumes: Perfume[]; onCh
       setMessage(`${movement.type === 'entrada' ? 'Entrada' : 'Saída'} registrada para ${movement.name}.`);
       setMovement(null); setMovementQty(''); await load(); onChanged?.();
     } catch (err) { setError(err instanceof ApiError ? err.message : 'Não foi possível movimentar o insumo.'); }
+    finally { setBusy(false); }
+  };
+
+  const beginEdit = (item: Insumo) => {
+    const linkedPerfume = item.perfumeId ? perfumes.find((p) => p.id === item.perfumeId) : undefined;
+    setEditing(item);
+    setEditForm({
+      nome: item.nome,
+      custoUnitario: String(item.custoUnitario ?? 0).replace('.', ','),
+      estoqueMinimo: String(item.estoqueMinimo ?? 0).replace('.', ','),
+      tamanhoMl: String(item.tamanhoMl || 30),
+      perfumeId: item.perfumeId || '',
+      observacoes: item.observacoes || '',
+    });
+    setEditPerfumeSearch(linkedPerfume?.nome || '');
+    setArchiveCandidate(null);
+    setMovement(null);
+    setMessage(''); setError('');
+  };
+
+  const saveEdit = async () => {
+    if (!editing || !editForm.nome.trim()) return;
+    if (editing.categoria === 'essencia' && !editForm.perfumeId) {
+      setError('Vincule a essência a um perfume antes de salvar.');
+      return;
+    }
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await updateInsumo(editing.id, {
+        nome: editForm.nome.trim(),
+        categoria: editing.categoria,
+        unidade: editing.unidade,
+        custoUnitario: parseNumber(editForm.custoUnitario),
+        estoqueMinimo: parseNumber(editForm.estoqueMinimo),
+        fornecedorId: editing.fornecedorId || null,
+        perfumeId: editing.categoria === 'essencia' ? (editForm.perfumeId || null) : (editing.perfumeId || null),
+        tamanhoMl: editing.categoria === 'frasco' ? Math.max(1, Number(editForm.tamanhoMl) || 30) : (editing.tamanhoMl || null),
+        observacoes: editForm.observacoes,
+        ativo: true,
+      });
+      setMessage(`${editForm.nome.trim()} atualizado.`);
+      setEditing(null); setEditPerfumeSearch('');
+      await load(); onChanged?.();
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'Não foi possível atualizar o insumo.'); }
+    finally { setBusy(false); }
+  };
+
+  const archive = async (item: Insumo) => {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await archiveInsumo(item.id);
+      setMessage(`${item.nome} arquivado. O histórico de estoque foi preservado.`);
+      setArchiveCandidate(null);
+      if (editing?.id === item.id) setEditing(null);
+      await load(); onChanged?.();
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'Não foi possível arquivar o insumo.'); }
+    finally { setBusy(false); }
+  };
+
+  const restore = async (item: Insumo) => {
+    setBusy(true); setError(''); setMessage('');
+    try {
+      await updateInsumo(item.id, {
+        nome: item.nome, categoria: item.categoria, unidade: item.unidade,
+        custoUnitario: item.custoUnitario, estoqueMinimo: item.estoqueMinimo,
+        fornecedorId: item.fornecedorId || null, perfumeId: item.perfumeId || null,
+        tamanhoMl: item.tamanhoMl || null, observacoes: item.observacoes || '', ativo: true,
+      });
+      setMessage(`${item.nome} restaurado.`);
+      await load(); onChanged?.();
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'Não foi possível restaurar o insumo.'); }
     finally { setBusy(false); }
   };
 
@@ -340,22 +422,65 @@ export function InsumosView({ perfumes, onChanged }: { perfumes: Perfume[]; onCh
         <PrimaryButton label={busy ? 'Salvando…' : 'Cadastrar insumo'} onPress={() => void add()} disabled={busy || !form.nome.trim() || (form.categoria === 'essencia' && !form.perfumeId)} />
       </Card>
 
-      <Card title="Matérias-primas" subtitle="Saldo por movimentação; nenhuma quantidade é sobrescrita silenciosamente." icon="layers">
-        {items.length === 0 && <Text style={styles.emptyText}>Nenhum insumo cadastrado.</Text>}
+      <Card title="Matérias-primas" subtitle="Saldo por movimentação; custos e cadastros podem ser editados sem alterar o histórico." icon="layers">
+        {items.filter((item) => item.ativo).length === 0 && <Text style={styles.emptyText}>Nenhum insumo ativo cadastrado.</Text>}
         {items.filter((item) => item.ativo).map((item) => {
           const low = item.saldoAtual <= item.estoqueMinimo;
           return (
-            <View key={item.id} style={styles.inventoryRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowTitle}>{item.nome}</Text>
-                <Text style={styles.rowMeta}>{item.categoria} · custo {brl(item.custoUnitario)}/{item.unidade}</Text>
-                <Text style={[styles.stockValue, low && { color: COLORS.rust }]}>{item.saldoAtual.toLocaleString('pt-BR')} {item.unidade}{low ? ' · REPOSIÇÃO' : ''}</Text>
+            <React.Fragment key={item.id}>
+              <View style={styles.inventoryRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle}>{item.nome}</Text>
+                  <Text style={styles.rowMeta}>{item.categoria} · custo {brl(item.custoUnitario)}/{item.unidade} · mínimo {item.estoqueMinimo.toLocaleString('pt-BR')} {item.unidade}</Text>
+                  <Text style={[styles.stockValue, low && { color: COLORS.rust }]}>{item.saldoAtual.toLocaleString('pt-BR')} {item.unidade}{low ? ' · REPOSIÇÃO' : ''}</Text>
+                </View>
+                <View style={styles.inventoryActions}>
+                  <Pressable accessibilityLabel={`Editar ${item.nome}`} style={styles.smallAction} onPress={() => beginEdit(item)}><Feather name="edit-2" size={14} color={COLORS.gold} /></Pressable>
+                  <Pressable accessibilityLabel={`Entrada em ${item.nome}`} style={styles.smallAction} onPress={() => { setMovement({ id: item.id, name: item.nome, type: 'entrada' }); setMovementQty(''); setEditing(null); setArchiveCandidate(null); }}><Feather name="plus" size={14} color={COLORS.sage} /></Pressable>
+                  <Pressable accessibilityLabel={`Saída de ${item.nome}`} style={styles.smallAction} onPress={() => { setMovement({ id: item.id, name: item.nome, type: 'saida' }); setMovementQty(''); setEditing(null); setArchiveCandidate(null); }}><Feather name="minus" size={14} color={COLORS.rust} /></Pressable>
+                  <Pressable accessibilityLabel={`Arquivar ${item.nome}`} style={styles.smallAction} onPress={() => { setArchiveCandidate(item); setEditing(null); setMovement(null); }}><Feather name="archive" size={14} color={COLORS.muted} /></Pressable>
+                </View>
               </View>
-              <View style={styles.inventoryActions}>
-                <Pressable style={styles.smallAction} onPress={() => { setMovement({ id: item.id, name: item.nome, type: 'entrada' }); setMovementQty(''); }}><Feather name="plus" size={14} color={COLORS.sage} /></Pressable>
-                <Pressable style={styles.smallAction} onPress={() => { setMovement({ id: item.id, name: item.nome, type: 'saida' }); setMovementQty(''); }}><Feather name="minus" size={14} color={COLORS.rust} /></Pressable>
-              </View>
-            </View>
+
+              {editing?.id === item.id && (
+                <View style={styles.inlineForm}>
+                  <View style={styles.inlineHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.rowTitle}>Editar · {item.nome}</Text>
+                      <Text style={styles.rowMeta}>Categoria: {item.categoria} · saldo atual preservado: {item.saldoAtual.toLocaleString('pt-BR')} {item.unidade}</Text>
+                    </View>
+                    <Feather name="edit-3" size={16} color={COLORS.gold} />
+                  </View>
+                  <Field label="Nome"><TInput value={editForm.nome} onChangeText={(nome) => setEditForm((c) => ({ ...c, nome }))} /></Field>
+                  {item.categoria === 'essencia' && (
+                    <>
+                      <Field label="Vincular a um perfume"><TInput value={editPerfumeSearch} onChangeText={(v) => { setEditPerfumeSearch(v); setEditForm((c) => ({ ...c, perfumeId: '' })); }} placeholder="Digite o nome do perfume" /></Field>
+                      {editMatchingPerfumes.map((p) => (
+                        <Pressable key={p.id} onPress={() => { setEditForm((c) => ({ ...c, perfumeId: p.id })); setEditPerfumeSearch(p.nome); }} style={[styles.searchOption, editForm.perfumeId === p.id && styles.searchOptionActive]}>
+                          <Text style={styles.searchOptionText}>{p.nome}</Text>
+                        </Pressable>
+                      ))}
+                    </>
+                  )}
+                  <View style={styles.fieldGrid}>
+                    <View style={styles.fieldHalf}><Field label={`Custo por ${item.unidade} (R$)`}><TInput keyboardType="decimal-pad" value={editForm.custoUnitario} onChangeText={(v) => setEditForm((c) => ({ ...c, custoUnitario: v }))} /></Field></View>
+                    <View style={styles.fieldHalf}><Field label={`Estoque mínimo (${item.unidade})`}><TInput keyboardType="decimal-pad" value={editForm.estoqueMinimo} onChangeText={(v) => setEditForm((c) => ({ ...c, estoqueMinimo: v }))} /></Field></View>
+                    {item.categoria === 'frasco' && <View style={styles.fieldHalf}><Field label="Tamanho do frasco (ml)"><TInput keyboardType="numeric" value={editForm.tamanhoMl} onChangeText={(v) => setEditForm((c) => ({ ...c, tamanhoMl: v }))} /></Field></View>}
+                  </View>
+                  <Field label="Observações"><TInput value={editForm.observacoes} onChangeText={(observacoes) => setEditForm((c) => ({ ...c, observacoes }))} placeholder="Código do fornecedor, lote, observações…" /></Field>
+                  <Text style={styles.helper}>O saldo não é editado aqui. Para corrigir ou repor quantidade, use os botões + e − para manter o histórico.</Text>
+                  <View style={styles.buttonRow}><SecondaryButton label="Cancelar" onPress={() => { setEditing(null); setEditPerfumeSearch(''); }} /><PrimaryButton label={busy ? 'Salvando…' : 'Salvar alterações'} onPress={() => void saveEdit()} disabled={busy || !editForm.nome.trim() || (item.categoria === 'essencia' && !editForm.perfumeId)} /></View>
+                </View>
+              )}
+
+              {archiveCandidate?.id === item.id && (
+                <View style={styles.archiveConfirm}>
+                  <Feather name="alert-circle" size={17} color={COLORS.rust} />
+                  <View style={{ flex: 1 }}><Text style={styles.rowTitle}>Arquivar {item.nome}?</Text><Text style={styles.rowMeta}>Ele sairá da lista ativa, mas movimentações e saldo histórico serão preservados.</Text></View>
+                  <View style={styles.buttonRow}><SecondaryButton label="Cancelar" onPress={() => setArchiveCandidate(null)} /><PrimaryButton label={busy ? 'Arquivando…' : 'Arquivar'} onPress={() => void archive(item)} disabled={busy} /></View>
+                </View>
+              )}
+            </React.Fragment>
           );
         })}
         {movement && (
@@ -363,6 +488,17 @@ export function InsumosView({ perfumes, onChanged }: { perfumes: Perfume[]; onCh
             <Text style={styles.rowTitle}>{movement.type === 'entrada' ? 'Entrada' : 'Saída'} · {movement.name}</Text>
             <TInput keyboardType="decimal-pad" value={movementQty} onChangeText={setMovementQty} placeholder="Quantidade" />
             <View style={styles.buttonRow}><SecondaryButton label="Cancelar" onPress={() => setMovement(null)} /><PrimaryButton label="Registrar" onPress={() => void applyMovement()} disabled={busy || parseNumber(movementQty) <= 0} /></View>
+          </View>
+        )}
+        {items.some((item) => !item.ativo) && (
+          <View style={styles.archivedSection}>
+            <Text style={styles.sectionCaption}>ARQUIVADOS</Text>
+            {items.filter((item) => !item.ativo).map((item) => (
+              <View key={item.id} style={styles.archivedRow}>
+                <View style={{ flex: 1 }}><Text style={styles.rowTitle}>{item.nome}</Text><Text style={styles.rowMeta}>{item.categoria} · saldo histórico {item.saldoAtual.toLocaleString('pt-BR')} {item.unidade}</Text></View>
+                <Pressable accessibilityLabel={`Restaurar ${item.nome}`} style={styles.restoreAction} onPress={() => void restore(item)} disabled={busy}><Feather name="rotate-ccw" size={14} color={COLORS.sage} /><Text style={styles.restoreText}>Restaurar</Text></Pressable>
+              </View>
+            ))}
           </View>
         )}
       </Card>
@@ -580,11 +716,17 @@ const styles = StyleSheet.create({
   searchOptionActive: { borderColor: COLORS.gold, backgroundColor: COLORS.surfaceRaised },
   searchOptionText: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall },
   inventoryRow: { flexDirection: 'row', gap: SPACING.sm, paddingVertical: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
-  inventoryActions: { flexDirection: 'row', gap: SPACING.xs, alignItems: 'center' },
+  inventoryActions: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.xs, alignItems: 'center', justifyContent: 'flex-end' },
   smallAction: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
   stockValue: { color: COLORS.sage, fontSize: FONT_SIZES.bodySmall, fontWeight: '700', marginTop: 4 },
   inlineForm: { gap: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceRaised, marginTop: SPACING.sm },
-  buttonRow: { flexDirection: 'row', gap: SPACING.sm },
+  inlineHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  archiveConfirm: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surfaceRaised, marginTop: SPACING.sm },
+  archivedSection: { marginTop: SPACING.lg, paddingTop: SPACING.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
+  archivedRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.sm, opacity: 0.72 },
+  restoreAction: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
+  restoreText: { color: COLORS.sage, fontSize: FONT_SIZES.caption, fontWeight: '700' },
+  buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
   productionPlan: { marginTop: SPACING.md, gap: SPACING.sm },
   supplierRow: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, marginBottom: SPACING.sm },
   supplierRowActive: { borderColor: COLORS.gold, backgroundColor: COLORS.surfaceRaised },
