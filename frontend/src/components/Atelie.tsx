@@ -15,7 +15,7 @@ import {
   listMovimentos, createMovimento, getEstoqueMap, getEstoqueResumo, conferirEstoque,
   atualizarDisponibilidadeCatalogo,
   getCatalogoEstoqueResumo, completarEstoqueProntaEntrega, zerarEstoqueSobEncomenda,
-  listPedidos, createPedido, updatePedido, deletePedido,
+  listPedidos, createPedido, updatePedido, deletePedido, getClientePorContato,
   listOpinioes, deleteOpiniao,
   publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
   downloadBackup, getMetricas, resetAllOrders,
@@ -847,7 +847,41 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
   );
   const [searchingIdx, setSearchingIdx] = useState<number | null>(null);
   const [q, setQ] = useState('');
+  const [editandoEndereco, setEditandoEndereco] = useState(false);
+  const [recuperandoEndereco, setRecuperandoEndereco] = useState(false);
+  const [mensagemEndereco, setMensagemEndereco] = useState('');
   const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
+  const enderecoVazio = () => ({
+    cep: '', endereco: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
+  });
+  const setEndereco = (k: string, v: string) => setF((s: any) => ({
+    ...s,
+    endereco: { ...(s.endereco || enderecoVazio()), [k]: v },
+  }));
+  const pedidoRetirada = initial?.entrega?.tipo === 'retirada' || initial?.tipoEntrega === 'retirada';
+  const recuperarEnderecoCliente = async () => {
+    const contato = String(f.contato || '').trim();
+    if (!contato) {
+      setMensagemEndereco('Este pedido não possui contato para localizar o cadastro do cliente.');
+      return;
+    }
+    setRecuperandoEndereco(true);
+    setMensagemEndereco('');
+    try {
+      const cliente = await getClientePorContato(contato);
+      if (!cliente.endereco) {
+        setMensagemEndereco('O cadastro deste cliente não possui endereço salvo.');
+        return;
+      }
+      setF((current: any) => ({ ...current, endereco: { ...enderecoVazio(), ...cliente.endereco } }));
+      setEditandoEndereco(true);
+      setMensagemEndereco('Endereço recuperado do cadastro do cliente. Confira e salve o pedido.');
+    } catch {
+      setMensagemEndereco('Não foi possível localizar um endereço salvo para este contato.');
+    } finally {
+      setRecuperandoEndereco(false);
+    }
+  };
   const addItem = () => {
     if (!perfumes[0]) return;
     setF((s: any) => ({ ...s, itens: [...s.itens, { perfumeId: perfumes[0].id, ml: perfumes[0].precos?.[0]?.ml || 30, quantidade: 1 }] }));
@@ -990,30 +1024,71 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
           </View>
         </View>
       )}
-      {pedidoRecebido && initial?.entrega?.tipo !== 'retirada' && initial?.endereco && (
-        <View style={styles.orderAddressCard}>
-          <View style={styles.orderAddressIcon}>
-            <Feather name="map-pin" size={17} color={COLORS.gold} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.orderAddressEyebrow}>ENDEREÇO DE ENTREGA</Text>
-            <Text style={styles.orderAddressTitle}>
-              {initial.endereco.endereco}, {initial.endereco.numero}
-              {initial.endereco.complemento ? ` · ${initial.endereco.complemento}` : ''}
+      {pedidoRecebido && !pedidoRetirada && (
+        <View style={{ marginBottom: SPACING.md }}>
+          {f.endereco ? (
+            <View style={styles.orderAddressCard}>
+              <View style={styles.orderAddressIcon}>
+                <Feather name="map-pin" size={17} color={COLORS.gold} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.orderAddressEyebrow}>ENDEREÇO DE ENTREGA</Text>
+                <Text style={styles.orderAddressTitle}>
+                  {f.endereco.endereco}, {f.endereco.numero}
+                  {f.endereco.complemento ? ` · ${f.endereco.complemento}` : ''}
+                </Text>
+                <Text style={styles.orderAddressMeta}>
+                  {f.endereco.bairro} · {f.endereco.cidade}/{f.endereco.estado}
+                </Text>
+                <Text style={styles.orderAddressMeta}>
+                  CEP {String(f.endereco.cep || '').replace(/\D/g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2')}
+                </Text>
+                <Pressable onPress={() => setEditandoEndereco((value) => !value)} style={{ marginTop: 8 }} testID="pedido-editar-endereco">
+                  <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label }}>{editandoEndereco ? 'Fechar edição' : 'Editar endereço'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.orderAddressWarning}>
+              <Feather name="alert-triangle" size={16} color={COLORS.rust} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.orderAddressWarningText}>Endereço de entrega não está gravado neste pedido.</Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
+                  <Pressable onPress={recuperarEnderecoCliente} disabled={recuperandoEndereco} testID="pedido-recuperar-endereco">
+                    <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label }}>
+                      {recuperandoEndereco ? 'Buscando…' : 'Buscar no cadastro do cliente'}
+                    </Text>
+                  </Pressable>
+                  <Pressable onPress={() => { setF((current: any) => ({ ...current, endereco: enderecoVazio() })); setEditandoEndereco(true); }} testID="pedido-adicionar-endereco">
+                    <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label }}>Adicionar manualmente</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {!!mensagemEndereco && (
+            <Text style={{ color: mensagemEndereco.startsWith('Endereço recuperado') ? COLORS.sage : COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 6 }}>
+              {mensagemEndereco}
             </Text>
-            <Text style={styles.orderAddressMeta}>
-              {initial.endereco.bairro} · {initial.endereco.cidade}/{initial.endereco.estado}
-            </Text>
-            <Text style={styles.orderAddressMeta}>
-              CEP {String(initial.endereco.cep || '').replace(/\D/g, '').replace(/^(\d{5})(\d{3})$/, '$1-$2')}
-            </Text>
-          </View>
-        </View>
-      )}
-      {pedidoRecebido && initial?.entrega?.tipo === 'entrega' && !initial?.endereco && (
-        <View style={styles.orderAddressWarning}>
-          <Feather name="alert-triangle" size={16} color={COLORS.rust} />
-          <Text style={styles.orderAddressWarningText}>Endereço de entrega não encontrado neste pedido.</Text>
+          )}
+
+          {editandoEndereco && f.endereco && (
+            <View style={{ marginTop: SPACING.sm, padding: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, backgroundColor: COLORS.surface }}>
+              <Field label="CEP"><TInput keyboardType="numeric" value={f.endereco.cep || ''} onChangeText={(v) => setEndereco('cep', v)} /></Field>
+              <Field label="Endereço"><TInput value={f.endereco.endereco || ''} onChangeText={(v) => setEndereco('endereco', v)} /></Field>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 1 }}><Field label="Número"><TInput value={f.endereco.numero || ''} onChangeText={(v) => setEndereco('numero', v)} /></Field></View>
+                <View style={{ flex: 2 }}><Field label="Complemento"><TInput value={f.endereco.complemento || ''} onChangeText={(v) => setEndereco('complemento', v)} /></Field></View>
+              </View>
+              <Field label="Bairro"><TInput value={f.endereco.bairro || ''} onChangeText={(v) => setEndereco('bairro', v)} /></Field>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <View style={{ flex: 3 }}><Field label="Cidade"><TInput value={f.endereco.cidade || ''} onChangeText={(v) => setEndereco('cidade', v)} /></Field></View>
+                <View style={{ flex: 1 }}><Field label="UF"><TInput maxLength={2} autoCapitalize="characters" value={f.endereco.estado || ''} onChangeText={(v) => setEndereco('estado', v)} /></Field></View>
+              </View>
+              <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>O endereço será gravado quando você tocar em “Salvar pedido”.</Text>
+            </View>
+          )}
         </View>
       )}
       <Field label="Status">
@@ -1560,6 +1635,15 @@ export function Atelie({
     contato: data.contato || '',
     status: data.status,
     observacoes: data.observacoes || '',
+    endereco: data.endereco ? {
+      cep: String(data.endereco.cep || '').replace(/\D/g, ''),
+      endereco: String(data.endereco.endereco || '').trim(),
+      numero: String(data.endereco.numero || '').trim(),
+      complemento: String(data.endereco.complemento || '').trim(),
+      bairro: String(data.endereco.bairro || '').trim(),
+      cidade: String(data.endereco.cidade || '').trim(),
+      estado: String(data.endereco.estado || '').trim().toUpperCase(),
+    } : undefined,
     itens: (data.itens || []).map((item: any) => ({
       perfumeId: item.perfumeId,
       ml: Number(item.ml),
