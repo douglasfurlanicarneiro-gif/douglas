@@ -25,6 +25,7 @@ import {
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
+import { CustosView, FornecedoresView, InsumosView } from './GestaoOperacional';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'availability' }
@@ -540,6 +541,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
     nome: '', imagemUrl: '', ocasioes: [], familia: FAMILIAS[0], familias: [FAMILIAS[0]], concentracao: CONCENTRACOES[0],
     notasSaida: '', notasCoracao: '', notasFundo: '',
     precos: [{ ml: 30, preco: 0 }], estoqueMinimoMl: 100, publicavel: false, prontaEntrega: false,
+    custoEssenciaPorMl: 0, concentracaoPercentual: 25, fornecedorId: '', fornecedorCodigo: '',
   });
   const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
   const toggleOcasiao = (value: string) => setF((s: any) => {
@@ -634,6 +636,26 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
       <Field label="Estoque mínimo de alerta (ml)">
         <TInput keyboardType="numeric" value={String(f.estoqueMinimoMl)} onChangeText={(v) => set('estoqueMinimoMl', Number(v) || 0)} />
       </Field>
+      <View style={{ padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
+        <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700', marginBottom: 8 }}>CUSTO & PRODUÇÃO · ADMINISTRATIVO</Text>
+        <Field label="Custo da essência por ml (R$)">
+          <TInput
+            keyboardType="decimal-pad"
+            value={String(f.custoEssenciaPorMl ?? 0).replace('.', ',')}
+            onChangeText={(v) => set('custoEssenciaPorMl', Number(v.replace(',', '.')) || 0)}
+            placeholder="0,00"
+          />
+        </Field>
+        <Field label="Concentração real da fórmula (%)">
+          <TInput
+            keyboardType="decimal-pad"
+            value={String(f.concentracaoPercentual ?? 25).replace('.', ',')}
+            onChangeText={(v) => set('concentracaoPercentual', Math.min(100, Math.max(0, Number(v.replace(',', '.')) || 0)))}
+            placeholder="25"
+          />
+        </Field>
+        <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>Esses dados não aparecem na vitrine. Eles alimentam lucro, margem e ordens de produção.</Text>
+      </View>
       <Pressable onPress={() => set('prontaEntrega', !f.prontaEntrega)} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, marginBottom: SPACING.md }}>
         <View style={{ flex: 1, paddingRight: SPACING.md }}>
           <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body }}>Pronta entrega</Text>
@@ -1094,7 +1116,7 @@ export function Atelie({
 }) {
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState('dashboard');
-  const [systemView, setSystemView] = useState<'main' | 'historico' | 'fornecedores'>('main');
+  const [systemView, setSystemView] = useState<'main' | 'historico' | 'fornecedores' | 'custos' | 'insumos'>('main');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
@@ -1109,6 +1131,7 @@ export function Atelie({
   const [search, setSearch] = useState('');
   const [publicando, setPublicando] = useState(false);
   const [metricas, setMetricas] = useState<Metricas | null>(null);
+  const [metricPeriod, setMetricPeriod] = useState<'7d' | '30d' | 'mes' | 'todos'>('30d');
   const [freteConfig, setFreteConfig] = useState<ConfiguracaoFrete | null>(null);
   const [freteFeeInput, setFreteFeeInput] = useState('0,00');
   const [freteCepInput, setFreteCepInput] = useState('');
@@ -1175,7 +1198,7 @@ export function Atelie({
         optional('sugestões', listSugestoes()),
         optional('compras', listCompras()),
         optional('estoque', estoque),
-        optional('métricas', getMetricas()),
+        optional('métricas', getMetricas('30d')),
         optional('frete', getConfiguracaoFrete()),
         optional('configurações', getConfiguracoesLoja()),
         optional('resumo do catálogo', getCatalogoEstoqueResumo()),
@@ -1211,6 +1234,15 @@ export function Atelie({
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const changeMetricPeriod = async (period: '7d' | '30d' | 'mes' | 'todos') => {
+    setMetricPeriod(period);
+    try {
+      setMetricas(await getMetricas(period));
+    } catch (error) {
+      setSheet({ type: 'info', label: error instanceof ApiError ? error.message : 'Não foi possível atualizar o período do dashboard.' });
+    }
+  };
 
   const saveFreteConfig = async () => {
     const fee = Number(freteFeeInput.replace(',', '.'));
@@ -1670,25 +1702,98 @@ export function Atelie({
           </View>
           {metricas && (
             <View style={styles.metricsPanel}>
-              <Text style={styles.sectionLabel}>VISÃO DO NEGÓCIO</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.sm, flexWrap: 'wrap' }}>
+                <Text style={styles.sectionLabel}>VISÃO DO NEGÓCIO</Text>
+                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                  {([['7d', '7 dias'], ['30d', '30 dias'], ['mes', 'Este mês'], ['todos', 'Tudo']] as const).map(([id, label]) => (
+                    <Pressable key={id} onPress={() => void changeMetricPeriod(id)} style={[styles.miniChip, metricPeriod === id && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
+                      <Text style={{ color: metricPeriod === id ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
               <View style={styles.metricsRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.metricLabel}>Faturamento em pedidos</Text>
-                  <Text style={styles.metricValue}>{brl(metricas.faturamento)}</Text>
+                  <Text style={styles.metricLabel}>Receita confirmada</Text>
+                  <Text style={styles.metricValue}>{brl(metricas.receitaConfirmada)}</Text>
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.metricLabel}>Lucro estimado</Text>
+                  <Text style={[styles.metricValue, { color: metricas.lucroEstimado >= 0 ? COLORS.sage : COLORS.rust }]}>{brl(metricas.lucroEstimado)}</Text>
+                </View>
+              </View>
+              <View style={[styles.metricsRow, { marginTop: SPACING.md }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.metricLabel}>Ticket médio</Text>
                   <Text style={styles.metricValue}>{brl(metricas.ticketMedio)}</Text>
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.metricLabel}>Margem estimada</Text>
+                  <Text style={styles.metricValue}>{metricas.margemEstimada.toFixed(1)}%</Text>
+                </View>
               </View>
+              <View style={[styles.metricsRow, { marginTop: SPACING.md }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.metricLabel}>A receber</Text>
+                  <Text style={styles.metricValue}>{brl(metricas.aReceber)}</Text>
+                  <Text style={styles.metricSubtle}>{metricas.pedidosPendentes} pendente(s)</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.metricLabel}>Volume vendido</Text>
+                  <Text style={styles.metricValue}>{metricas.mlVendidos.toLocaleString('pt-BR')} ml</Text>
+                  <Text style={styles.metricSubtle}>{metricas.pedidosPagos} pedido(s) pago(s)</Text>
+                </View>
+              </View>
+              {metricas.serieDiaria?.length > 0 && (() => {
+                const dias = metricas.serieDiaria.slice(-14);
+                const maxReceita = Math.max(1, ...dias.map((dia) => dia.receita));
+                return (
+                  <>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: SPACING.lg }}>
+                      <Text style={styles.metricLabel}>RECEITA DIÁRIA</Text>
+                      {!!metricas.tamanhoMaisVendido && (
+                        <Text style={styles.metricSubtle}>Tamanho líder: {metricas.tamanhoMaisVendido.ml}ml · {metricas.tamanhoMaisVendido.quantidade} un.</Text>
+                      )}
+                    </View>
+                    <View style={styles.metricChart}>
+                      {dias.map((dia, index) => (
+                        <View key={dia.data} style={styles.metricChartColumn}>
+                          <View style={[styles.metricChartBar, { height: Math.max(3, Math.round((dia.receita / maxReceita) * 72)) }]} />
+                          {(index === 0 || index === dias.length - 1) && (
+                            <Text style={styles.metricChartLabel}>{dia.data.slice(5).replace('-', '/')}</Text>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                );
+              })()}
               {metricas.maisVendidos.length > 0 && (
                 <>
-                  <Text style={[styles.metricLabel, { marginTop: SPACING.md }]}>MAIS VENDIDOS</Text>
+                  <Text style={[styles.metricLabel, { marginTop: SPACING.lg }]}>MAIS VENDIDOS · POR VOLUME</Text>
                   {metricas.maisVendidos.slice(0, 5).map((item, index) => (
                     <View key={`${item.perfumeId}-${index}`} style={styles.rankingRow}>
                       <Text style={styles.rankingNumber}>{index + 1}</Text>
-                      <Text style={styles.rankingName} numberOfLines={1}>{item.nome}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rankingName} numberOfLines={1}>{item.nome}</Text>
+                        <Text style={styles.metricSubtle}>{item.ml.toLocaleString('pt-BR')} ml · {brl(item.faturamento)}</Text>
+                      </View>
                       <Text style={styles.rankingQty}>{item.quantidade} un.</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+              {metricas.maisLucrativos?.length > 0 && (
+                <>
+                  <Text style={[styles.metricLabel, { marginTop: SPACING.lg }]}>MAIOR LUCRO ESTIMADO</Text>
+                  {metricas.maisLucrativos.slice(0, 3).map((item, index) => (
+                    <View key={`lucro-${item.perfumeId}-${index}`} style={styles.rankingRow}>
+                      <Text style={styles.rankingNumber}>{index + 1}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.rankingName} numberOfLines={1}>{item.nome}</Text>
+                        <Text style={styles.metricSubtle}>{brl(item.faturamento)} em vendas</Text>
+                      </View>
+                      <Text style={[styles.rankingQty, { color: item.lucroEstimado >= 0 ? COLORS.sage : COLORS.rust }]}>{brl(item.lucroEstimado)}</Text>
                     </View>
                   ))}
                 </>
@@ -2098,35 +2203,29 @@ export function Atelie({
         );
       }
 
+      if (systemView === 'custos') {
+        return (
+          <View style={styles.systemPage}>
+            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}><Feather name="arrow-left" size={16} color={COLORS.gold} /><Text style={styles.systemBackText}>Voltar ao Sistema</Text></Pressable>
+            <CustosView onChanged={() => void load()} />
+          </View>
+        );
+      }
+
+      if (systemView === 'insumos') {
+        return (
+          <View style={styles.systemPage}>
+            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}><Feather name="arrow-left" size={16} color={COLORS.gold} /><Text style={styles.systemBackText}>Voltar ao Sistema</Text></Pressable>
+            <InsumosView perfumes={perfumes} onChanged={() => void load()} />
+          </View>
+        );
+      }
+
       if (systemView === 'fornecedores') {
         return (
           <View style={styles.systemPage}>
-            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}>
-              <Feather name="arrow-left" size={16} color={COLORS.gold} />
-              <Text style={styles.systemBackText}>Voltar ao Sistema</Text>
-            </Pressable>
-            <SystemCard icon="archive" title="Fornecedores" subtitle="Importe e mantenha seu catálogo sincronizado.">
-              <View style={styles.supplierActive}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.supplierName}>Nova Essência</Text>
-                  <Text style={styles.supplierMeta}>{PRESET_FORNECEDOR.length} fragrâncias disponíveis</Text>
-                </View>
-                <View style={styles.connectedPill}><Text style={styles.connectedPillText}>ATIVO</Text></View>
-              </View>
-              <SystemAction
-                icon="download-cloud"
-                title="Importar todos os perfumes"
-                subtitle="Adiciona somente os itens que ainda não existem."
-                onPress={() => setSheet({
-                  type: 'confirm',
-                  label: `Importar e sincronizar ${PRESET_FORNECEDOR.length} fragrâncias da Nova Essência? Itens existentes serão preservados.`,
-                  onConfirm: doImport,
-                  confirmLabel: 'Sincronizar catálogo',
-                })}
-              />
-              <SystemAction icon="plus-circle" title="Essencial" subtitle="Novo fornecedor poderá ser conectado aqui." disabled badge="PLANEJADO" />
-              <SystemAction icon="plus-circle" title="Casa das Essências" subtitle="Novo fornecedor poderá ser conectado aqui." disabled badge="PLANEJADO" />
-            </SystemCard>
+            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}><Feather name="arrow-left" size={16} color={COLORS.gold} /><Text style={styles.systemBackText}>Voltar ao Sistema</Text></Pressable>
+            <FornecedoresView perfumes={perfumes} onChanged={() => void load()} />
           </View>
         );
       }
@@ -2357,12 +2456,21 @@ export function Atelie({
             )}
           </SystemCard>
 
-          <SystemCard icon="archive" title="Fornecedores" subtitle="Importe e mantenha seu catálogo sincronizado.">
+          <SystemCard icon="dollar-sign" title="Custos & Rentabilidade" subtitle="Custo real por frasco, lucro estimado e margem por perfume.">
+            <SystemAction icon="trending-up" title="Abrir custos" subtitle="Configure base, frascos, embalagem e acompanhe rentabilidade." onPress={() => setSystemView('custos')} badge="NOVO" />
+          </SystemCard>
+
+          <SystemCard icon="package" title="Matérias-primas & Produção" subtitle="Essências, base, frascos e baixa automática por ordem de produção.">
+            <SystemAction icon="tool" title="Abrir produção" subtitle="Cadastre insumos, simule lotes e atualize o estoque acabado." onPress={() => setSystemView('insumos')} badge="NOVO" />
+          </SystemCard>
+
+          <SystemCard icon="archive" title="Fornecedores" subtitle="Contatos, condições comerciais e histórico de cotações.">
             <SystemAction
-              icon="external-link"
+              icon="briefcase"
               title="Abrir fornecedores"
-              subtitle="Consulte e sincronize fornecedores em uma página separada."
+              subtitle="Cadastre fornecedores, preços e vincule cotações aos perfumes."
               onPress={() => setSystemView('fornecedores')}
+              badge="NOVO"
             />
           </SystemCard>
 
@@ -2642,6 +2750,11 @@ const styles = StyleSheet.create({
   metricsRow: { flexDirection: 'row', gap: 12 },
   metricLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.6 },
   metricValue: { color: COLORS.bone, fontSize: FONT_SIZES.heading, fontWeight: '600', marginTop: 3 },
+  metricSubtle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
+  metricChart: { height: 96, flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginTop: SPACING.sm, paddingTop: SPACING.xs, borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  metricChartColumn: { flex: 1, minWidth: 4, height: 92, justifyContent: 'flex-end', alignItems: 'center' },
+  metricChartBar: { width: '72%', minWidth: 3, maxWidth: 18, borderTopLeftRadius: 3, borderTopRightRadius: 3, backgroundColor: COLORS.gold },
+  metricChartLabel: { color: COLORS.muted, fontSize: 8, marginTop: 3, position: 'absolute', bottom: -13, width: 42, textAlign: 'center' },
   rankingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   rankingNumber: { color: COLORS.gold, width: 22, fontSize: FONT_SIZES.label, fontWeight: '700' },
   rankingName: { color: COLORS.bone, flex: 1, fontSize: FONT_SIZES.label },
