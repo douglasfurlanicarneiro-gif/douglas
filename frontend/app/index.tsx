@@ -6,7 +6,7 @@ import { Vitrine } from '../src/components/Vitrine';
 import { BottomSheet } from '../src/components/BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton } from '../src/components/atoms';
 import { LaunchIntro } from '../src/components/LaunchIntro';
-import { login, saveToken, getToken, clearToken, getConfiguracoesPublicas } from '../src/api';
+import { ApiError, login, saveToken, getToken, clearToken, getConfiguracoesPublicas } from '../src/api';
 import { DEFAULT_STORE_CONFIG, publicStoreConfig } from '../src/storeConfig';
 import type { ConfiguracoesLojaPublicas } from '../src/types';
 import { AppText as Text } from '../src/components/Typography';
@@ -44,7 +44,7 @@ function LoginForm({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () 
       } else {
         setErro('Usuário ou senha incorretos.');
       }
-    } catch { setErro('Erro ao conectar. Tente novamente.'); }
+    } catch (error) { setErro(error instanceof ApiError ? error.message : 'Erro ao conectar. Tente novamente.'); }
     finally { setLoading(false); }
   };
   return (
