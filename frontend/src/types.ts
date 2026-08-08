@@ -134,6 +134,16 @@ export type Pedido = {
   codigoAcompanhamento?: string;
   historicoStatus?: StatusHistoryItem[];
   pagamento?: PaymentDetails;
+  tipoEntrega?: 'entrega' | 'retirada';
+  endereco?: {
+    cep: string;
+    endereco: string;
+    numero: string;
+    complemento: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+  } | null;
 };
 
 export type Opiniao = {
