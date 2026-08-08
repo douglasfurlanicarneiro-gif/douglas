@@ -244,6 +244,20 @@ export const autorizarMelhorEnvio = () =>
   request<{ url: string }>('/integracoes/melhor-envio/autorizar', { method: 'POST' }, true);
 
 // Pedidos
+export const getClientePorContato = (contato: string) => request<{
+  contato: string;
+  nomeCompleto?: string;
+  endereco?: {
+    cep: string;
+    endereco: string;
+    numero: string;
+    complemento?: string;
+    bairro: string;
+    cidade: string;
+    estado: string;
+  };
+}>(`/clientes/por-contato/${encodeURIComponent(contato)}`, {}, true);
+
 export const listPedidos = () => request<Pedido[]>('/pedidos', {}, true);
 export const createPedido = (data: Omit<Pedido, 'id' | 'seq' | 'criadoEm'>) => request<Pedido>('/pedidos', { method: 'POST', body: JSON.stringify(data) }, true);
 export const updatePedido = (id: string, data: Partial<Pedido>) => request<Pedido>(`/pedidos/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
@@ -341,10 +355,6 @@ export const listInsumos = () => request<Insumo[]>('/admin/insumos', {}, true);
 export const createInsumo = (data: {
   nome: string; categoria: Insumo['categoria']; unidade: Insumo['unidade']; custoUnitario: number; estoqueMinimo: number; estoqueInicial: number; fornecedorId?: string | null; perfumeId?: string | null; tamanhoMl?: number | null; observacoes: string; ativo: boolean;
 }) => request<Insumo>('/admin/insumos', { method: 'POST', body: JSON.stringify(data) }, true);
-export const updateInsumo = (id: string, data: {
-  nome: string; categoria: Insumo['categoria']; unidade: Insumo['unidade']; custoUnitario: number; estoqueMinimo: number; fornecedorId?: string | null; perfumeId?: string | null; tamanhoMl?: number | null; observacoes: string; ativo: boolean;
-}) => request<Insumo>(`/admin/insumos/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
-export const archiveInsumo = (id: string) => request<{ status: string }>(`/admin/insumos/${id}`, { method: 'DELETE' }, true);
 export const moveInsumo = (id: string, data: { tipo: 'entrada' | 'saida'; quantidade: number; motivo: string }) => request(`/admin/insumos/${id}/movimentos`, { method: 'POST', body: JSON.stringify(data) }, true);
 export const simulateProducao = (data: { perfumeId: string; ml: number; quantidade: number }) => request<PlanoProducao>('/admin/insumos/producao/simular', { method: 'POST', body: JSON.stringify(data) }, true);
 export const registerProducao = (data: { perfumeId: string; ml: number; quantidade: number }) => request<PlanoProducao>('/admin/insumos/producao/registrar', { method: 'POST', body: JSON.stringify(data) }, true);
