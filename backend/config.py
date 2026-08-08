@@ -15,8 +15,8 @@ MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = os.getenv("DB_NAME", "atelier_perfumes")
 
 # --- Autenticação do Ateliê ---
-# Usadas apenas na primeira inicialização, para criar o usuário admin caso
-# a coleção `admins` ainda esteja vazia (ver server.py -> _seed_admin).
+# O usuário é criado quando necessário e a senha é sincronizada no bootstrap.
+# Assim, rotacionar ATELIE_ADMIN_PASSWORD no Render atualiza o hash no MongoDB.
 ATELIE_ADMIN_USER = os.getenv("ATELIE_ADMIN_USER")
 ATELIE_ADMIN_PASSWORD = os.getenv("ATELIE_ADMIN_PASSWORD")
 

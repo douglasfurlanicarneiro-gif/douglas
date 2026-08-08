@@ -19,9 +19,10 @@ from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
 from database import get_db
 from locks import stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
-                     clientes, compras, frete, movimentos, opinioes,
-                     pagamentos, pedidos, perfumes, sugestoes, vitrine)
-from security import hash_password
+                     clientes, compras, custos, fornecedores, frete, insumos,
+                     movimentos, opinioes, pagamentos, pedidos, perfumes,
+                     sugestoes, vitrine)
+from security import hash_password, verify_password
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("atelie")
@@ -42,6 +43,16 @@ async def _seed_admin():
     db = get_db()
     existente = await db.admins.find_one({"usuario": ATELIE_ADMIN_USER})
     if existente:
+        # As credenciais de ambiente são a fonte de verdade. Assim, trocar
+        # ATELIE_ADMIN_PASSWORD no Render efetivamente rotaciona a senha no
+        # MongoDB no próximo reinício/deploy, em vez de manter o hash antigo.
+        senha_hash = existente.get("senhaHash", "")
+        if not senha_hash or not verify_password(ATELIE_ADMIN_PASSWORD, senha_hash):
+            await db.admins.update_one(
+                {"_id": existente["_id"]},
+                {"$set": {"senhaHash": hash_password(ATELIE_ADMIN_PASSWORD)}},
+            )
+            logger.info("Senha do administrador sincronizada com a configuração do ambiente.")
         return
     await db.admins.insert_one({
         "usuario": ATELIE_ADMIN_USER,
@@ -54,6 +65,7 @@ async def _criar_indices():
     """Índices de integridade e desempenho das rotas mais acessadas."""
     db = get_db()
     await db.admins.create_index("usuario", unique=True)
+    await db.auth_login_attempts.create_index("bloqueadoAte")
     await db.pedidos.create_index("seq")
     await db.pedidos.create_index("status")
     await db.pedidos.create_index("pagamento.transactionNsu", sparse=True)
@@ -65,6 +77,13 @@ async def _criar_indices():
     await db.movimentos.create_index("perfumeId")
     await db.movimentos.create_index("origem")
     await db.operacoes_sistema.create_index("data")
+    await db.fornecedores.create_index("nome")
+    await db.cotacoes_fornecedores.create_index([("fornecedorId", 1), ("data", -1)])
+    await db.cotacoes_fornecedores.create_index([("perfumeId", 1), ("data", -1)])
+    await db.insumos.create_index([("categoria", 1), ("ativo", -1)])
+    await db.insumos.create_index("perfumeId")
+    await db.movimentos_insumos.create_index([("insumoId", 1), ("data", -1)])
+    await db.producoes.create_index([("perfumeId", 1), ("data", -1)])
 
 
 async def _bootstrap_database() -> None:
@@ -142,6 +161,9 @@ app.include_router(opinioes.router)
 app.include_router(pagamentos.router)
 app.include_router(sugestoes.router)
 app.include_router(compras.router)
+app.include_router(custos.router)
+app.include_router(fornecedores.router)
+app.include_router(insumos.router)
 app.include_router(frete.router)
 app.include_router(vitrine.router)
 app.include_router(clientes.router)
@@ -158,3 +180,14 @@ async def raiz():
 async def health():
     """Health check leve, sem depender do MongoDB."""
     return {"status": "ok"}
+
+
+@app.get("/health/ready")
+async def health_ready():
+    """Confirma que a API e o MongoDB estão prontos para atender o app."""
+    try:
+        await asyncio.wait_for(get_db().command("ping"), timeout=5)
+    except Exception:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=503, detail="Banco de dados indisponível.")
+    return {"status": "ready", "database": "ok"}
