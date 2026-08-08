@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from database import get_db
+from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
 from security import require_atelie_auth
 from stock import quantidades_por_perfume, validar_estoque
@@ -23,6 +24,8 @@ class ItemPedido(BaseModel):
     subtotal: Optional[float] = Field(default=None, ge=0)
     prontaEntrega: Optional[bool] = None
     tipoAtendimento: Optional[Literal["pronta_entrega", "sob_encomenda"]] = None
+    custoUnitarioEstimado: Optional[float] = Field(default=None, ge=0)
+    lucroUnitarioEstimado: Optional[float] = None
 
 
 class PedidoIn(BaseModel):
@@ -69,25 +72,41 @@ async def _itens_com_atendimento(db, itens: List[ItemPedido]) -> list[dict[str, 
             continue
     perfumes = await db.perfumes.find(
         {"_id": {"$in": object_ids}},
-        {"prontaEntrega": 1},
+        {
+            "prontaEntrega": 1,
+            "custoEssenciaPorMl": 1,
+            "concentracaoPercentual": 1,
+            "precos": 1,
+        },
     ).to_list(len(object_ids))
-    pronta_por_id = {
-        str(perfume["_id"]): perfume.get("prontaEntrega") is True
-        for perfume in perfumes
-    }
+    perfumes_por_id = {str(perfume["_id"]): perfume for perfume in perfumes}
+    config_custos = await obter_config_custos(db)
 
     resultado = []
     for item in itens:
         data = item.model_dump()
+        perfume = perfumes_por_id.get(item.perfumeId, {})
         pronta = data.get("prontaEntrega")
         if pronta is None:
             # Item antigo ou produto removido: o padrão conservador evita
             # liberar uma reserva que já existia.
-            pronta = pronta_por_id.get(item.perfumeId, True)
+            pronta = perfume.get("prontaEntrega", True)
         data["prontaEntrega"] = bool(pronta)
         data["tipoAtendimento"] = (
             "pronta_entrega" if pronta else "sob_encomenda"
         )
+        preco = data.get("precoUnitario")
+        if preco is None:
+            opcao = next(
+                (p for p in perfume.get("precos", []) if int(p.get("ml", 0) or 0) == item.ml),
+                None,
+            )
+            preco = float((opcao or {}).get("preco", 0) or 0)
+        if data.get("custoUnitarioEstimado") is None:
+            calculo = estimar_custo_unitario(perfume, item.ml, float(preco or 0), config_custos)
+            data["custoUnitarioEstimado"] = float(calculo["custoTotal"])
+        custo_snapshot = float(data.get("custoUnitarioEstimado") or 0)
+        data["lucroUnitarioEstimado"] = float(preco or 0) - custo_snapshot
         resultado.append(data)
     return resultado
 

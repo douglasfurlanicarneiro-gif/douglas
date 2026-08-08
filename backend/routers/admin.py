@@ -2,7 +2,7 @@
 import asyncio
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +12,7 @@ from pymongo import ReturnDocument
 
 from config import INFINITEPAY_HANDLE
 from database import get_db
+from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
 from payments.pix import PIX_KEY
 from security import require_atelie_auth
@@ -75,11 +76,17 @@ async def baixar_backup(_: str = Depends(require_atelie_auth)):
         "sugestoes",
         "compras",
         "operacoes_sistema",
+        "fornecedores",
+        "cotacoes_fornecedores",
+        "insumos",
+        "movimentos_insumos",
+        "producoes",
+        "configuracoes",
     )
     conteudo = {
         "aplicacao": "L'Essence Furlani",
         "geradoEm": datetime.now(timezone.utc).isoformat(),
-        "versao": 1,
+        "versao": 2,
         "dados": {},
     }
     resultados = await asyncio.gather(*[
@@ -105,78 +112,212 @@ async def baixar_backup(_: str = Depends(require_atelie_auth)):
 
 
 @router.get("/metricas")
-async def obter_metricas(_: str = Depends(require_atelie_auth)):
+async def obter_metricas(
+    periodo: str = "30d",
+    _: str = Depends(require_atelie_auth),
+):
+    """BI operacional com receita somente de pedidos efetivamente pagos.
+
+    ``periodo`` aceita 7d, 30d, mes e todos. O cálculo de lucro usa o custo
+    congelado no item quando existir e, para pedidos antigos, a configuração
+    atual de custos como estimativa.
+    """
     db = get_db()
-    pedidos = await db.pedidos.find().to_list(length=None)
-    validos = [p for p in pedidos if p.get("status") != "cancelado"]
+    agora = datetime.now(timezone.utc)
+    filtro: dict = {}
+    if periodo == "7d":
+        filtro["criadoEm"] = {"$gte": (agora - timedelta(days=7)).isoformat()}
+    elif periodo == "30d":
+        filtro["criadoEm"] = {"$gte": (agora - timedelta(days=30)).isoformat()}
+    elif periodo == "mes":
+        inicio_mes = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        filtro["criadoEm"] = {"$gte": inicio_mes.isoformat()}
+    elif periodo != "todos":
+        periodo = "30d"
+        filtro["criadoEm"] = {"$gte": (agora - timedelta(days=30)).isoformat()}
+
+    pedidos = await db.pedidos.find(filtro).to_list(20_000)
+    status_pagos = {
+        "pagamento_confirmado",
+        "preparando",
+        "pronto",
+        "enviado",
+        "entregue",
+    }
+    pagos = [p for p in pedidos if p.get("status") in status_pagos]
+    pendentes = [p for p in pedidos if p.get("status", "pendente") == "pendente"]
+    cancelados = [p for p in pedidos if p.get("status") == "cancelado"]
 
     por_status: dict[str, int] = {}
-    produtos: dict[str, dict] = {}
-    faturamento = 0.0
     for pedido in pedidos:
         status = pedido.get("status", "pendente")
         por_status[status] = por_status.get(status, 0) + 1
-    for pedido in validos:
-        faturamento += float(pedido.get("total", 0) or 0)
+
+    ids_perfumes: set[ObjectId] = set()
+    for pedido in pagos:
         for item in pedido.get("itens", []):
-            chave = str(item.get("perfumeId", item.get("perfumeNome", "")))
+            try:
+                ids_perfumes.add(ObjectId(str(item.get("perfumeId"))))
+            except Exception:
+                continue
+    perfumes = await db.perfumes.find(
+        {"_id": {"$in": list(ids_perfumes)}},
+        {"nome": 1, "custoEssenciaPorMl": 1, "concentracaoPercentual": 1},
+    ).to_list(len(ids_perfumes)) if ids_perfumes else []
+    perfumes_por_id = {str(item["_id"]): item for item in perfumes}
+    config_custos = await obter_config_custos(db)
+
+    produtos: dict[str, dict] = {}
+    serie_diaria: dict[str, dict] = {}
+    tamanhos: dict[int, dict] = {}
+    receita_confirmada = 0.0
+    receita_entregue = 0.0
+    a_receber = sum(float(p.get("total", 0) or 0) for p in pendentes)
+    custo_estimado = 0.0
+    receita_produtos = 0.0
+    lucro_produtos_estimado = 0.0
+    ml_vendidos = 0
+
+    for pedido in pagos:
+        total_pedido = float(pedido.get("total", 0) or 0)
+        receita_confirmada += total_pedido
+        if pedido.get("status") == "entregue":
+            receita_entregue += total_pedido
+
+        data_pedido = str(pedido.get("criadoEm") or "")[:10]
+        dia = None
+        if len(data_pedido) == 10:
+            dia = serie_diaria.setdefault(data_pedido, {
+                "data": data_pedido, "receita": 0.0, "lucro": 0.0, "pedidos": 0, "ml": 0,
+            })
+            dia["receita"] += total_pedido
+            dia["pedidos"] += 1
+
+        for item in pedido.get("itens", []):
+            perfume_id = str(item.get("perfumeId") or "")
+            nome = item.get("perfumeNome") or perfumes_por_id.get(perfume_id, {}).get("nome") or "Perfume"
+            chave = perfume_id or nome
             if not chave:
                 continue
-            linha = produtos.setdefault(
-                chave,
-                {
-                    "perfumeId": item.get("perfumeId"),
-                    "nome": item.get("perfumeNome") or "Perfume",
-                    "quantidade": 0,
-                    "faturamento": 0.0,
-                },
-            )
-            quantidade = int(item.get("quantidade", 1) or 1)
-            linha["quantidade"] += quantidade
-            linha["faturamento"] += float(
-                item.get(
-                    "subtotal",
-                    float(item.get("precoUnitario", 0) or 0) * quantidade,
-                )
-                or 0
-            )
+            quantidade = max(1, int(item.get("quantidade", 1) or 1))
+            ml = max(0, int(item.get("ml", 0) or 0))
+            preco_unitario = float(item.get("precoUnitario", 0) or 0)
+            subtotal = float(item.get("subtotal", preco_unitario * quantidade) or 0)
 
+            custo_unitario = item.get("custoUnitarioEstimado")
+            if custo_unitario is None:
+                perfume = perfumes_por_id.get(perfume_id, {})
+                custo_unitario = estimar_custo_unitario(
+                    perfume, ml, preco_unitario, config_custos
+                )["custoTotal"]
+            custo_item = float(custo_unitario or 0) * quantidade
+            lucro_item = subtotal - custo_item
+            custo_estimado += custo_item
+            receita_produtos += subtotal
+            lucro_produtos_estimado += lucro_item
+            ml_item = ml * quantidade
+            ml_vendidos += ml_item
+            if dia is not None:
+                dia["lucro"] += lucro_item
+                dia["ml"] += ml_item
+            tamanho = tamanhos.setdefault(ml, {"ml": ml, "quantidade": 0, "faturamento": 0.0})
+            tamanho["quantidade"] += quantidade
+            tamanho["faturamento"] += subtotal
+
+            linha = produtos.setdefault(chave, {
+                "perfumeId": perfume_id or None,
+                "nome": nome,
+                "quantidade": 0,
+                "ml": 0,
+                "faturamento": 0.0,
+                "lucroEstimado": 0.0,
+            })
+            linha["quantidade"] += quantidade
+            linha["ml"] += ml_item
+            linha["faturamento"] += subtotal
+            linha["lucroEstimado"] += lucro_item
+
+    # Lucro de produto não inclui frete cobrado do cliente. Isso evita
+    # inflar a margem quando o total do pedido contém entrega.
+    lucro_estimado = lucro_produtos_estimado
+    margem_estimada = (lucro_estimado / receita_produtos * 100) if receita_produtos else 0.0
+    ticket_medio = receita_confirmada / len(pagos) if pagos else 0.0
     mais_vendidos = sorted(
         produtos.values(),
-        key=lambda item: (item["quantidade"], item["faturamento"]),
+        key=lambda item: (item["ml"], item["faturamento"]),
         reverse=True,
     )[:10]
-    # Pedidos administrativos antigos guardavam somente o perfumeId. Resolva
-    # os nomes em lote para o ranking não aparecer como "Perfume".
-    ids_produtos: list[ObjectId] = []
-    for item in mais_vendidos:
-        perfume_id = item.get("perfumeId")
-        if not perfume_id:
-            continue
-        try:
-            ids_produtos.append(ObjectId(str(perfume_id)))
-        except Exception:
-            continue
-    nomes_por_id = {
-        str(perfume["_id"]): perfume.get("nome", "Perfume")
-        for perfume in await db.perfumes.find(
-            {"_id": {"$in": ids_produtos}},
-            {"nome": 1},
-        ).to_list(len(ids_produtos))
-    } if ids_produtos else {}
-    for item in mais_vendidos:
-        if item.get("nome") == "Perfume" and item.get("perfumeId"):
-            item["nome"] = nomes_por_id.get(str(item["perfumeId"]), "Perfume removido")
-    ticket_medio = faturamento / len(validos) if validos else 0
+    mais_lucrativos = sorted(
+        produtos.values(),
+        key=lambda item: (item["lucroEstimado"], item["faturamento"]),
+        reverse=True,
+    )[:10]
+    tamanho_mais_vendido = max(
+        tamanhos.values(), key=lambda item: (item["quantidade"], item["faturamento"]), default=None
+    )
+
+    # Para períodos curtos, preenche dias sem venda para o gráfico não
+    # desaparecer nem sugerir continuidade onde houve zero movimento.
+    if periodo in {"7d", "30d", "mes"}:
+        if periodo == "7d":
+            inicio_serie = (agora - timedelta(days=6)).date()
+        elif periodo == "30d":
+            inicio_serie = (agora - timedelta(days=29)).date()
+        else:
+            inicio_serie = agora.replace(day=1).date()
+        cursor = inicio_serie
+        while cursor <= agora.date():
+            chave_dia = cursor.isoformat()
+            serie_diaria.setdefault(chave_dia, {
+                "data": chave_dia, "receita": 0.0, "lucro": 0.0, "pedidos": 0, "ml": 0,
+            })
+            cursor += timedelta(days=1)
+
     return {
+        "periodo": periodo,
         "pedidosTotal": len(pedidos),
-        "pedidosValidos": len(validos),
+        "pedidosValidos": len([p for p in pedidos if p.get("status") != "cancelado"]),
+        "pedidosPagos": len(pagos),
+        "pedidosPendentes": len(pendentes),
+        "pedidosCancelados": len(cancelados),
         "pedidosPorStatus": por_status,
-        "faturamento": round(faturamento, 2),
+        # Mantido por compatibilidade; agora significa receita confirmada.
+        "faturamento": round(receita_confirmada, 2),
+        "receitaConfirmada": round(receita_confirmada, 2),
+        "receitaEntregue": round(receita_entregue, 2),
+        "aReceber": round(a_receber, 2),
         "ticketMedio": round(ticket_medio, 2),
+        "custoEstimado": round(custo_estimado, 2),
+        "lucroEstimado": round(lucro_estimado, 2),
+        "margemEstimada": round(margem_estimada, 2),
+        "mlVendidos": int(ml_vendidos),
+        "tamanhoMaisVendido": (
+            {**tamanho_mais_vendido, "faturamento": round(tamanho_mais_vendido["faturamento"], 2)}
+            if tamanho_mais_vendido else None
+        ),
+        "serieDiaria": [
+            {
+                **item,
+                "receita": round(item["receita"], 2),
+                "lucro": round(item["lucro"], 2),
+            }
+            for item in sorted(serie_diaria.values(), key=lambda item: item["data"])
+        ],
         "maisVendidos": [
-            {**item, "faturamento": round(item["faturamento"], 2)}
+            {
+                **item,
+                "faturamento": round(item["faturamento"], 2),
+                "lucroEstimado": round(item["lucroEstimado"], 2),
+            }
             for item in mais_vendidos
+        ],
+        "maisLucrativos": [
+            {
+                **item,
+                "faturamento": round(item["faturamento"], 2),
+                "lucroEstimado": round(item["lucroEstimado"], 2),
+            }
+            for item in mais_lucrativos
         ],
     }
 

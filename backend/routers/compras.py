@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from config import INFINITEPAY_HANDLE
 from database import get_db
+from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
 from payments.base import PaymentProviderError
 from payments.service import iniciar_pagamento
@@ -136,6 +137,7 @@ async def _criar_compra(payload: CompraIn):
 
     perfumes = await db.perfumes.find({"_id": {"$in": ids}}).to_list(len(ids))
     perfumes_por_id = {str(p["_id"]): p for p in perfumes}
+    config_custos = await obter_config_custos(db)
     itens_doc = []
     total = 0.0
     for item in itens_entrada:
@@ -145,15 +147,19 @@ async def _criar_compra(payload: CompraIn):
         opcao = next((p for p in perfume.get("precos", []) if p.get("ml") == item.ml), None)
         if not opcao or float(opcao.get("preco", 0)) <= 0:
             raise HTTPException(status_code=400, detail=f"Tamanho indisponível para {perfume['nome']}.")
-        subtotal = round(float(opcao["preco"]) * item.quantidade, 2)
+        preco_unitario = float(opcao["preco"])
+        subtotal = round(preco_unitario * item.quantidade, 2)
         total += subtotal
+        calculo_custo = estimar_custo_unitario(perfume, item.ml, preco_unitario, config_custos)
         itens_doc.append({
             "perfumeId": item.perfumeId,
             "perfumeNome": perfume["nome"],
             "ml": item.ml,
             "quantidade": item.quantidade,
-            "precoUnitario": float(opcao["preco"]),
+            "precoUnitario": preco_unitario,
             "subtotal": subtotal,
+            "custoUnitarioEstimado": float(calculo_custo["custoTotal"]),
+            "lucroUnitarioEstimado": float(calculo_custo["lucro"]),
             "prontaEntrega": perfume.get("prontaEntrega") is True,
             "tipoAtendimento": (
                 "pronta_entrega"

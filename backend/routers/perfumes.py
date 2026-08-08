@@ -134,6 +134,11 @@ class PerfumeIn(BaseModel):
     estoqueMinimoMl: int = Field(default=0, ge=0, le=1_000_000)
     publicavel: bool = False
     prontaEntrega: bool = False
+    # Dados administrativos: nunca são enviados para a vitrine pública.
+    custoEssenciaPorMl: float = Field(default=0, ge=0, le=100_000)
+    concentracaoPercentual: float = Field(default=25, ge=0, le=100)
+    fornecedorId: str = Field(default="", max_length=80)
+    fornecedorCodigo: str = Field(default="", max_length=120)
 
     @model_validator(mode="after")
     def validar_publicacao(self):
@@ -249,6 +254,10 @@ async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_ateli
             "precos": [],
             "estoqueMinimoMl": 0,
             "prontaEntrega": False,
+            "custoEssenciaPorMl": 0,
+            "concentracaoPercentual": 25,
+            "fornecedorId": "",
+            "fornecedorCodigo": "",
             # Trava de segurança (auditoria A6): item importado em massa nunca
             # entra publicável por padrão — sem preço/estoque revisados, não
             # pode aparecer na vitrine pública até alguém editar e confirmar.

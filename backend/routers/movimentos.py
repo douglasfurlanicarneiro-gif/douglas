@@ -181,7 +181,7 @@ async def apagar_movimento(movimento_id: str, _: str = Depends(require_atelie_au
 
 
 @router.get("/api/estoque")
-async def mapa_estoque():
+async def mapa_estoque(_: str = Depends(require_atelie_auth)):
     db = get_db()
     mapa: dict[str, int] = {}
     async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):

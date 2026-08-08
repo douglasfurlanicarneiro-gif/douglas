@@ -25,6 +25,21 @@ def _alphabetical_name(item: dict) -> str:
     ).casefold()
 
 
+_ADMIN_ONLY_FIELDS = {
+    "estoqueAtualMl",
+    "estoqueMinimoMl",
+    "custoEssenciaPorMl",
+    "concentracaoPercentual",
+    "fornecedorId",
+    "fornecedorCodigo",
+}
+
+
+def _item_publico(item: dict) -> dict:
+    """Remove estoque exato, custos e referências internas do payload público."""
+    return {chave: valor for chave, valor in item.items() if chave not in _ADMIN_ONLY_FIELDS}
+
+
 def _aplicar_disponibilidade(
     item: dict,
     *,
@@ -36,7 +51,6 @@ def _aplicar_disponibilidade(
     tamanhos = tamanhos_disponiveis(item, saldo_livre_ml)
 
     item["prontaEntrega"] = pronta_entrega
-    item["estoqueAtualMl"] = max(saldo_fisico_ml, 0)
     item["tamanhosDisponiveisMl"] = tamanhos
     if pronta_entrega:
         item["disponivel"] = bool(tamanhos)
@@ -54,7 +68,7 @@ async def publicar_snapshot(db, *, registrar_operacao: bool = True) -> dict:
 
     itens = []
     for perfume in perfumes:
-        item = serialize(perfume)
+        item = _item_publico(serialize(perfume))
         qtd = estoque_map.get(item["id"], 0)
         _aplicar_disponibilidade(
             item,
@@ -92,7 +106,7 @@ async def obter_vitrine():
     estoque_map = await mapa_saldo_fisico(db)
     reservado_map = await mapa_reservado(db)
 
-    itens = [dict(item) for item in snapshot.get("itens", [])]
+    itens = [_item_publico(dict(item)) for item in snapshot.get("itens", [])]
     for item in itens:
         qtd = estoque_map.get(item.get("id"), 0)
         _aplicar_disponibilidade(
