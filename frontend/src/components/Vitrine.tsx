@@ -9,7 +9,7 @@ import { COLORS, SPACING, RADIUS, FONT_SIZES, brl, familiasDoPerfume, nomeConcen
 import { BottomSheet } from './BottomSheet';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
 import { Field, TInput, PrimaryButton, SecondaryButton, Chip, Stars } from './atoms';
-import { ApiError, confirmarPagamentoInfinitePay, createOpiniao, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
+import { ApiError, confirmarPagamentoInfinitePay, createOpiniao, createSolicitacaoPrivacidade, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
 import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
 import { storage } from '../utils/storage';
@@ -97,6 +97,11 @@ const FAQ_ITEMS: { question: string; answer: string; icon: FeatherIconName }[] =
     question: 'Os perfumes já vêm prontos para uso?',
     answer: 'Sim. Todos os perfumes passam pelo período adequado de maturação antes do envio, buscando oferecer o melhor desempenho olfativo.',
     icon: 'check-circle',
+  },
+  {
+    question: 'Como meus dados pessoais são usados?',
+    answer: 'Usamos nome, contato, e-mail e endereço somente para processar, entregar e permitir o acompanhamento do pedido. Salvar os dados para compras futuras é opcional. Você pode solicitar acesso, correção, exclusão ou revogar esse consentimento pela área de Privacidade desta Central de Ajuda.',
+    icon: 'shield',
   },
 ];
 const PRODUCT_CARD_COLORS = {
@@ -279,6 +284,7 @@ export function Vitrine({
   const [contactFallback, setContactFallback] = useState<ContactFallback | null>(null);
   const [sugestaoOpen, setSugestaoOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [faqExpanded, setFaqExpanded] = useState<number | null>(0);
   const [reviewItem, setReviewItem] = useState<VitrineItem | null>(null);
   const [info, setInfo] = useState<string | null>(null);
@@ -301,6 +307,14 @@ export function Vitrine({
   const loadRef = useRef<() => Promise<void>>(async () => undefined);
 
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
+  const [privacyForm, setPrivacyForm] = useState({
+    tipo: 'acesso' as 'acesso' | 'correcao' | 'exclusao' | 'revogacao',
+    nome: '',
+    contato: '',
+    email: '',
+    mensagem: '',
+    confirmacaoTitularidade: false,
+  });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
   const [enviando, setEnviando] = useState(false);
   const manualPixCode = successOrder?.pagamento?.metodo === 'pix'
@@ -664,6 +678,38 @@ export function Vitrine({
       setSuggestionSuccess(true);
     } catch { setInfo('Não foi possível enviar. Tente novamente.'); }
     finally { setEnviando(false); }
+  };
+
+  const submitPrivacyRequest = async () => {
+    if (
+      privacyForm.nome.trim().length < 2
+      || privacyForm.contato.trim().length < 8
+      || !privacyForm.confirmacaoTitularidade
+    ) return;
+    setEnviando(true);
+    try {
+      const result = await createSolicitacaoPrivacidade({
+        ...privacyForm,
+        nome: privacyForm.nome.trim(),
+        contato: privacyForm.contato.trim(),
+        email: privacyForm.email.trim() || undefined,
+        mensagem: privacyForm.mensagem.trim(),
+      });
+      setPrivacyOpen(false);
+      setPrivacyForm({
+        tipo: 'acesso',
+        nome: '',
+        contato: '',
+        email: '',
+        mensagem: '',
+        confirmacaoTitularidade: false,
+      });
+      setInfo(`Solicitação recebida. Guarde seu protocolo: ${result.protocolo}`);
+    } catch (error) {
+      setInfo(error instanceof ApiError ? error.message : 'Não foi possível enviar sua solicitação.');
+    } finally {
+      setEnviando(false);
+    }
   };
 
   const submitReview = async () => {
@@ -1243,6 +1289,21 @@ export function Vitrine({
               </Pressable>
             );
           })}
+          <Pressable
+            onPress={() => {
+              setFaqOpen(false);
+              setPrivacyOpen(true);
+            }}
+            style={styles.contactAction}
+            testID="faq-privacy"
+          >
+            <View style={styles.contactActionIcon}><Feather name="shield" size={17} color={COLORS.gold} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.contactActionTitle}>Privacidade e seus dados</Text>
+              <Text style={styles.contactActionSubtitle}>Solicite acesso, correção, exclusão ou revogação</Text>
+            </View>
+            <Feather name="chevron-right" size={15} color={COLORS.muted} />
+          </Pressable>
           {!!supportNumber && (
             <Pressable
               onPress={() => {
@@ -1277,6 +1338,52 @@ export function Vitrine({
           <View style={styles.contactFallbackActions}>
             <SecondaryButton label="Copiar contato" onPress={() => { void copyContact(); }} />
             <PrimaryButton label="Tentar novamente" onPress={retryContactRedirect} testID="contact-retry" />
+          </View>
+        </View>
+      </BottomSheet>
+
+      <BottomSheet visible={privacyOpen} onClose={() => setPrivacyOpen(false)} title="Privacidade e seus dados" testID="privacy-sheet">
+        <View>
+          <Text style={styles.contactIntro}>
+            Use este canal para exercer seus direitos sobre os dados pessoais tratados em suas compras.
+          </Text>
+          <Text style={styles.formSectionLabel}>O QUE VOCÊ DESEJA?</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg }}>
+            {([
+              ['acesso', 'Acessar dados'],
+              ['correcao', 'Corrigir'],
+              ['exclusao', 'Excluir'],
+              ['revogacao', 'Revogar'],
+            ] as const).map(([tipo, label]) => (
+              <Chip
+                key={tipo}
+                label={label}
+                active={privacyForm.tipo === tipo}
+                onPress={() => setPrivacyForm({ ...privacyForm, tipo })}
+              />
+            ))}
+          </View>
+          <Field label="Nome completo"><TInput value={privacyForm.nome} onChangeText={(nome) => setPrivacyForm({ ...privacyForm, nome })} /></Field>
+          <Field label="Celular / WhatsApp"><TInput keyboardType="phone-pad" value={privacyForm.contato} onChangeText={(contato) => setPrivacyForm({ ...privacyForm, contato })} /></Field>
+          <Field label="E-mail (opcional)"><TInput keyboardType="email-address" autoCapitalize="none" value={privacyForm.email} onChangeText={(email) => setPrivacyForm({ ...privacyForm, email })} /></Field>
+          <Field label="Detalhes (opcional)"><TInput multiline value={privacyForm.mensagem} onChangeText={(mensagem) => setPrivacyForm({ ...privacyForm, mensagem })} style={{ minHeight: 82, textAlignVertical: 'top' }} /></Field>
+          <Pressable
+            onPress={() => setPrivacyForm({ ...privacyForm, confirmacaoTitularidade: !privacyForm.confirmacaoTitularidade })}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: privacyForm.confirmacaoTitularidade }}
+            style={styles.privacyConfirmation}
+          >
+            <Feather name={privacyForm.confirmacaoTitularidade ? 'check-square' : 'square'} size={19} color={privacyForm.confirmacaoTitularidade ? COLORS.gold : COLORS.muted} />
+            <Text style={styles.privacyConfirmationText}>Confirmo que esta solicitação se refere aos meus próprios dados.</Text>
+          </Pressable>
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
+            <SecondaryButton label="Cancelar" onPress={() => setPrivacyOpen(false)} />
+            <PrimaryButton
+              label={enviando ? 'Enviando…' : 'Enviar solicitação'}
+              onPress={submitPrivacyRequest}
+              disabled={enviando || privacyForm.nome.trim().length < 2 || privacyForm.contato.trim().length < 8 || !privacyForm.confirmacaoTitularidade}
+              testID="privacy-submit"
+            />
           </View>
         </View>
       </BottomSheet>
@@ -1536,6 +1643,9 @@ const styles = StyleSheet.create({
   filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg },
   filterSheetActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
   contactIntro: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.md },
+  formSectionLabel: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600', letterSpacing: 1.2, marginBottom: SPACING.sm },
+  privacyConfirmation: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
+  privacyConfirmationText: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18 },
   contactAction: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   contactActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   contactActionTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },

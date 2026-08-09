@@ -23,8 +23,9 @@ import {
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
   aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
   listArquivados, restoreArquivado,
+  listSolicitacoesPrivacidade, updateSolicitacaoPrivacidade,
 } from '../api';
-import type { RegistroArquivado } from '../api';
+import type { RegistroArquivado, SolicitacaoPrivacidade } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
@@ -1288,7 +1289,7 @@ export function Atelie({
 }) {
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState('dashboard');
-  const [systemView, setSystemView] = useState<'main' | 'historico' | 'arquivados' | 'fornecedores' | 'custos' | 'insumos'>('main');
+  const [systemView, setSystemView] = useState<'main' | 'historico' | 'arquivados' | 'privacidade' | 'fornecedores' | 'custos' | 'insumos'>('main');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
@@ -1301,6 +1302,8 @@ export function Atelie({
   const [catalogoEstoque, setCatalogoEstoque] = useState<CatalogoEstoqueResumo | null>(null);
   const [arquivados, setArquivados] = useState<RegistroArquivado[]>([]);
   const [loadingArquivados, setLoadingArquivados] = useState(false);
+  const [solicitacoesPrivacidade, setSolicitacoesPrivacidade] = useState<SolicitacaoPrivacidade[]>([]);
+  const [loadingPrivacidade, setLoadingPrivacidade] = useState(false);
   const [sheet, setSheet] = useState<SheetType>(null);
   const [search, setSearch] = useState('');
   const [stockSearch, setStockSearch] = useState('');
@@ -1442,6 +1445,30 @@ export function Atelie({
         await load();
       },
     });
+  };
+
+  const openPrivacidade = async () => {
+    setSystemView('privacidade');
+    setLoadingPrivacidade(true);
+    try {
+      setSolicitacoesPrivacidade(await listSolicitacoesPrivacidade());
+    } catch (error) {
+      setSheet({
+        type: 'info',
+        label: error instanceof ApiError ? error.message : 'Não foi possível abrir a Central de Privacidade.',
+      });
+    } finally {
+      setLoadingPrivacidade(false);
+    }
+  };
+
+  const changePrivacyStatus = async (
+    item: SolicitacaoPrivacidade,
+    status: SolicitacaoPrivacidade['status'],
+  ) => {
+    await updateSolicitacaoPrivacidade(item.id, status);
+    setSolicitacoesPrivacidade(await listSolicitacoesPrivacidade());
+    await load();
   };
 
   const changeMetricPeriod = async (period: '7d' | '30d' | 'mes' | 'todos') => {
@@ -1857,7 +1884,7 @@ export function Atelie({
   const doBackup = async () => {
     try {
       await downloadBackup();
-      setSheet({ type: 'info', label: 'Backup gerado e baixado com sucesso. Guarde o arquivo em um local seguro.' });
+      setSheet({ type: 'info', label: 'Backup criptografado gerado com sucesso. Guarde o arquivo .lfe em um local seguro; ele não pode ser lido como um JSON comum.' });
     } catch {
       setSheet({ type: 'info', label: 'Não foi possível baixar o backup. Abra o painel no navegador e tente novamente.' });
     }
@@ -2478,6 +2505,55 @@ export function Atelie({
         );
       }
 
+      if (systemView === 'privacidade') {
+        const privacyLabels = {
+          acesso: 'Acesso aos dados',
+          correcao: 'Correção de dados',
+          exclusao: 'Exclusão de dados',
+          revogacao: 'Revogação de consentimento',
+        };
+        return (
+          <View style={styles.systemPage}>
+            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}>
+              <Feather name="arrow-left" size={16} color={COLORS.gold} />
+              <Text style={styles.systemBackText}>Voltar ao Sistema</Text>
+            </Pressable>
+            <SystemCard icon="shield" title="Central de Privacidade" subtitle="Solicitações feitas pelos clientes na vitrine.">
+              {loadingPrivacidade && <ActivityIndicator color={COLORS.gold} style={{ marginVertical: SPACING.xl }} />}
+              {!loadingPrivacidade && solicitacoesPrivacidade.length === 0 && (
+                <Text style={styles.catalogHistoryEmpty}>Nenhuma solicitação de privacidade recebida.</Text>
+              )}
+              {!loadingPrivacidade && solicitacoesPrivacidade.map((item) => (
+                <View key={item.id} style={styles.privacyAdminCard}>
+                  <View style={styles.privacyAdminHeader}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.catalogHistoryTitle}>{privacyLabels[item.tipo]}</Text>
+                      <Text style={styles.catalogHistoryDetails}>{item.protocolo} · {item.nome}</Text>
+                    </View>
+                    <Text style={styles.systemSuccessBadge}>{item.status.replace('_', ' ').toUpperCase()}</Text>
+                  </View>
+                  <Text style={styles.catalogHistoryDetails}>{item.contato}{item.email ? ` · ${item.email}` : ''}</Text>
+                  {!!item.mensagem && <Text style={styles.privacyAdminMessage}>{item.mensagem}</Text>}
+                  <Text style={styles.catalogHistoryDate}>{fmtDate(item.criadoEm)}</Text>
+                  {item.status === 'recebida' && (
+                    <Pressable onPress={() => void changePrivacyStatus(item, 'em_analise')} style={styles.systemInlineButton}>
+                      <Feather name="eye" size={14} color={COLORS.gold} />
+                      <Text style={styles.systemInlineButtonText}>Iniciar análise</Text>
+                    </Pressable>
+                  )}
+                  {item.status === 'em_analise' && (
+                    <Pressable onPress={() => void changePrivacyStatus(item, 'concluida')} style={styles.systemInlineButton}>
+                      <Feather name="check" size={14} color={COLORS.gold} />
+                      <Text style={styles.systemInlineButtonText}>Marcar concluída</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+            </SystemCard>
+          </View>
+        );
+      }
+
       if (systemView === 'custos') {
         return (
           <View style={styles.systemPage}>
@@ -2748,13 +2824,20 @@ export function Atelie({
           </SystemCard>
 
           <SystemCard icon="database" title="Base de dados" subtitle="Backup e limpezas protegidas por confirmação.">
-            <SystemAction icon="download" title="Exportar backup" subtitle="Baixe uma cópia dos dados atuais." onPress={doBackup} />
+            <SystemAction icon="download" title="Exportar backup criptografado" subtitle="Baixe uma cópia protegida e compactada dos dados atuais." onPress={doBackup} />
             <SystemAction
               icon="archive"
               title="Itens arquivados"
               subtitle="Restaure pedidos, perfumes, avaliações e sugestões preservados."
               onPress={() => void openArquivados()}
               badge={arquivados.length ? String(arquivados.length) : undefined}
+            />
+            <SystemAction
+              icon="shield"
+              title="Central de Privacidade"
+              subtitle="Atenda solicitações de acesso, correção, exclusão e revogação."
+              onPress={() => void openPrivacidade()}
+              badge={solicitacoesPrivacidade.filter((item) => item.status === 'recebida').length ? String(solicitacoesPrivacidade.filter((item) => item.status === 'recebida').length) : undefined}
             />
             <SystemAction icon="upload" title="Restaurar backup" subtitle="Importação validada de um arquivo anterior." disabled badge="PRÓXIMA ETAPA" />
             <SystemAction
@@ -3112,6 +3195,9 @@ const styles = StyleSheet.create({
   catalogHistoryDate: { color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 3 },
   systemInlineButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface },
   systemInlineButtonText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  privacyAdminCard: { paddingVertical: SPACING.md, gap: 7, borderTopWidth: 1, borderTopColor: COLORS.border },
+  privacyAdminHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm },
+  privacyAdminMessage: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, lineHeight: 18, padding: SPACING.sm, borderRadius: RADIUS.sm, backgroundColor: COLORS.surface },
   availabilitySummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   availabilitySummaryDivider: { width: 1, height: 42, backgroundColor: COLORS.border },
   availabilityCount: { color: COLORS.bone, fontSize: FONT_SIZES.display, fontWeight: '700', textAlign: 'center' },

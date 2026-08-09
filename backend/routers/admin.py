@@ -1,18 +1,17 @@
 """Recursos operacionais do painel: métricas e backup."""
 import asyncio
-import json
-import os
 from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
 from audit import registrar_auditoria
-from config import INFINITEPAY_HANDLE
+from backup_service import gerar_backup_criptografado, transmitir_e_remover
+from config import BACKUP_ENCRYPTION_KEY, INFINITEPAY_HANDLE
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
@@ -167,47 +166,39 @@ async def restaurar_arquivado(
 
 @router.get("/backup")
 async def baixar_backup(_: str = Depends(require_atelie_auth)):
-    db = get_db()
-    colecoes = (
-        "perfumes",
-        "movimentos",
-        "pedidos",
-        "clientes",
-        "opinioes",
-        "sugestoes",
-        "compras",
-        "operacoes_sistema",
-        "fornecedores",
-        "cotacoes_fornecedores",
-        "insumos",
-        "movimentos_insumos",
-        "producoes",
-        "configuracoes",
-    )
-    conteudo = {
-        "aplicacao": "L'Essence Furlani",
-        "geradoEm": datetime.now(timezone.utc).isoformat(),
-        "versao": 2,
-        "dados": {},
-    }
-    resultados = await asyncio.gather(*[
-        db[nome].find().to_list(length=100_000)
-        for nome in colecoes
-    ])
-    for nome, documentos in zip(colecoes, resultados):
-        conteudo["dados"][nome] = [
-            _json_seguro(documento) for documento in documentos
-        ]
-
-    arquivo = json.dumps(conteudo, ensure_ascii=False, indent=2).encode("utf-8")
+    if not BACKUP_ENCRYPTION_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Configure BACKUP_ENCRYPTION_KEY para habilitar o backup seguro.",
+        )
+    try:
+        caminho, resumo = await gerar_backup_criptografado(
+            get_db(), BACKUP_ENCRYPTION_KEY
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    return Response(
-        content=arquivo,
-        media_type="application/json; charset=utf-8",
+    await registrar_auditoria(
+        get_db(),
+        acao="exportar",
+        recurso="backup",
+        recurso_id=data,
+        titulo="Backup criptografado exportado",
+        detalhes=(
+            f"Backup v3 gerado com {sum(resumo['colecoes'].values())} registro(s)."
+        ),
+        metadados={"tamanhoBytes": resumo["tamanhoBytes"]},
+    )
+    return StreamingResponse(
+        transmitir_e_remover(caminho),
+        media_type="application/octet-stream",
         headers={
             "Content-Disposition": (
-                f'attachment; filename="lessence-furlani-backup-{data}.json"'
-            )
+                f'attachment; filename="lessence-furlani-backup-{data}.lfe"'
+            ),
+            "Content-Length": str(resumo["tamanhoBytes"]),
+            "Cache-Control": "no-store, max-age=0",
+            "Pragma": "no-cache",
         },
     )
 

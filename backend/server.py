@@ -21,7 +21,7 @@ from locks import stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
                      clientes, compras, custos, fornecedores, frete, insumos,
                      movimentos, opinioes, pagamentos, pedidos, perfumes,
-                     sugestoes, vitrine)
+                     privacidade, sugestoes, vitrine)
 from security import hash_password, verify_password
 from utils import reparar_sequencias
 
@@ -91,6 +91,8 @@ async def _criar_indices():
     await db.insumos.create_index("perfumeId")
     await db.movimentos_insumos.create_index([("insumoId", 1), ("data", -1)])
     await db.producoes.create_index([("perfumeId", 1), ("data", -1)])
+    await db.solicitacoes_privacidade.create_index("protocolo", unique=True)
+    await db.solicitacoes_privacidade.create_index([("status", 1), ("criadoEm", -1)])
 
 
 async def _bootstrap_database() -> None:
@@ -196,6 +198,7 @@ app.include_router(frete.router)
 app.include_router(vitrine.router)
 app.include_router(clientes.router)
 app.include_router(acompanhamento.router)
+app.include_router(privacidade.router)
 app.include_router(admin.router)
 
 

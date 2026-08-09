@@ -402,6 +402,8 @@ export type CheckoutPayload = {
   formaPagamento: 'pix' | 'cartao';
   observacoes: string;
   aceitePrazoEncomenda: boolean;
+  aceitePoliticaPrivacidade: boolean;
+  salvarDadosParaProximaCompra: boolean;
   tipoEntrega: 'entrega' | 'retirada';
   freteEscolhido?: {
     serviceId: number;

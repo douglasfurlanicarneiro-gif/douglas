@@ -9,7 +9,7 @@ import { BottomSheet } from './BottomSheet';
 import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';
 import { AppText as Text } from './Typography';
 
-const CUSTOMER_KEY = 'checkout-customer-v1';
+const CUSTOMER_KEY = 'checkout-customer-v2-consented';
 const CHECKOUT_ATTEMPT_KEY = 'checkout-attempt-v1';
 
 type CheckoutAttempt = {
@@ -30,7 +30,7 @@ export type CartItem = {
 
 type CustomerForm = Omit<
   CheckoutPayload,
-  'itens' | 'cliente' | 'contato' | 'observacoes' | 'freteEscolhido' | 'tipoEntrega' | 'endereco' | 'aceitePrazoEncomenda'
+  'itens' | 'cliente' | 'contato' | 'observacoes' | 'freteEscolhido' | 'tipoEntrega' | 'endereco' | 'aceitePrazoEncomenda' | 'aceitePoliticaPrivacidade' | 'salvarDadosParaProximaCompra'
 > & {
   endereco: NonNullable<CheckoutPayload['endereco']>;
   observacoes: string;
@@ -94,6 +94,8 @@ export function CheckoutSheet({
   const [freteSelecionado, setFreteSelecionado] = useState<OpcaoFrete | null>(null);
   const [freteRefresh, setFreteRefresh] = useState(0);
   const [prazoEncomendaAceito, setPrazoEncomendaAceito] = useState(false);
+  const [privacidadeAceita, setPrivacidadeAceita] = useState(false);
+  const [lembrarDados, setLembrarDados] = useState(false);
   const checkoutAttemptRef = useRef<CheckoutAttempt | null>(null);
   const contemSobEncomenda = useMemo(
     () => items.some((item) => item.perfume.prontaEntrega !== true),
@@ -163,6 +165,7 @@ export function CheckoutSheet({
           formaPagamento: cartaoOnlineAtivo ? 'cartao' : 'pix',
           endereco: { ...EMPTY_FORM.endereco, ...(parsed.endereco || {}) },
         });
+        setLembrarDados(true);
       } catch {
         storage.removeItem(CUSTOMER_KEY);
       }
@@ -174,6 +177,7 @@ export function CheckoutSheet({
     setStep('dados');
     setError('');
     setPrazoEncomendaAceito(false);
+    setPrivacidadeAceita(false);
   }, [visible]);
 
   useEffect(() => {
@@ -294,6 +298,7 @@ export function CheckoutSheet({
     && pagamentoDisponivel
     && (form.formaPagamento !== 'cartao' || cartaoOnlineAtivo)
     && (!contemSobEncomenda || prazoEncomendaAceito)
+    && privacidadeAceita
   );
 
   const selectDeliveryType = (type: DeliveryType) => {
@@ -317,6 +322,8 @@ export function CheckoutSheet({
         contato: form.whatsapp.trim(),
         ...dadosCliente,
         aceitePrazoEncomenda: !contemSobEncomenda || prazoEncomendaAceito,
+        aceitePoliticaPrivacidade: privacidadeAceita,
+        salvarDadosParaProximaCompra: lembrarDados,
         tipoEntrega,
         ...(tipoEntrega === 'entrega'
           ? {
@@ -356,7 +363,8 @@ export function CheckoutSheet({
         );
       }
       const order = await createCompra(payload, checkoutAttemptRef.current.key);
-      await storage.setItem(CUSTOMER_KEY, JSON.stringify(form));
+      if (lembrarDados) await storage.setItem(CUSTOMER_KEY, JSON.stringify(form));
+      else await storage.removeItem(CUSTOMER_KEY);
       const paymentMessage = order.pagamento?.checkoutUrl
         ? 'Seu pedido está salvo. Escolha Pix ou cartão na InfinitePay; após a aprovação, a confirmação será automática.'
         : order.pagamento?.pixCopiaECola
@@ -535,6 +543,24 @@ export function CheckoutSheet({
                 </Text>
               )}
             </Field>
+
+            <Pressable
+              onPress={() => setLembrarDados((current) => !current)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: lembrarDados }}
+              style={styles.consentRow}
+              testID="remember-checkout-data"
+            >
+              <Feather
+                name={lembrarDados ? 'check-square' : 'square'}
+                size={19}
+                color={lembrarDados ? COLORS.gold : COLORS.muted}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.consentTitle}>Lembrar meus dados neste aparelho</Text>
+                <Text style={styles.consentHint}>Opcional. Facilita sua próxima compra e pode ser desativado a qualquer momento.</Text>
+              </View>
+            </Pressable>
 
             <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
               <SecondaryButton label="Continuar comprando" onPress={onClose} />
@@ -786,6 +812,26 @@ export function CheckoutSheet({
                 </Pressable>
               </View>
             )}
+
+            <Pressable
+              onPress={() => setPrivacidadeAceita((current) => !current)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: privacidadeAceita }}
+              style={[styles.consentRow, styles.privacyConsent]}
+              testID="accept-privacy-notice"
+            >
+              <Feather
+                name={privacidadeAceita ? 'check-square' : 'square'}
+                size={19}
+                color={privacidadeAceita ? COLORS.gold : COLORS.muted}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.consentTitle}>Li o aviso de privacidade</Text>
+                <Text style={styles.consentHint}>
+                  Meus dados serão usados para processar, entregar e permitir o acompanhamento deste pedido. O salvamento para compras futuras é opcional.
+                </Text>
+              </View>
+            </Pressable>
 
             {!!error && <Text style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
             <View style={[styles.paymentActions, isWide && styles.paymentActionsWide]}>
@@ -1131,6 +1177,30 @@ const styles = StyleSheet.create({
   paymentSummaryTotalWide: {
     fontSize: FONT_SIZES.display,
     lineHeight: 34,
+  },
+  consentRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+  },
+  privacyConsent: {
+    borderColor: COLORS.gold,
+    backgroundColor: COLORS.surfaceRaised,
+  },
+  consentTitle: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.bone,
+  },
+  consentHint: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.muted,
+    marginTop: 3,
   },
   paymentActions: {
     flexDirection: 'row',

@@ -24,7 +24,16 @@ def payload_base():
         "whatsapp": "11999999999",
         "email": "cliente@example.com",
         "formaPagamento": "pix",
+        "aceitePoliticaPrivacidade": True,
     }
+
+
+def test_checkout_exige_aceite_do_aviso_de_privacidade():
+    payload = payload_base()
+    payload["aceitePoliticaPrivacidade"] = False
+
+    with pytest.raises(ValidationError, match="privacidade"):
+        CompraIn(**payload, tipoEntrega="retirada")
 
 
 def test_retirada_nao_exige_endereco_nem_frete():

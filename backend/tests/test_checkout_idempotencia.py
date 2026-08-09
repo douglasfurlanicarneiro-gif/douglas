@@ -27,6 +27,7 @@ def _payload(*, quantidade: int = 1) -> CompraIn:
         email="cliente@example.com",
         formaPagamento="cartao",
         tipoEntrega="retirada",
+        aceitePoliticaPrivacidade=True,
     )
 
 

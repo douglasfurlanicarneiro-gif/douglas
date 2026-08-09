@@ -67,6 +67,8 @@ class CompraIn(BaseModel):
     endereco: Optional[EnderecoIn] = None
     formaPagamento: Optional[Literal["pix", "cartao"]] = None
     aceitePrazoEncomenda: bool = False
+    aceitePoliticaPrivacidade: bool = False
+    salvarDadosParaProximaCompra: bool = False
     tipoEntrega: Literal["entrega", "retirada"] = "entrega"
     freteEscolhido: Optional[FreteEscolhidoIn] = None
 
@@ -83,6 +85,8 @@ class CompraIn(BaseModel):
             )
             if not all(obrigatorios):
                 raise ValueError("Complete o cadastro e escolha a forma de pagamento.")
+            if not self.aceitePoliticaPrivacidade:
+                raise ValueError("Leia e aceite o aviso de privacidade para continuar.")
             if self.tipoEntrega == "entrega" and not (
                 self.endereco and self.freteEscolhido
             ):
@@ -308,6 +312,9 @@ async def _criar_compra(
     ).isoformat()
     doc["codigoAcompanhamento"] = secrets.token_urlsafe(12)
     doc["historicoStatus"] = [{"status": "pendente", "data": agora}]
+    if payload.aceitePoliticaPrivacidade:
+        doc["aceitePoliticaPrivacidadeEm"] = agora
+        doc["versaoPoliticaPrivacidade"] = "2026-08-09"
     if idempotency_key and payload_hash:
         doc["checkoutIdempotencyKey"] = idempotency_key
         doc["checkoutPayloadHash"] = payload_hash
@@ -329,7 +336,7 @@ async def _criar_compra(
     # compra vir com os campos pré-preenchidos (o app consulta isso por
     # GET /api/clientes/por-contato/{contato} antes de abrir o formulário).
     identificador = payload.whatsapp or payload.contato
-    if payload.nomeCompleto and identificador:
+    if payload.salvarDadosParaProximaCompra and payload.nomeCompleto and identificador:
         dados_cliente: dict[str, object] = {
             "contato": identificador,
             "nomeCompleto": payload.nomeCompleto,
@@ -337,6 +344,8 @@ async def _criar_compra(
             "whatsapp": payload.whatsapp,
             "email": payload.email,
             "atualizadoEm": agora,
+            "consentimentoCadastroEm": agora,
+            "versaoConsentimento": "2026-08-09",
         }
         if payload.endereco:
             dados_cliente["endereco"] = payload.endereco.model_dump()

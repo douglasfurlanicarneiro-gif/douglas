@@ -23,6 +23,7 @@ ATELIE_ADMIN_PASSWORD = os.getenv("ATELIE_ADMIN_PASSWORD")
 JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "72"))
+BACKUP_ENCRYPTION_KEY = os.getenv("BACKUP_ENCRYPTION_KEY", "") or (JWT_SECRET or "")
 
 # --- CORS ---
 # O padrão já é restrito à vitrine oficial e aos endereços de desenvolvimento.

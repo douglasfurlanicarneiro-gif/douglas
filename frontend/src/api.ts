@@ -297,6 +297,38 @@ export const createSugestao = (data: Pick<Sugestao, 'cliente' | 'contato' | 'men
 export const listSugestoes = () => request<Sugestao[]>('/sugestoes', {}, true);
 export const deleteSugestao = (id: string) => request<{ status: string }>(`/sugestoes/${id}`, { method: 'DELETE' }, true);
 
+export type SolicitacaoPrivacidadePayload = {
+  tipo: 'acesso' | 'correcao' | 'exclusao' | 'revogacao';
+  nome: string;
+  contato: string;
+  email?: string;
+  mensagem: string;
+  confirmacaoTitularidade: boolean;
+};
+export const createSolicitacaoPrivacidade = (data: SolicitacaoPrivacidadePayload) =>
+  request<{ protocolo: string; status: string; criadoEm: string }>(
+    '/privacidade/solicitacoes',
+    { method: 'POST', body: JSON.stringify(data) },
+  );
+export type SolicitacaoPrivacidade = SolicitacaoPrivacidadePayload & {
+  id: string;
+  protocolo: string;
+  status: 'recebida' | 'em_analise' | 'concluida' | 'recusada';
+  criadoEm: string;
+  atualizadoEm: string;
+  observacaoInterna?: string;
+};
+export const listSolicitacoesPrivacidade = () =>
+  request<SolicitacaoPrivacidade[]>('/privacidade/solicitacoes', {}, true);
+export const updateSolicitacaoPrivacidade = (
+  id: string,
+  status: SolicitacaoPrivacidade['status'],
+  observacaoInterna = '',
+) => request<SolicitacaoPrivacidade>(`/privacidade/solicitacoes/${id}`, {
+  method: 'PATCH',
+  body: JSON.stringify({ status, observacaoInterna }),
+}, true);
+
 // Compras
 export const createCompra = (data: CheckoutPayload, idempotencyKey: string) => request<Compra>('/compras', {
   method: 'POST',
@@ -411,7 +443,7 @@ export async function downloadBackup(): Promise<void> {
   const match = disposition.match(/filename="([^"]+)"/);
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
-  link.download = match?.[1] || 'lessence-furlani-backup.json';
+  link.download = match?.[1] || 'lessence-furlani-backup.lfe';
   document.body.appendChild(link);
   link.click();
   link.remove();
