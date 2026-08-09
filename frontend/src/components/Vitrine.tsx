@@ -834,70 +834,110 @@ export function Vitrine({
                   <Feather name="chevron-right" size={18} color={COLORS.gold} />
                 </Pressable>
                 <View style={styles.quickFilters}>
-                  <Pressable
-                    onPress={() => {
-                      setFamiliaAtiva('Todas');
-                      setOcasiaoAtiva('Todas');
-                      setDisponibilidadeAtiva('pronta');
-                    }}
-                    style={[
-                      styles.quickFilterButton,
-                      familiaAtiva === 'Todas'
-                        && ocasiaoAtiva === 'Todas'
-                        && disponibilidadeAtiva === 'pronta'
-                        && styles.quickFilterButtonActive,
-                    ]}
-                    testID="filter-ready-delivery"
-                  >
-                    <Feather
-                      name="package"
-                      size={13}
-                      color={
+                  <View style={styles.quickFilterRow}>
+                    <Pressable
+                      onPress={() => {
+                        setFamiliaAtiva('Todas');
+                        setOcasiaoAtiva('Todas');
+                        setDisponibilidadeAtiva('pronta');
+                      }}
+                      style={[
+                        styles.quickFilterButton,
+                        styles.quickFilterGrow,
+                        familiaAtiva === 'Todas'
+                          && ocasiaoAtiva === 'Todas'
+                          && disponibilidadeAtiva === 'pronta'
+                          && styles.quickFilterButtonActive,
+                      ]}
+                      testID="filter-ready-delivery"
+                    >
+                      <Feather
+                        name="package"
+                        size={13}
+                        color={
+                          disponibilidadeAtiva === 'pronta'
+                            && familiaAtiva === 'Todas'
+                            && ocasiaoAtiva === 'Todas'
+                            ? COLORS.ink
+                            : COLORS.gold
+                        }
+                      />
+                      <Text style={[
+                        styles.quickFilterText,
                         disponibilidadeAtiva === 'pronta'
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
-                          ? COLORS.ink
-                          : COLORS.gold
-                      }
-                    />
-                    <Text style={[
-                      styles.quickFilterText,
-                      disponibilidadeAtiva === 'pronta'
-                        && familiaAtiva === 'Todas'
-                        && ocasiaoAtiva === 'Todas'
-                        && styles.quickFilterTextActive,
-                    ]}>Pronta entrega</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      setFamiliaAtiva('Favoritos');
-                      setOcasiaoAtiva('Todas');
-                      setDisponibilidadeAtiva('todas');
-                    }}
-                    style={[styles.quickFilterButton, styles.quickFilterGrow, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
-                    testID="filter-favorites"
-                  >
-                    {familiaAtiva === 'Favoritos' ? (
-                      <FontAwesome name="heart" size={14} color={COLORS.favorite} />
-                    ) : (
-                      <Feather name="heart" size={14} color={COLORS.gold} />
-                    )}
-                    <Text style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]}>Favoritos</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => {
-                      if (familiaAtiva === 'Favoritos') setFamiliaAtiva('Todas');
-                      setFiltersOpen(true);
-                    }}
-                    style={[styles.quickFilterButton, styles.quickFilterGrow, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
-                    testID="filter-open"
-                  >
-                    <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />
-                    <Text style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]}>Filtros</Text>
-                    {filtrosAtivos > 0 && (
-                      <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{filtrosAtivos}</Text></View>
-                    )}
-                  </Pressable>
+                          && styles.quickFilterTextActive,
+                      ]}>Pronta entrega</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setFamiliaAtiva('Todas');
+                        setOcasiaoAtiva('Todas');
+                        setDisponibilidadeAtiva('encomenda');
+                      }}
+                      style={[
+                        styles.quickFilterButton,
+                        styles.quickFilterGrow,
+                        familiaAtiva === 'Todas'
+                          && ocasiaoAtiva === 'Todas'
+                          && disponibilidadeAtiva === 'encomenda'
+                          && styles.quickFilterButtonActive,
+                      ]}
+                      testID="filter-made-to-order"
+                    >
+                      <Feather
+                        name="clock"
+                        size={13}
+                        color={
+                          disponibilidadeAtiva === 'encomenda'
+                            && familiaAtiva === 'Todas'
+                            && ocasiaoAtiva === 'Todas'
+                            ? COLORS.ink
+                            : COLORS.gold
+                        }
+                      />
+                      <Text style={[
+                        styles.quickFilterText,
+                        disponibilidadeAtiva === 'encomenda'
+                          && familiaAtiva === 'Todas'
+                          && ocasiaoAtiva === 'Todas'
+                          && styles.quickFilterTextActive,
+                      ]}>Sob encomenda</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.quickFilterRow}>
+                    <Pressable
+                      onPress={() => {
+                        setFamiliaAtiva('Favoritos');
+                        setOcasiaoAtiva('Todas');
+                        setDisponibilidadeAtiva('todas');
+                      }}
+                      style={[styles.quickFilterButton, styles.quickFilterGrow, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
+                      testID="filter-favorites"
+                    >
+                      {familiaAtiva === 'Favoritos' ? (
+                        <FontAwesome name="heart" size={14} color={COLORS.favorite} />
+                      ) : (
+                        <Feather name="heart" size={14} color={COLORS.gold} />
+                      )}
+                      <Text style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]}>Favoritos</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        if (familiaAtiva === 'Favoritos') setFamiliaAtiva('Todas');
+                        setFiltersOpen(true);
+                      }}
+                      style={[styles.quickFilterButton, styles.quickFilterGrow, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
+                      testID="filter-open"
+                    >
+                      <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />
+                      <Text style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]}>Filtros</Text>
+                      {filtrosAtivos > 0 && (
+                        <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{filtrosAtivos}</Text></View>
+                      )}
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             )}
@@ -1444,7 +1484,8 @@ const styles = StyleSheet.create({
   quizIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   quizTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
   quizSubtitle: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
-  quickFilters: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, marginBottom: SPACING.sm },
+  quickFilters: { gap: 8, paddingVertical: 8, marginBottom: SPACING.sm },
+  quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   quickFilterButton: { minHeight: 40, paddingHorizontal: 14, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   quickFilterGrow: { flex: 1 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
