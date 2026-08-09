@@ -44,7 +44,10 @@ def pode_cancelar_pedido(pedido: dict) -> bool:
 async def acompanhar_pedido(codigo: str):
     _validar_codigo(codigo)
 
-    pedido = await get_db().pedidos.find_one({"codigoAcompanhamento": codigo})
+    pedido = await get_db().pedidos.find_one({
+        "codigoAcompanhamento": codigo,
+        "acompanhamentoAtivo": {"$ne": False},
+    })
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado.")
 
@@ -59,7 +62,10 @@ async def cancelar_pedido_cliente(codigo: str):
 
     db = get_db()
     async with stock_lock(db):
-        pedido = await db.pedidos.find_one({"codigoAcompanhamento": codigo})
+        pedido = await db.pedidos.find_one({
+            "codigoAcompanhamento": codigo,
+            "acompanhamentoAtivo": {"$ne": False},
+        })
         if not pedido:
             raise HTTPException(status_code=404, detail="Pedido não encontrado.")
 

@@ -123,7 +123,10 @@ async def marcar_vitrine_pendente(db) -> dict:
 async def _publicar_snapshot_sem_trava(db, *, registrar_operacao: bool = True) -> dict:
     estado = await _estado_publicacao(db)
     revisao = int(estado.get("revisao", 0))
-    perfumes = await db.perfumes.find({"publicavel": True}).to_list(2000)
+    perfumes = await db.perfumes.find({
+        "publicavel": True,
+        "arquivadoEm": None,
+    }).to_list(2000)
 
     estoque_map = await mapa_saldo_fisico(db)
     reservado_map = await mapa_reservado(db)

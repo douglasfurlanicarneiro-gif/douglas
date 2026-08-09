@@ -5,6 +5,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from audit import registrar_auditoria
 from database import get_db
 from rate_limit import feedback_rate_limit
 from security import require_atelie_auth
@@ -23,7 +24,9 @@ class OpiniaoIn(BaseModel):
 @router.get("")
 async def listar_opinioes():
     db = get_db()
-    opinioes = await db.opinioes.find().sort("data", -1).to_list(2000)
+    opinioes = await db.opinioes.find(
+        {"arquivadoEm": None}
+    ).sort("data", -1).to_list(2000)
     return [serialize(o) for o in opinioes]
 
 
@@ -46,7 +49,19 @@ async def apagar_opiniao(opiniao_id: str, _: str = Depends(require_atelie_auth))
         oid = ObjectId(opiniao_id)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de opinião inválido.")
-    resultado = await db.opinioes.delete_one({"_id": oid})
-    if resultado.deleted_count == 0:
+    agora = datetime.now(timezone.utc).isoformat()
+    resultado = await db.opinioes.update_one(
+        {"_id": oid, "arquivadoEm": None},
+        {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},
+    )
+    if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Opinião não encontrada.")
-    return {"status": "Opinião apagada."}
+    await registrar_auditoria(
+        db,
+        acao="arquivar",
+        recurso="opiniao",
+        recurso_id=opiniao_id,
+        titulo="Avaliação arquivada",
+        detalhes="Avaliação retirada da vitrine com registro preservado.",
+    )
+    return {"status": "Opinião arquivada."}

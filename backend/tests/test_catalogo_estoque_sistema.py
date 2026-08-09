@@ -109,7 +109,10 @@ def test_disponibilidade_por_id_atualiza_catalogo_e_snapshot_sem_nomes():
         "encontrados": ["id-c", "id-a"],
         "naoEncontrados": ["id-inexistente"],
     }
-    assert db.perfumes.updates[0] == ({}, {"$set": {"prontaEntrega": False}})
+    assert db.perfumes.updates[0] == (
+        {"arquivadoEm": None},
+        {"$set": {"prontaEntrega": False}},
+    )
     assert db.perfumes.updates[1][0] == {"_id": {"$in": ["id-c", "id-a"]}}
     assert [item["prontaEntrega"] for item in db.vitrine.updated_items] == [
         True,

@@ -5,6 +5,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from audit import registrar_auditoria
 from database import get_db
 from locks import stock_lock
 from security import require_atelie_auth
@@ -74,7 +75,9 @@ async def completar_estoque(payload: CompletarEstoqueIn, _: str = Depends(requir
     """Completa cada perfume até o saldo alvo sem duplicar entradas existentes."""
     db = get_db()
     async with stock_lock(db):
-        filtro = {"publicavel": True} if payload.somentePublicaveis else {}
+        filtro = {"arquivadoEm": None}
+        if payload.somentePublicaveis:
+            filtro["publicavel"] = True
         perfumes = await db.perfumes.find(filtro, {"_id": 1}).to_list(5000)
         estoque_atual = await mapa_saldo_fisico(db)
 
@@ -174,10 +177,62 @@ async def apagar_movimento(movimento_id: str, _: str = Depends(require_atelie_au
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de movimento inválido.")
     async with stock_lock(db):
-        resultado = await db.movimentos.delete_one({"_id": oid})
-    if resultado.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Movimento não encontrado.")
-    return {"status": "Movimento apagado."}
+        movimento = await db.movimentos.find_one({"_id": oid})
+        if not movimento:
+            raise HTTPException(status_code=404, detail="Movimento não encontrado.")
+        if movimento.get("anuladoEm"):
+            return {"status": "Movimento já estava estornado."}
+        origem = str(movimento.get("origem") or "")
+        if origem.startswith("pedido:"):
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "A baixa automática pertence a um pedido. "
+                    "Cancele ou corrija o pedido para ajustar o estoque."
+                ),
+            )
+        if movimento.get("categoria") == "estorno":
+            raise HTTPException(
+                status_code=409,
+                detail="Um estorno não pode ser excluído; faça uma nova movimentação de ajuste.",
+            )
+
+        agora = datetime.now(timezone.utc).isoformat()
+        estorno = {
+            "perfumeId": movimento.get("perfumeId"),
+            "tipo": "saida" if movimento.get("tipo") == "entrada" else "entrada",
+            "quantidadeMl": int(movimento.get("quantidadeMl", 0) or 0),
+            "motivo": f"Estorno do movimento {movimento_id}",
+            "categoria": "estorno",
+            "origem": f"estorno:{movimento_id}",
+            "movimentoEstornadoId": movimento_id,
+            "data": agora,
+        }
+        resultado_estorno = await db.movimentos.insert_one(estorno)
+        await db.movimentos.update_one(
+            {"_id": oid, "anuladoEm": None},
+            {"$set": {
+                "anuladoEm": agora,
+                "anuladoPor": "administrador",
+                "estornoMovimentoId": str(resultado_estorno.inserted_id),
+            }},
+        )
+        await registrar_auditoria(
+            db,
+            acao="estornar",
+            recurso="movimento_estoque",
+            recurso_id=movimento_id,
+            titulo="Movimento de estoque estornado",
+            detalhes=(
+                f"Lançamento de {movimento.get('quantidadeMl', 0)}ml compensado "
+                "por um movimento inverso."
+            ),
+            metadados={
+                "perfumeId": movimento.get("perfumeId"),
+                "estornoId": str(resultado_estorno.inserted_id),
+            },
+        )
+    return {"status": "Movimento estornado com histórico preservado."}
 
 
 @router.get("/api/estoque")
@@ -198,7 +253,9 @@ async def resumo_estoque(_: str = Depends(require_atelie_auth)):
 
     # Todo perfume cadastrado pertence ao estoque, mesmo antes da primeira
     # entrada. Assim itens novos aparecem explicitamente com saldo de 0 ml.
-    perfumes = await db.perfumes.find({}, {"_id": 1}).to_list(100_000)
+    perfumes = await db.perfumes.find(
+        {"arquivadoEm": None}, {"_id": 1}
+    ).to_list(100_000)
     ids = {str(perfume["_id"]) for perfume in perfumes} | set(saldo_atual) | set(reservado)
     return {
         perfume_id: {

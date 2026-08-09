@@ -6,6 +6,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from audit import registrar_auditoria
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
@@ -67,7 +68,7 @@ def _oid(pedido_id: str) -> ObjectId:
 
 
 async def _reverter_movimentos_do_pedido(db, pedido_id: str):
-    await db.movimentos.delete_many({"origem": f"pedido:{pedido_id}"})
+    await _sincronizar_movimentos_do_pedido(db, pedido_id, [], "cancelado")
 
 
 def _status_consume_estoque(status: str) -> bool:
@@ -155,35 +156,46 @@ async def _sincronizar_movimentos_do_pedido(
 ) -> None:
     """Concilia a baixa do pedido com escritas repetíveis e recuperáveis."""
     origem = f"pedido:{pedido_id}"
-    if not _status_consume_estoque(status):
-        await db.movimentos.delete_many({"origem": origem})
-        return
+    movimentos_atuais = await db.movimentos.find(
+        {"origem": origem},
+        {"perfumeId": 1, "tipo": 1, "quantidadeMl": 1},
+    ).to_list(5000)
+    consumo_atual: dict[str, int] = {}
+    for movimento in movimentos_atuais:
+        perfume_id = str(movimento.get("perfumeId") or "")
+        if not perfume_id:
+            continue
+        quantidade = int(movimento.get("quantidadeMl", 0) or 0)
+        sinal = 1 if movimento.get("tipo") == "saida" else -1
+        consumo_atual[perfume_id] = consumo_atual.get(perfume_id, 0) + sinal * quantidade
 
+    desejado = (
+        quantidades_por_perfume(itens)
+        if _status_consume_estoque(status)
+        else {}
+    )
     agora = datetime.now(timezone.utc).isoformat()
-    quantidades = quantidades_por_perfume(itens)
-    for perfume_id, quantidade_ml in quantidades.items():
-        await db.movimentos.update_one(
-            {"origem": origem, "perfumeId": perfume_id},
-            {
-                "$set": {
-                    "tipo": "saida",
-                    "quantidadeMl": quantidade_ml,
-                    "motivo": "Baixa automática ao iniciar preparação",
-                    "categoria": "pedido",
-                    "data": agora,
-                },
-                "$setOnInsert": {
-                    "origem": origem,
-                    "perfumeId": perfume_id,
-                },
-            },
-            upsert=True,
-        )
-
-    filtro_obsoletos: dict[str, Any] = {"origem": origem}
-    if quantidades:
-        filtro_obsoletos["perfumeId"] = {"$nin": list(quantidades)}
-    await db.movimentos.delete_many(filtro_obsoletos)
+    ajustes = []
+    for perfume_id in set(consumo_atual) | set(desejado):
+        diferenca = desejado.get(perfume_id, 0) - consumo_atual.get(perfume_id, 0)
+        if diferenca == 0:
+            continue
+        ajustes.append({
+            "perfumeId": perfume_id,
+            "tipo": "saida" if diferenca > 0 else "entrada",
+            "quantidadeMl": abs(diferenca),
+            "motivo": (
+                "Baixa automática do pedido"
+                if diferenca > 0
+                else "Estorno automático do pedido"
+            ),
+            "categoria": "pedido",
+            "origem": origem,
+            "pedidoId": pedido_id,
+            "data": agora,
+        })
+    if ajustes:
+        await db.movimentos.insert_many(ajustes)
 
 
 async def _persistir_pedido_e_estoque(
@@ -249,7 +261,9 @@ async def _persistir_pedido_e_estoque(
 @router.get("")
 async def listar_pedidos(_: str = Depends(require_atelie_auth)):
     db = get_db()
-    pedidos = await db.pedidos.find().sort("seq", -1).to_list(5000)
+    pedidos = await db.pedidos.find(
+        {"arquivadoEm": None}
+    ).sort("seq", -1).to_list(5000)
     return [serialize(p) for p in pedidos]
 
 
@@ -314,8 +328,56 @@ async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(r
 async def apagar_pedido(pedido_id: str, _: str = Depends(require_atelie_auth)):
     db = get_db()
     async with stock_lock(db):
-        await _reverter_movimentos_do_pedido(db, pedido_id)
-        resultado = await db.pedidos.delete_one({"_id": _oid(pedido_id)})
-        if resultado.deleted_count == 0:
+        oid = _oid(pedido_id)
+        pedido = await db.pedidos.find_one({"_id": oid})
+        if not pedido:
             raise HTTPException(status_code=404, detail="Pedido não encontrado.")
-        return {"status": "Pedido apagado."}
+        if pedido.get("status") not in {"cancelado", "entregue"}:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "Somente pedidos cancelados ou entregues podem ser arquivados. "
+                    "Conclua o fluxo antes de arquivar."
+                ),
+            )
+        agora = datetime.now(timezone.utc).isoformat()
+        await db.pedidos.update_one(
+            {"_id": oid, "arquivadoEm": None},
+            {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},
+        )
+        await registrar_auditoria(
+            db,
+            acao="arquivar",
+            recurso="pedido",
+            recurso_id=pedido_id,
+            titulo="Pedido arquivado",
+            detalhes=f"Pedido Nº {pedido.get('seq', 0)} preservado fora do fluxo ativo.",
+            metadados={"seq": pedido.get("seq"), "status": pedido.get("status")},
+        )
+        return {"status": "Pedido arquivado com histórico preservado."}
+
+
+@router.post("/{pedido_id}/restaurar")
+async def restaurar_pedido(pedido_id: str, _: str = Depends(require_atelie_auth)):
+    db = get_db()
+    oid = _oid(pedido_id)
+    resultado = await db.pedidos.update_one(
+        {"_id": oid, "arquivadoEm": {"$ne": None}},
+        {"$unset": {
+            "arquivadoEm": "",
+            "arquivadoPor": "",
+            "excluirMetricas": "",
+            "acompanhamentoAtivo": "",
+        }},
+    )
+    if resultado.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Pedido arquivado não encontrado.")
+    await registrar_auditoria(
+        db,
+        acao="restaurar",
+        recurso="pedido",
+        recurso_id=pedido_id,
+        titulo="Pedido restaurado",
+        detalhes="Pedido devolvido ao painel administrativo.",
+    )
+    return {"status": "Pedido restaurado."}

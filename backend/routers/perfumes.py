@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 from pymongo import UpdateOne
 
+from audit import registrar_auditoria
 from database import get_db
 from availability import apply_ready_delivery
 from routers.vitrine import marcar_vitrine_pendente, publicar_snapshot
@@ -167,7 +168,9 @@ async def listar_perfumes(_: str = Depends(require_atelie_auth)):
     sequencias_reparadas = await reparar_sequencias(db, "perfumes")
     if sequencias_reparadas:
         await marcar_vitrine_pendente(db)
-    perfumes = await db.perfumes.find().sort("seq", 1).to_list(2000)
+    perfumes = await db.perfumes.find(
+        {"arquivadoEm": None}
+    ).sort("seq", 1).to_list(2000)
     return [serialize(p) for p in perfumes]
 
 
@@ -196,11 +199,53 @@ async def atualizar_perfume(perfume_id: str, payload: PerfumeIn, _: str = Depend
 @router.delete("/{perfume_id}")
 async def apagar_perfume(perfume_id: str, _: str = Depends(require_atelie_auth)):
     db = get_db()
-    resultado = await db.perfumes.delete_one({"_id": _oid(perfume_id)})
-    if resultado.deleted_count == 0:
+    oid = _oid(perfume_id)
+    perfume = await db.perfumes.find_one({"_id": oid})
+    if not perfume:
         raise HTTPException(status_code=404, detail="Perfume não encontrado.")
+    agora = datetime.now(timezone.utc).isoformat()
+    await db.perfumes.update_one(
+        {"_id": oid, "arquivadoEm": None},
+        {"$set": {
+            "arquivadoEm": agora,
+            "arquivadoPor": "administrador",
+            "publicavel": False,
+            "prontaEntrega": False,
+        }},
+    )
+    await registrar_auditoria(
+        db,
+        acao="arquivar",
+        recurso="perfume",
+        recurso_id=perfume_id,
+        titulo="Perfume arquivado",
+        detalhes=f"{perfume.get('nome', 'Perfume')} saiu do catálogo ativo sem perder o histórico.",
+        metadados={"seq": perfume.get("seq")},
+    )
     await marcar_vitrine_pendente(db)
-    return {"status": "Perfume apagado."}
+    return {"status": "Perfume arquivado e removido da vitrine."}
+
+
+@router.post("/{perfume_id}/restaurar")
+async def restaurar_perfume(perfume_id: str, _: str = Depends(require_atelie_auth)):
+    db = get_db()
+    oid = _oid(perfume_id)
+    resultado = await db.perfumes.update_one(
+        {"_id": oid, "arquivadoEm": {"$ne": None}},
+        {"$unset": {"arquivadoEm": "", "arquivadoPor": ""}},
+    )
+    if resultado.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Perfume arquivado não encontrado.")
+    await registrar_auditoria(
+        db,
+        acao="restaurar",
+        recurso="perfume",
+        recurso_id=perfume_id,
+        titulo="Perfume restaurado",
+        detalhes="Perfume devolvido ao catálogo administrativo como não publicado.",
+    )
+    await marcar_vitrine_pendente(db)
+    return {"status": "Perfume restaurado como não publicado."}
 
 
 class BulkImportPayload(BaseModel):
@@ -308,7 +353,9 @@ async def aplicar_precos(payload: AplicarPrecosPayload, _: str = Depends(require
     if not tamanhos or not tamanhos.issubset(precos_informados.keys()):
         raise HTTPException(status_code=400, detail="Informe um preço para cada tamanho selecionado.")
 
-    perfumes = await db.perfumes.find({}, {"_id": 1, "precos": 1}).to_list(5000)
+    perfumes = await db.perfumes.find(
+        {"arquivadoEm": None}, {"_id": 1, "precos": 1}
+    ).to_list(5000)
     operacoes = [
         UpdateOne(
             {"_id": perfume["_id"]},
@@ -351,7 +398,7 @@ async def padronizar_tamanhos(_: str = Depends(require_atelie_auth)):
     db = get_db()
     precos_padrao = {30: 50.0, 50: 80.0, 100: 120.0}
     atualizados = 0
-    cursor = db.perfumes.find({"publicavel": True})
+    cursor = db.perfumes.find({"publicavel": True, "arquivadoEm": None})
     async for p in cursor:
         atuais = {
             int(item.get("ml", 0)): float(item.get("preco", 0))

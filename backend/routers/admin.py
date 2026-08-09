@@ -5,21 +5,34 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
+from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
+from audit import registrar_auditoria
 from config import INFINITEPAY_HANDLE
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
 from payments.pix import PIX_KEY
+from routers.vitrine import marcar_vitrine_pendente
 from security import require_atelie_auth
+from stock import mapa_saldo_fisico
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 PEDIDOS_RESET_ID = "pedidos-reset"
 PEDIDOS_RESET_VERSAO_INICIAL = 2
+
+RECURSOS_ARQUIVAVEIS = {
+    "pedido": "pedidos",
+    "compra": "compras",
+    "perfume": "perfumes",
+    "opiniao": "opinioes",
+    "sugestao": "sugestoes",
+    "cotacao": "cotacoes_fornecedores",
+}
 
 
 class ConfiguracoesLojaIn(BaseModel):
@@ -62,6 +75,94 @@ def _json_seguro(valor):
     if isinstance(valor, list):
         return [_json_seguro(item) for item in valor]
     return valor
+
+
+def _resumo_arquivado(recurso: str, documento: dict) -> dict:
+    if recurso == "pedido":
+        titulo = f"Pedido Nº {documento.get('seq', 0)}"
+        detalhes = str(documento.get("cliente") or "Cliente não informado")
+    elif recurso == "compra":
+        titulo = "Compra legada"
+        detalhes = str(documento.get("cliente") or "Cliente não informado")
+    elif recurso == "perfume":
+        titulo = str(documento.get("nome") or "Perfume")
+        detalhes = f"Nº {documento.get('seq', 0)}"
+    elif recurso == "opiniao":
+        titulo = "Avaliação"
+        detalhes = f"Nota {documento.get('nota', 0)} de 5"
+    elif recurso == "cotacao":
+        titulo = str(documento.get("produto") or "Cotação")
+        detalhes = str(documento.get("fornecedorNome") or "Fornecedor")
+    else:
+        titulo = "Sugestão"
+        detalhes = str(documento.get("mensagem") or "")[:120]
+    return {
+        "id": str(documento["_id"]),
+        "recurso": recurso,
+        "titulo": titulo,
+        "detalhes": detalhes,
+        "arquivadoEm": documento.get("arquivadoEm"),
+    }
+
+
+@router.get("/arquivados")
+async def listar_arquivados(_: str = Depends(require_atelie_auth)):
+    db = get_db()
+    resultados = await asyncio.gather(*[
+        db[colecao].find({"arquivadoEm": {"$ne": None}}).sort(
+            "arquivadoEm", -1
+        ).to_list(500)
+        for colecao in RECURSOS_ARQUIVAVEIS.values()
+    ])
+    itens = [
+        _resumo_arquivado(recurso, documento)
+        for recurso, documentos in zip(RECURSOS_ARQUIVAVEIS, resultados)
+        for documento in documentos
+    ]
+    itens.sort(key=lambda item: str(item.get("arquivadoEm") or ""), reverse=True)
+    return itens
+
+
+@router.post("/arquivados/{recurso}/{recurso_id}/restaurar")
+async def restaurar_arquivado(
+    recurso: str,
+    recurso_id: str,
+    _: str = Depends(require_atelie_auth),
+):
+    colecao = RECURSOS_ARQUIVAVEIS.get(recurso)
+    if not colecao:
+        raise HTTPException(status_code=404, detail="Tipo de arquivo não encontrado.")
+    try:
+        oid = ObjectId(recurso_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=400, detail="Registro arquivado inválido.") from exc
+
+    db = get_db()
+    atualizacao: dict = {"$unset": {
+        "arquivadoEm": "",
+        "arquivadoPor": "",
+        "excluirMetricas": "",
+        "acompanhamentoAtivo": "",
+    }}
+    if recurso == "perfume":
+        atualizacao["$set"] = {"publicavel": False, "prontaEntrega": False}
+    resultado = await db[colecao].update_one(
+        {"_id": oid, "arquivadoEm": {"$ne": None}},
+        atualizacao,
+    )
+    if resultado.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Registro arquivado não encontrado.")
+    await registrar_auditoria(
+        db,
+        acao="restaurar",
+        recurso=recurso,
+        recurso_id=recurso_id,
+        titulo="Registro restaurado",
+        detalhes=f"{recurso.capitalize()} devolvido ao fluxo administrativo.",
+    )
+    if recurso == "perfume":
+        await marcar_vitrine_pendente(db)
+    return {"status": "Registro restaurado."}
 
 
 @router.get("/backup")
@@ -124,7 +225,7 @@ async def obter_metricas(
     """
     db = get_db()
     agora = datetime.now(timezone.utc)
-    filtro: dict = {}
+    filtro: dict = {"excluirMetricas": {"$ne": True}}
     if periodo == "7d":
         filtro["criadoEm"] = {"$gte": (agora - timedelta(days=7)).isoformat()}
     elif periodo == "30d":
@@ -399,19 +500,56 @@ async def salvar_configuracoes(
 @router.post("/dados/{recurso}/limpar")
 async def limpar_dados(recurso: str, _: str = Depends(require_atelie_auth)):
     db = get_db()
+    agora = datetime.now(timezone.utc).isoformat()
     if recurso == "opinioes":
-        opinioes = await db.opinioes.delete_many({})
-        sugestoes = await db.sugestoes.delete_many({})
+        marcador = {"arquivadoEm": agora, "arquivadoPor": "limpeza_administrativa"}
+        opinioes = await db.opinioes.update_many(
+            {"arquivadoEm": None}, {"$set": marcador}
+        )
+        sugestoes = await db.sugestoes.update_many(
+            {"arquivadoEm": None}, {"$set": marcador}
+        )
+        await registrar_auditoria(
+            db,
+            acao="arquivar_em_massa",
+            recurso="feedback",
+            recurso_id="todos",
+            titulo="Avaliações e sugestões arquivadas",
+            detalhes="A caixa de entrada foi limpa sem destruir os registros.",
+        )
         return {
-            "status": "Opiniões e sugestões removidas.",
-            "removidos": opinioes.deleted_count + sugestoes.deleted_count,
+            "status": "Opiniões e sugestões arquivadas.",
+            "removidos": opinioes.modified_count + sugestoes.modified_count,
         }
     if recurso == "estoque":
         async with stock_lock(db):
-            movimentos = await db.movimentos.delete_many({})
+            saldos = await mapa_saldo_fisico(db)
+            ajustes = [
+                {
+                    "perfumeId": perfume_id,
+                    "tipo": "saida" if saldo > 0 else "entrada",
+                    "quantidadeMl": abs(int(saldo)),
+                    "motivo": "Zeragem administrativa com histórico preservado",
+                    "categoria": "ajuste-zeragem",
+                    "origem": "sistema:zerar-estoque",
+                    "data": agora,
+                }
+                for perfume_id, saldo in saldos.items()
+                if int(saldo) != 0
+            ]
+            if ajustes:
+                await db.movimentos.insert_many(ajustes)
+            await registrar_auditoria(
+                db,
+                acao="zerar",
+                recurso="estoque",
+                recurso_id="todos",
+                titulo="Estoque zerado por ajustes compensatórios",
+                detalhes=f"{len(ajustes)} saldo(s) zerados sem apagar lançamentos.",
+            )
         return {
-            "status": "Movimentos de estoque removidos.",
-            "removidos": movimentos.deleted_count,
+            "status": "Estoque zerado com histórico preservado.",
+            "removidos": len(ajustes),
         }
     if recurso == "catalogo":
         async with stock_lock(db):
@@ -423,16 +561,46 @@ async def limpar_dados(recurso: str, _: str = Depends(require_atelie_auth)):
                     status_code=409,
                     detail="Conclua ou cancele os pedidos ativos antes de resetar o catálogo.",
                 )
-            perfumes = await db.perfumes.delete_many({})
-            await asyncio.gather(
-                db.movimentos.delete_many({}),
-                db.opinioes.delete_many({}),
-                db.vitrine.delete_many({}),
-                db.counters.delete_one({"_id": "perfumes"}),
+            perfumes = await db.perfumes.update_many(
+                {"arquivadoEm": None},
+                {"$set": {
+                    "arquivadoEm": agora,
+                    "arquivadoPor": "reset_catalogo",
+                    "publicavel": False,
+                    "prontaEntrega": False,
+                }},
+            )
+            saldos = await mapa_saldo_fisico(db)
+            ajustes = [
+                {
+                    "perfumeId": perfume_id,
+                    "tipo": "saida" if saldo > 0 else "entrada",
+                    "quantidadeMl": abs(int(saldo)),
+                    "motivo": "Reset seguro do catálogo",
+                    "categoria": "ajuste-zeragem",
+                    "origem": "sistema:reset-catalogo",
+                    "data": agora,
+                }
+                for perfume_id, saldo in saldos.items()
+                if int(saldo) != 0
+            ]
+            if ajustes:
+                await db.movimentos.insert_many(ajustes)
+            await marcar_vitrine_pendente(db)
+            await registrar_auditoria(
+                db,
+                acao="arquivar_em_massa",
+                recurso="catalogo",
+                recurso_id="todos",
+                titulo="Catálogo arquivado",
+                detalhes=(
+                    f"{perfumes.modified_count} perfume(s) arquivados e "
+                    f"{len(ajustes)} saldo(s) zerados com rastreabilidade."
+                ),
             )
         return {
-            "status": "Catálogo resetado.",
-            "removidos": perfumes.deleted_count,
+            "status": "Catálogo arquivado e estoque zerado com segurança.",
+            "removidos": perfumes.modified_count,
         }
     raise HTTPException(status_code=404, detail="Ação de limpeza não encontrada.")
 
@@ -452,20 +620,58 @@ async def obter_versao_reset_pedidos():
 
 @router.post("/pedidos/reset")
 async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
-    """Apaga pedidos e invalida os códigos salvos em todos os aparelhos."""
+    """Arquiva pedidos de teste e invalida os códigos salvos nos aparelhos."""
     db = get_db()
     async with stock_lock(db):
-        pedidos = await db.pedidos.count_documents({})
-        compras_legadas = await db.compras.count_documents({})
+        agora = datetime.now(timezone.utc).isoformat()
+        pedidos = await db.pedidos.count_documents({"arquivadoEm": None})
+        compras_legadas = await db.compras.count_documents({"arquivadoEm": None})
 
-        # Os movimentos com essa origem são as baixas automáticas dos pedidos.
-        # Removê-los devolve o saldo ao estado anterior sem tocar nas entradas.
-        movimentos = await db.movimentos.delete_many({
-            "origem": {"$regex": r"^pedido:"},
-        })
-        await db.pedidos.delete_many({})
-        await db.compras.delete_many({})
-        await db.counters.delete_one({"_id": "pedidos"})
+        saldos_pedidos = await db.movimentos.aggregate([
+            {"$match": {"origem": {"$regex": r"^pedido:"}}},
+            {"$group": {
+                "_id": {"origem": "$origem", "perfumeId": "$perfumeId"},
+                "consumo": {"$sum": {"$cond": [
+                    {"$eq": ["$tipo", "saida"]},
+                    "$quantidadeMl",
+                    {"$multiply": ["$quantidadeMl", -1]},
+                ]}},
+            }},
+        ]).to_list(100_000)
+        estornos = [
+            {
+                "perfumeId": linha["_id"]["perfumeId"],
+                "tipo": "entrada" if int(linha.get("consumo", 0)) > 0 else "saida",
+                "quantidadeMl": abs(int(linha.get("consumo", 0))),
+                "motivo": "Estorno seguro ao arquivar base de pedidos",
+                "categoria": "estorno-pedidos",
+                "origem": linha["_id"]["origem"],
+                "data": agora,
+            }
+            for linha in saldos_pedidos
+            if int(linha.get("consumo", 0)) != 0
+        ]
+        if estornos:
+            await db.movimentos.insert_many(estornos)
+        marcador = {
+            "arquivadoEm": agora,
+            "arquivadoPor": "reset_pedidos",
+            "excluirMetricas": True,
+            "acompanhamentoAtivo": False,
+        }
+        await db.pedidos.update_many({"arquivadoEm": None}, {"$set": marcador})
+        await db.compras.update_many({"arquivadoEm": None}, {"$set": marcador})
+        await registrar_auditoria(
+            db,
+            acao="arquivar_em_massa",
+            recurso="pedidos",
+            recurso_id="todos",
+            titulo="Base operacional de pedidos arquivada",
+            detalhes=(
+                f"{pedidos} pedido(s), {compras_legadas} compra(s) legada(s) e "
+                f"{len(estornos)} ajuste(s) preservados."
+            ),
+        )
 
         await db.configuracoes.update_one(
             {"_id": PEDIDOS_RESET_ID},
@@ -482,9 +688,9 @@ async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
         )
 
     return {
-        "status": "Base de pedidos zerada.",
+        "status": "Base de pedidos arquivada com histórico preservado.",
         "pedidosApagados": pedidos,
         "comprasLegadasApagadas": compras_legadas,
-        "movimentosEstornados": movimentos.deleted_count,
+        "movimentosEstornados": len(estornos),
         "resetVersion": versao["version"],
     }

@@ -118,7 +118,7 @@ def _movimentos_para_completar(
 async def obter_resumo(_: str = Depends(require_atelie_auth)):
     db = get_db()
     perfumes = await db.perfumes.find(
-        {},
+        {"arquivadoEm": None},
         {"_id": 1, "prontaEntrega": 1},
     ).to_list(5000)
     estoque = await _estoque_atual(db)
@@ -169,7 +169,7 @@ async def zerar_sob_encomenda(_: str = Depends(require_atelie_auth)):
     db = get_db()
     async with stock_lock(db):
         perfumes = await db.perfumes.find(
-            {"prontaEntrega": {"$ne": True}},
+            {"prontaEntrega": {"$ne": True}, "arquivadoEm": None},
             {"_id": 1},
         ).to_list(5000)
         ids = {str(perfume["_id"]) for perfume in perfumes}
@@ -202,7 +202,7 @@ async def completar_pronta_entrega(
     db = get_db()
     async with stock_lock(db):
         perfumes = await db.perfumes.find(
-            {"prontaEntrega": True},
+            {"prontaEntrega": True, "arquivadoEm": None},
             {"_id": 1},
         ).to_list(5000)
         ids = {str(perfume["_id"]) for perfume in perfumes}

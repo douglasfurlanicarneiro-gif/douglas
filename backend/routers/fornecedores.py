@@ -9,6 +9,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from audit import registrar_auditoria
 from database import get_db
 from security import require_atelie_auth
 from utils import serialize
@@ -57,7 +58,7 @@ async def listar_fornecedores(_: str = Depends(require_atelie_auth)):
     contagens: dict[str, int] = {item: 0 for item in ids}
     if ids:
         async for linha in db.cotacoes_fornecedores.aggregate([
-            {"$match": {"fornecedorId": {"$in": ids}}},
+            {"$match": {"fornecedorId": {"$in": ids}, "arquivadoEm": None}},
             {"$group": {"_id": "$fornecedorId", "total": {"$sum": 1}}},
         ]):
             contagens[str(linha["_id"])] = int(linha.get("total", 0))
@@ -109,7 +110,7 @@ async def comparar_fornecedores(perfume_id: str, _: str = Depends(require_atelie
     """Última cotação de cada fornecedor para uma mesma essência/perfume."""
     _oid(perfume_id, "Perfume")
     docs = await get_db().cotacoes_fornecedores.find(
-        {"perfumeId": perfume_id}
+        {"perfumeId": perfume_id, "arquivadoEm": None}
     ).sort("data", -1).to_list(5000)
     ultimas: dict[str, dict] = {}
     for item in docs:
@@ -130,7 +131,7 @@ async def comparar_fornecedores(perfume_id: str, _: str = Depends(require_atelie
 async def listar_cotacoes(fornecedor_id: str, _: str = Depends(require_atelie_auth)):
     _oid(fornecedor_id, "Fornecedor")
     docs = await get_db().cotacoes_fornecedores.find(
-        {"fornecedorId": fornecedor_id}
+        {"fornecedorId": fornecedor_id, "arquivadoEm": None}
     ).sort("data", -1).to_list(2000)
     return [serialize(item) for item in docs]
 
@@ -192,7 +193,20 @@ async def criar_cotacao(
 
 @router.delete("/cotacoes/{cotacao_id}")
 async def apagar_cotacao(cotacao_id: str, _: str = Depends(require_atelie_auth)):
-    resultado = await get_db().cotacoes_fornecedores.delete_one({"_id": _oid(cotacao_id, "Cotação")})
-    if resultado.deleted_count == 0:
+    db = get_db()
+    agora = datetime.now(timezone.utc).isoformat()
+    resultado = await db.cotacoes_fornecedores.update_one(
+        {"_id": _oid(cotacao_id, "Cotação"), "arquivadoEm": None},
+        {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},
+    )
+    if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Cotação não encontrada.")
-    return {"status": "Cotação removida."}
+    await registrar_auditoria(
+        db,
+        acao="arquivar",
+        recurso="cotacao_fornecedor",
+        recurso_id=cotacao_id,
+        titulo="Cotação arquivada",
+        detalhes="Cotação removida do comparativo com histórico preservado.",
+    )
+    return {"status": "Cotação arquivada."}

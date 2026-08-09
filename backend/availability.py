@@ -63,7 +63,7 @@ def name_signature(name: str) -> str:
 
 
 async def apply_ready_delivery(db, names: list[str]) -> dict:
-    perfumes = await db.perfumes.find().to_list(5000)
+    perfumes = await db.perfumes.find({"arquivadoEm": None}).to_list(5000)
     by_signature: dict[str, list[dict]] = {}
     for perfume in perfumes:
         by_signature.setdefault(name_signature(perfume.get("nome", "")), []).append(perfume)
@@ -86,7 +86,9 @@ async def apply_ready_delivery(db, names: list[str]) -> dict:
         else:
             missing.append(name)
 
-    await db.perfumes.update_many({}, {"$set": {"prontaEntrega": False}})
+    await db.perfumes.update_many(
+        {"arquivadoEm": None}, {"$set": {"prontaEntrega": False}}
+    )
     if matched_ids:
         await db.perfumes.update_many(
             {"_id": {"$in": list(matched_ids)}},
@@ -119,14 +121,18 @@ async def apply_ready_delivery(db, names: list[str]) -> dict:
 
 async def apply_ready_delivery_by_ids(db, ids: list[str]) -> dict:
     """Atualiza a disponibilidade por ids exatos, sem depender do nome."""
-    perfumes = await db.perfumes.find({}, {"_id": 1}).to_list(5000)
+    perfumes = await db.perfumes.find(
+        {"arquivadoEm": None}, {"_id": 1}
+    ).to_list(5000)
     perfumes_por_id = {str(perfume["_id"]): perfume["_id"] for perfume in perfumes}
     ids_unicos = list(dict.fromkeys(str(item).strip() for item in ids if str(item).strip()))
     encontrados = [item_id for item_id in ids_unicos if item_id in perfumes_por_id]
     nao_encontrados = [item_id for item_id in ids_unicos if item_id not in perfumes_por_id]
     object_ids = [perfumes_por_id[item_id] for item_id in encontrados]
 
-    await db.perfumes.update_many({}, {"$set": {"prontaEntrega": False}})
+    await db.perfumes.update_many(
+        {"arquivadoEm": None}, {"$set": {"prontaEntrega": False}}
+    )
     if object_ids:
         await db.perfumes.update_many(
             {"_id": {"$in": object_ids}},
@@ -158,7 +164,7 @@ async def apply_ready_delivery_by_ids(db, ids: list[str]) -> dict:
 
 async def zero_made_to_order_stock(db) -> dict:
     perfumes = await db.perfumes.find(
-        {"prontaEntrega": {"$ne": True}},
+        {"prontaEntrega": {"$ne": True}, "arquivadoEm": None},
         {"_id": 1},
     ).to_list(5000)
     perfume_ids = {str(perfume["_id"]) for perfume in perfumes}

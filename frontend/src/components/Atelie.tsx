@@ -22,7 +22,9 @@ import {
   downloadBackup, getMetricas, resetAllOrders,
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
   aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
+  listArquivados, restoreArquivado,
 } from '../api';
+import type { RegistroArquivado } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
@@ -125,9 +127,10 @@ function SwipeablePedidoCard({
 }: {
   children: React.ReactNode;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   testID: string;
 }) {
+  const actionsWidth = onDelete ? ORDER_ACTIONS_WIDTH : ORDER_ACTIONS_WIDTH / 2;
   const translateX = useRef(new Animated.Value(0)).current;
   const openRef = useRef(false);
   const dragStartRef = useRef(0);
@@ -135,13 +138,13 @@ function SwipeablePedidoCard({
   const animateTo = useCallback((open: boolean) => {
     openRef.current = open;
     Animated.spring(translateX, {
-      toValue: open ? -ORDER_ACTIONS_WIDTH : 0,
+      toValue: open ? -actionsWidth : 0,
       useNativeDriver: false,
       damping: 22,
       stiffness: 240,
       mass: 0.8,
     }).start();
-  }, [translateX]);
+  }, [actionsWidth, translateX]);
 
   const panResponder = useMemo(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, gesture) => (
@@ -153,17 +156,17 @@ function SwipeablePedidoCard({
     },
     onPanResponderMove: (_, gesture) => {
       const nextPosition = Math.max(
-        -ORDER_ACTIONS_WIDTH,
+        -actionsWidth,
         Math.min(0, dragStartRef.current + gesture.dx),
       );
       translateX.setValue(nextPosition);
     },
     onPanResponderRelease: (_, gesture) => {
       const finalPosition = dragStartRef.current + gesture.dx;
-      animateTo(finalPosition < -(ORDER_ACTIONS_WIDTH / 2) || gesture.vx < -0.35);
+      animateTo(finalPosition < -(actionsWidth / 2) || gesture.vx < -0.35);
     },
     onPanResponderTerminate: () => animateTo(openRef.current),
-  }), [animateTo, translateX]);
+  }), [actionsWidth, animateTo, translateX]);
 
   const edit = () => {
     animateTo(false);
@@ -172,7 +175,7 @@ function SwipeablePedidoCard({
 
   const remove = () => {
     animateTo(false);
-    onDelete();
+    onDelete?.();
   };
 
   return (
@@ -188,16 +191,18 @@ function SwipeablePedidoCard({
           <Feather name="edit-2" size={18} color={COLORS.ink} />
           <Text style={styles.swipeOrderEditText}>Editar</Text>
         </Pressable>
-        <Pressable
-          onPress={remove}
-          style={({ pressed }) => [styles.swipeOrderAction, styles.swipeOrderDelete, pressed && styles.swipeOrderActionPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Excluir pedido"
-          testID={`${testID}-excluir`}
-        >
-          <Feather name="trash-2" size={18} color={COLORS.inverse} />
-          <Text style={styles.swipeOrderDeleteText}>Excluir</Text>
-        </Pressable>
+        {onDelete && (
+          <Pressable
+            onPress={remove}
+            style={({ pressed }) => [styles.swipeOrderAction, styles.swipeOrderDelete, pressed && styles.swipeOrderActionPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Arquivar pedido"
+            testID={`${testID}-arquivar`}
+          >
+            <Feather name="archive" size={18} color={COLORS.inverse} />
+            <Text style={styles.swipeOrderDeleteText}>Arquivar</Text>
+          </Pressable>
+        )}
       </View>
       <Animated.View
         style={[styles.swipeOrderFront, { transform: [{ translateX }] }]}
@@ -207,7 +212,7 @@ function SwipeablePedidoCard({
           onPress={() => openRef.current ? animateTo(false) : onEdit()}
           style={({ pressed }) => [styles.swipeOrderCard, pressed && { opacity: 0.94 }]}
           accessibilityRole="button"
-          accessibilityHint="Deslize para a esquerda para editar ou excluir"
+          accessibilityHint={onDelete ? 'Deslize para a esquerda para editar ou arquivar' : 'Deslize para a esquerda para editar'}
         >
           {children}
         </Pressable>
@@ -1257,16 +1262,16 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
           <Text style={styles.cancelAdminOrderText}>Cancelar pedido</Text>
         </Pressable>
       )}
-      {pedidoRecebido && initial?.status === 'cancelado' && (
+      {pedidoRecebido && (initial?.status === 'cancelado' || initial?.status === 'entregue') && (
         <Pressable
           onPress={() => onDelete(initial)}
           style={styles.deleteAdminOrderButton}
-          testID="pedido-excluir-definitivamente"
+          testID="pedido-arquivar"
         >
-          <Feather name="trash-2" size={16} color={COLORS.inverse} />
+          <Feather name="archive" size={16} color={COLORS.inverse} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.deleteAdminOrderTitle}>Excluir definitivamente</Text>
-            <Text style={styles.deleteAdminOrderHint}>Remove o pedido e seu histórico do painel.</Text>
+            <Text style={styles.deleteAdminOrderTitle}>Arquivar pedido</Text>
+            <Text style={styles.deleteAdminOrderHint}>Retira do fluxo ativo e preserva todo o histórico.</Text>
           </View>
         </Pressable>
       )}
@@ -1283,7 +1288,7 @@ export function Atelie({
 }) {
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState('dashboard');
-  const [systemView, setSystemView] = useState<'main' | 'historico' | 'fornecedores' | 'custos' | 'insumos'>('main');
+  const [systemView, setSystemView] = useState<'main' | 'historico' | 'arquivados' | 'fornecedores' | 'custos' | 'insumos'>('main');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
@@ -1294,6 +1299,8 @@ export function Atelie({
   const [compras, setCompras] = useState<Compra[]>([]);
   const [estoqueResumo, setEstoqueResumo] = useState<EstoqueResumo>({});
   const [catalogoEstoque, setCatalogoEstoque] = useState<CatalogoEstoqueResumo | null>(null);
+  const [arquivados, setArquivados] = useState<RegistroArquivado[]>([]);
+  const [loadingArquivados, setLoadingArquivados] = useState(false);
   const [sheet, setSheet] = useState<SheetType>(null);
   const [search, setSearch] = useState('');
   const [stockSearch, setStockSearch] = useState('');
@@ -1407,6 +1414,35 @@ export function Atelie({
     await load();
   }, [load]);
   const pullToRefresh = useWebPullToRefresh(refreshing, refreshPanel);
+
+  const openArquivados = async () => {
+    setSystemView('arquivados');
+    setLoadingArquivados(true);
+    try {
+      setArquivados(await listArquivados());
+    } catch (error) {
+      setSheet({
+        type: 'info',
+        label: error instanceof ApiError ? error.message : 'Não foi possível abrir os itens arquivados.',
+      });
+    } finally {
+      setLoadingArquivados(false);
+    }
+  };
+
+  const requestRestoreArquivado = (item: RegistroArquivado) => {
+    setSheet({
+      type: 'confirm',
+      label: `Restaurar “${item.titulo}” ao painel?`,
+      confirmLabel: 'Restaurar',
+      onConfirm: async () => {
+        await restoreArquivado(item.recurso, item.id);
+        setSheet(null);
+        setArquivados(await listArquivados());
+        await load();
+      },
+    });
+  };
 
   const changeMetricPeriod = async (period: '7d' | '30d' | 'mes' | 'todos') => {
     setMetricPeriod(period);
@@ -1786,11 +1822,10 @@ export function Atelie({
   const requestDeletePedido = (pedido: Pedido) => {
     setSheet({
       type: 'confirm',
-      label: `Excluir definitivamente o pedido Nº ${padSeq(pedido.seq)} de ${pedido.cliente}?`,
+      label: `Arquivar o pedido Nº ${padSeq(pedido.seq)} de ${pedido.cliente}?`,
       onConfirm: () => doDelPedido(pedido.id),
-      confirmLabel: 'Excluir definitivamente',
-      danger: true,
-      safetyText: 'Esta ação não pode ser desfeita. O pedido, o acompanhamento do cliente e todo o histórico serão removidos.',
+      confirmLabel: 'Arquivar pedido',
+      safetyText: 'O pedido sairá do fluxo ativo, mas o histórico, o acompanhamento e os dados financeiros serão preservados.',
     });
   };
   const doDelOpiniao = async (id: string) => { await deleteOpiniao(id); setSheet(null); load(); };
@@ -2033,7 +2068,7 @@ export function Atelie({
                     </View>
                     <View style={{ flexDirection: 'row', gap: 12 }}>
                       <Pressable onPress={() => setSheet({ type: 'perfume', data: p })} hitSlop={8} testID={`edit-${p.id}`}><Feather name="edit-2" size={16} color={COLORS.muted} /></Pressable>
-                      <Pressable onPress={() => setSheet({ type: 'confirm', label: `Excluir "${p.nome}"?`, onConfirm: () => doDeletePerfume(p.id), danger: true })} hitSlop={8} testID={`del-${p.id}`}><Feather name="trash-2" size={16} color={COLORS.muted} /></Pressable>
+                      <Pressable onPress={() => setSheet({ type: 'confirm', label: `Arquivar "${p.nome}"? Ele sairá da vitrine, mas o histórico será preservado.`, onConfirm: () => doDeletePerfume(p.id), danger: true, confirmLabel: 'Arquivar perfume', safetyText: 'O perfume poderá ser restaurado e seus pedidos e movimentos de estoque não serão apagados.' })} hitSlop={8} testID={`archive-${p.id}`}><Feather name="archive" size={16} color={COLORS.muted} /></Pressable>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
@@ -2276,7 +2311,7 @@ export function Atelie({
             <>
               <View style={styles.swipeOrderHint}>
                 <Feather name="chevrons-left" size={15} color={COLORS.gold} />
-                <Text style={styles.swipeOrderHintText}>Deslize um pedido para a esquerda para editar ou excluir.</Text>
+                <Text style={styles.swipeOrderHintText}>Deslize um pedido para a esquerda para editar; pedidos concluídos ou cancelados também podem ser arquivados.</Text>
               </View>
               {pedidosFiltrados.map((p) => {
                 const st = STATUS.find((s) => s.id === p.status) || STATUS[0];
@@ -2284,12 +2319,12 @@ export function Atelie({
                   <SwipeablePedidoCard
                     key={`${p.fonte}-${p.id}`}
                     onEdit={() => abrirPedido(p)}
-                    onDelete={() => setSheet({
+                    onDelete={(['cancelado', 'entregue'] as OrderStatus[]).includes(p.status) ? () => setSheet({
                       type: 'confirm',
-                      label: `Excluir pedido de ${p.cliente}?`,
+                      label: `Arquivar pedido de ${p.cliente}? O histórico será preservado.`,
                       onConfirm: () => p.compraLegada ? doDelCompra(p.compraLegada.id) : doDelPedido(p.id),
-                      danger: true,
-                    })}
+                      confirmLabel: 'Arquivar pedido',
+                    }) : undefined}
                     testID={`pedido-${p.id}`}
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
@@ -2319,8 +2354,8 @@ export function Atelie({
               <View key={o.id} style={styles.rowCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p?.nome || 'Perfume removido'}</Text>
-                  <Pressable onPress={() => setSheet({ type: 'confirm', label: 'Excluir opinião?', onConfirm: () => doDelOpiniao(o.id), danger: true })} hitSlop={8}>
-                    <Feather name="trash-2" size={14} color={COLORS.muted} />
+                  <Pressable onPress={() => setSheet({ type: 'confirm', label: 'Arquivar esta avaliação? Ela deixará de aparecer, mas o registro será preservado.', onConfirm: () => doDelOpiniao(o.id), confirmLabel: 'Arquivar avaliação' })} hitSlop={8}>
+                    <Feather name="archive" size={14} color={COLORS.muted} />
                   </Pressable>
                 </View>
                 <View style={{ marginTop: 4 }}><Stars value={o.nota} size={14} /></View>
@@ -2335,7 +2370,17 @@ export function Atelie({
             <View key={s.id} style={styles.rowCard}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }}>{s.cliente || 'Anônimo'}</Text>
-                <Pressable onPress={() => doDelSugestao(s.id)} hitSlop={8}><Feather name="trash-2" size={14} color={COLORS.muted} /></Pressable>
+                <Pressable
+                  onPress={() => setSheet({
+                    type: 'confirm',
+                    label: 'Arquivar esta sugestão? O registro continuará no histórico.',
+                    onConfirm: () => doDelSugestao(s.id),
+                    confirmLabel: 'Arquivar sugestão',
+                  })}
+                  hitSlop={8}
+                >
+                  <Feather name="archive" size={14} color={COLORS.muted} />
+                </Pressable>
               </View>
               {!!s.contato && <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginTop: 2 }}>{s.contato}</Text>}
               <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, marginTop: 4 }}>{s.mensagem}</Text>
@@ -2388,6 +2433,44 @@ export function Atelie({
                     <Text style={styles.catalogHistoryDetails}>{operacao.detalhes}</Text>
                     <Text style={styles.catalogHistoryDate}>{fmtDate(operacao.data)}</Text>
                   </View>
+                </View>
+              ))}
+            </SystemCard>
+          </View>
+        );
+      }
+
+      if (systemView === 'arquivados') {
+        return (
+          <View style={styles.systemPage}>
+            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}>
+              <Feather name="arrow-left" size={16} color={COLORS.gold} />
+              <Text style={styles.systemBackText}>Voltar ao Sistema</Text>
+            </Pressable>
+            <SystemCard icon="archive" title="Itens arquivados" subtitle="Registros preservados fora das telas operacionais.">
+              {loadingArquivados && <ActivityIndicator color={COLORS.gold} style={{ marginVertical: SPACING.xl }} />}
+              {!loadingArquivados && arquivados.length === 0 && (
+                <Text style={styles.catalogHistoryEmpty}>Nenhum registro arquivado.</Text>
+              )}
+              {!loadingArquivados && arquivados.map((item) => (
+                <View key={`${item.recurso}-${item.id}`} style={styles.catalogHistoryRow}>
+                  <View style={styles.catalogHistoryIcon}>
+                    <Feather name="archive" size={13} color={COLORS.gold} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.catalogHistoryTitle}>{item.titulo}</Text>
+                    <Text style={styles.catalogHistoryDetails}>{item.detalhes}</Text>
+                    <Text style={styles.catalogHistoryDate}>{fmtDate(item.arquivadoEm)}</Text>
+                  </View>
+                  <Pressable
+                    onPress={() => requestRestoreArquivado(item)}
+                    style={styles.systemInlineButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Restaurar ${item.titulo}`}
+                  >
+                    <Feather name="rotate-ccw" size={14} color={COLORS.gold} />
+                    <Text style={styles.systemInlineButtonText}>Restaurar</Text>
+                  </Pressable>
                 </View>
               ))}
             </SystemCard>
@@ -2666,6 +2749,13 @@ export function Atelie({
 
           <SystemCard icon="database" title="Base de dados" subtitle="Backup e limpezas protegidas por confirmação.">
             <SystemAction icon="download" title="Exportar backup" subtitle="Baixe uma cópia dos dados atuais." onPress={doBackup} />
+            <SystemAction
+              icon="archive"
+              title="Itens arquivados"
+              subtitle="Restaure pedidos, perfumes, avaliações e sugestões preservados."
+              onPress={() => void openArquivados()}
+              badge={arquivados.length ? String(arquivados.length) : undefined}
+            />
             <SystemAction icon="upload" title="Restaurar backup" subtitle="Importação validada de um arquivo anterior." disabled badge="PRÓXIMA ETAPA" />
             <SystemAction
               icon="trash-2"
@@ -3020,6 +3110,8 @@ const styles = StyleSheet.create({
   catalogHistoryTitle: { color: COLORS.bone, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   catalogHistoryDetails: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
   catalogHistoryDate: { color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 3 },
+  systemInlineButton: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface },
+  systemInlineButtonText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   availabilitySummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   availabilitySummaryDivider: { width: 1, height: 42, backgroundColor: COLORS.border },
   availabilityCount: { color: COLORS.bone, fontSize: FONT_SIZES.display, fontWeight: '700', textAlign: 'center' },

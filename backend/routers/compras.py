@@ -9,6 +9,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
+from audit import registrar_auditoria
 from config import INFINITEPAY_HANDLE
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
@@ -140,7 +141,9 @@ def _validar_reuso_idempotente(pedido: dict, payload_hash: str) -> None:
 @router.get("")
 async def listar_compras(_: str = Depends(require_atelie_auth)):
     db = get_db()
-    compras = await db.compras.find().sort("data", -1).to_list(2000)
+    compras = await db.compras.find(
+        {"arquivadoEm": None}
+    ).sort("data", -1).to_list(2000)
     return [serialize(c) for c in compras]
 
 
@@ -494,11 +497,30 @@ async def apagar_compra(compra_id: str, _: str = Depends(require_atelie_auth)):
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de compra inválido.")
     async with stock_lock(db):
-        resultado = await db.compras.delete_one({"_id": oid})
-        if resultado.deleted_count == 0:
+        agora = datetime.now(timezone.utc).isoformat()
+        resultado = await db.compras.update_one(
+            {"_id": oid, "arquivadoEm": None},
+            {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},
+        )
+        if resultado.matched_count == 0:
             pedido = await db.pedidos.find_one({"_id": oid, "origem": "vitrine"})
             if not pedido:
                 raise HTTPException(status_code=404, detail="Pedido de compra não encontrado.")
-            await db.movimentos.delete_many({"origem": f"pedido:{compra_id}"})
-            await db.pedidos.delete_one({"_id": oid})
-    return {"status": "Pedido de compra apagado."}
+            if pedido.get("status") not in {"cancelado", "entregue"}:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Cancele ou conclua o pedido antes de arquivá-lo.",
+                )
+            await db.pedidos.update_one(
+                {"_id": oid, "arquivadoEm": None},
+                {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},
+            )
+        await registrar_auditoria(
+            db,
+            acao="arquivar",
+            recurso="compra",
+            recurso_id=compra_id,
+            titulo="Compra arquivada",
+            detalhes="Registro retirado do fluxo ativo com histórico preservado.",
+        )
+    return {"status": "Pedido de compra arquivado."}

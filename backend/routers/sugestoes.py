@@ -5,6 +5,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from audit import registrar_auditoria
 from database import get_db
 from rate_limit import feedback_rate_limit
 from security import require_atelie_auth
@@ -36,7 +37,9 @@ async def criar_sugestao(payload: SugestaoIn):
 @router.get("")
 async def listar_sugestoes(_: str = Depends(require_atelie_auth)):
     db = get_db()
-    sugestoes = await db.sugestoes.find().sort("data", -1).to_list(2000)
+    sugestoes = await db.sugestoes.find(
+        {"arquivadoEm": None}
+    ).sort("data", -1).to_list(2000)
     return [serialize(s) for s in sugestoes]
 
 
@@ -47,7 +50,19 @@ async def apagar_sugestao(sugestao_id: str, _: str = Depends(require_atelie_auth
         oid = ObjectId(sugestao_id)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de sugestão inválido.")
-    resultado = await db.sugestoes.delete_one({"_id": oid})
-    if resultado.deleted_count == 0:
+    agora = datetime.now(timezone.utc).isoformat()
+    resultado = await db.sugestoes.update_one(
+        {"_id": oid, "arquivadoEm": None},
+        {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},
+    )
+    if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Sugestão não encontrada.")
-    return {"status": "Sugestão apagada."}
+    await registrar_auditoria(
+        db,
+        acao="arquivar",
+        recurso="sugestao",
+        recurso_id=sugestao_id,
+        titulo="Sugestão arquivada",
+        detalhes="Sugestão removida da caixa de entrada com registro preservado.",
+    )
+    return {"status": "Sugestão arquivada."}

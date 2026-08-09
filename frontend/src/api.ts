@@ -314,6 +314,21 @@ export const confirmarPagamentoInfinitePay = (data: {
 export const listCompras = () => request<Compra[]>('/compras', {}, true);
 export const deleteCompra = (id: string) => request<{ status: string }>(`/compras/${id}`, { method: 'DELETE' }, true);
 
+export type RegistroArquivado = {
+  id: string;
+  recurso: 'pedido' | 'compra' | 'perfume' | 'opiniao' | 'sugestao' | 'cotacao';
+  titulo: string;
+  detalhes: string;
+  arquivadoEm: string;
+};
+
+export const listArquivados = () =>
+  request<RegistroArquivado[]>('/admin/arquivados', {}, true);
+export const restoreArquivado = (recurso: RegistroArquivado['recurso'], id: string) =>
+  request<{ status: string }>(`/admin/arquivados/${recurso}/${id}/restaurar`, {
+    method: 'POST',
+  }, true);
+
 // Experiência e operação
 export const acompanharPedido = (codigo: string) =>
   request<Acompanhamento>(`/acompanhamento/${encodeURIComponent(codigo)}`);

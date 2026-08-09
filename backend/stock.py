@@ -120,6 +120,7 @@ def _object_id_or_original(value: Any) -> Any:
 async def mapa_reservado(db, *, excluir_pedido_id: Any | None = None) -> dict[str, int]:
     filtro: dict[str, Any] = {
         "status": {"$in": list(ACTIVE_RESERVATION_STATUSES)},
+        "arquivadoEm": None,
     }
     if excluir_pedido_id is not None:
         filtro["_id"] = {"$ne": _object_id_or_original(excluir_pedido_id)}
