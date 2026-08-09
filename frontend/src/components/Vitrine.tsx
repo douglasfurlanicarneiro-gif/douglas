@@ -311,6 +311,8 @@ export function Vitrine({
   onRefreshStoreConfig?: () => Promise<ConfiguracoesLojaPublicas>;
   onReady?: () => void;
 }) {
+  const { width: viewportWidth } = useWindowDimensions();
+  const narrowViewport = viewportWidth < 410;
   const currentStore = publicStoreConfig(storeConfig);
   const brand = storeNameParts(currentStore.nomeLoja);
   const supportNumber = whatsappNumber(currentStore.whatsapp);
@@ -984,6 +986,7 @@ export function Vitrine({
                       }}
                       style={[
                         styles.quickFilterButton,
+                        narrowViewport && styles.quickFilterButtonNarrow,
                         styles.quickFilterPrimary,
                         familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
@@ -1008,6 +1011,7 @@ export function Vitrine({
                       />
                       <Text style={[
                         styles.quickFilterText,
+                        narrowViewport && styles.quickFilterTextNarrow,
                         disponibilidadeAtiva === 'pronta'
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
@@ -1022,6 +1026,7 @@ export function Vitrine({
                       }}
                       style={[
                         styles.quickFilterButton,
+                        narrowViewport && styles.quickFilterButtonNarrow,
                         styles.quickFilterPrimary,
                         familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
@@ -1046,6 +1051,7 @@ export function Vitrine({
                       />
                       <Text style={[
                         styles.quickFilterText,
+                        narrowViewport && styles.quickFilterTextNarrow,
                         disponibilidadeAtiva === 'encomenda'
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
@@ -1058,7 +1064,7 @@ export function Vitrine({
                         setOcasiaoAtiva('Todas');
                         setDisponibilidadeAtiva('todas');
                       }}
-                      style={[styles.quickFilterButton, styles.quickFilterSecondary, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
+                      style={[styles.quickFilterButton, narrowViewport && styles.quickFilterButtonNarrow, styles.quickFilterSecondary, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
                       testID="filter-favorites"
                       accessibilityRole="button"
                       accessibilityLabel="Mostrar perfumes favoritos"
@@ -1069,20 +1075,20 @@ export function Vitrine({
                       ) : (
                         <Feather name="heart" size={14} color={COLORS.gold} />
                       )}
-                      <Text style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>Favoritos</Text>
+                      <Text style={[styles.quickFilterText, narrowViewport && styles.quickFilterTextNarrow, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>Favoritos</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
                         if (familiaAtiva === 'Favoritos') setFamiliaAtiva('Todas');
                         setFiltersOpen(true);
                       }}
-                      style={[styles.quickFilterButton, styles.quickFilterCompact, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
+                      style={[styles.quickFilterButton, narrowViewport && styles.quickFilterButtonNarrow, styles.quickFilterCompact, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
                       testID="filter-open"
                       accessibilityRole="button"
                       accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
                     >
                       <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />
-                      <Text style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>Filtros</Text>
+                      <Text style={[styles.quickFilterText, narrowViewport && styles.quickFilterTextNarrow, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>Filtros</Text>
                       {filtrosAtivos > 0 && (
                         <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{filtrosAtivos}</Text></View>
                       )}
@@ -1740,11 +1746,13 @@ const styles = StyleSheet.create({
   quickFilters: { paddingVertical: 8, marginBottom: SPACING.sm },
   quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   quickFilterButton: { minHeight: 40, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
+  quickFilterButtonNarrow: { paddingHorizontal: 3, gap: 2 },
   quickFilterPrimary: { flex: 1.22 },
   quickFilterSecondary: { flex: 1 },
   quickFilterCompact: { flex: 0.82 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  quickFilterTextNarrow: { fontSize: FONT_SIZES.micro },
   quickFilterTextActive: { color: COLORS.ink },
   storefrontEmpty: { alignItems: 'center', padding: SPACING.xl, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   storefrontEmptyTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
