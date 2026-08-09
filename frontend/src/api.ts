@@ -127,6 +127,13 @@ async function request<T>(
 // Auth
 export const login = (usuario: string, senha: string) =>
   request<{ ok: boolean; token?: string }>('/auth/login', { method: 'POST', body: JSON.stringify({ usuario, senha }) });
+export async function logout(): Promise<void> {
+  try {
+    await request<{ ok: boolean }>('/auth/logout', { method: 'POST' }, true);
+  } finally {
+    await clearToken();
+  }
+}
 
 // Perfumes
 export const listPerfumes = () => request<Perfume[]>('/perfumes', {}, true);

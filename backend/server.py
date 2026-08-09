@@ -51,13 +51,22 @@ async def _seed_admin():
         if not senha_hash or not verify_password(ATELIE_ADMIN_PASSWORD, senha_hash):
             await db.admins.update_one(
                 {"_id": existente["_id"]},
-                {"$set": {"senhaHash": hash_password(ATELIE_ADMIN_PASSWORD)}},
+                {
+                    "$set": {"senhaHash": hash_password(ATELIE_ADMIN_PASSWORD)},
+                    "$inc": {"authVersion": 1},
+                },
             )
             logger.info("Senha do administrador sincronizada com a configuração do ambiente.")
+        elif "authVersion" not in existente:
+            await db.admins.update_one(
+                {"_id": existente["_id"]},
+                {"$set": {"authVersion": 1}},
+            )
         return
     await db.admins.insert_one({
         "usuario": ATELIE_ADMIN_USER,
         "senhaHash": hash_password(ATELIE_ADMIN_PASSWORD),
+        "authVersion": 1,
     })
     logger.info("Usuário administrador do Ateliê criado.")
 
@@ -66,7 +75,8 @@ async def _criar_indices():
     """Índices de integridade e desempenho das rotas mais acessadas."""
     db = get_db()
     await db.admins.create_index("usuario", unique=True)
-    await db.auth_login_attempts.create_index("bloqueadoAte")
+    await db.auth_login_attempts.create_index("expireAt", expireAfterSeconds=0)
+    await db.auth_revoked_tokens.create_index("expireAt", expireAfterSeconds=0)
     await db.api_rate_limits.create_index("expiresAt", expireAfterSeconds=0)
     await db.pedidos.create_index("seq")
     await db.pedidos.create_index("status")
@@ -177,7 +187,7 @@ async def security_headers(request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
-    if request.headers.get("x-atelie-token"):
+    if request.headers.get("x-atelie-token") or request.url.path.startswith("/api/auth"):
         response.headers.setdefault("Cache-Control", "no-store")
     return response
 

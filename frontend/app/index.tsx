@@ -6,7 +6,7 @@ import { Vitrine } from '../src/components/Vitrine';
 import { BottomSheet } from '../src/components/BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton } from '../src/components/atoms';
 import { LaunchIntro } from '../src/components/LaunchIntro';
-import { ApiError, login, saveToken, getToken, clearToken, getConfiguracoesPublicas, setSessionExpiredHandler } from '../src/api';
+import { ApiError, login, logout, saveToken, getToken, getConfiguracoesPublicas, setSessionExpiredHandler } from '../src/api';
 import { DEFAULT_STORE_CONFIG, publicStoreConfig } from '../src/storeConfig';
 import type { ConfiguracoesLojaPublicas } from '../src/types';
 import { AppText as Text } from '../src/components/Typography';
@@ -122,7 +122,7 @@ export default function Index() {
     return () => setSessionExpiredHandler(null);
   }, []);
 
-  const sair = async () => { await clearToken(); setModo('vitrine'); };
+  const sair = async () => { await logout().catch(() => undefined); setModo('vitrine'); };
   const finishIntro = useCallback(() => setShowIntro(false), []);
   const refreshStoreConfig = useCallback(async () => {
     const config = publicStoreConfig(await getConfiguracoesPublicas());

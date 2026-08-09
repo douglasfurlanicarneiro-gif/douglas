@@ -1,10 +1,16 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from audit import registrar_auditoria
 from database import get_db
-from security import create_token, verify_password
+from security import (
+    create_token,
+    decode_token_claims,
+    require_atelie_auth,
+    verify_password,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -19,8 +25,14 @@ class LoginPayload(BaseModel):
 
 
 def _login_key(request: Request, usuario: str) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-    ip = forwarded or (request.client.host if request.client else "unknown")
+    forwarded = [
+        item.strip()
+        for item in request.headers.get("x-forwarded-for", "").split(",")
+        if item.strip()
+    ]
+    ip = forwarded[-1] if forwarded else (
+        request.client.host if request.client else "unknown"
+    )
     return f"{ip}:{usuario.strip().casefold()}"
 
 
@@ -48,6 +60,7 @@ async def login(payload: LoginPayload, request: Request):
             "janelaInicio": inicio if dentro_janela else agora,
             "tentativas": quantidade,
             "ultimaTentativa": agora,
+            "expireAt": agora + timedelta(days=1),
         }
         if quantidade >= MAX_LOGIN_ATTEMPTS:
             atualizacao["bloqueadoAte"] = agora + timedelta(minutes=LOGIN_BLOCK_MINUTES)
@@ -55,5 +68,39 @@ async def login(payload: LoginPayload, request: Request):
         return {"ok": False}
 
     await db.auth_login_attempts.delete_one({"_id": chave})
-    token = create_token(admin["usuario"])
+    token = create_token(admin["usuario"], int(admin.get("authVersion", 1)))
+    await registrar_auditoria(
+        db,
+        acao="login",
+        recurso="sessao_administrativa",
+        recurso_id=admin["usuario"],
+        titulo="Acesso administrativo realizado",
+        detalhes="Uma nova sessão segura foi iniciada no painel.",
+    )
     return {"ok": True, "token": token}
+
+
+@router.post("/logout")
+async def logout(
+    usuario: str = Depends(require_atelie_auth),
+    x_atelie_token: str = Header(),
+):
+    claims = decode_token_claims(x_atelie_token)
+    if not claims:
+        raise HTTPException(status_code=401, detail="Sessão inválida ou expirada.")
+    expira_em = datetime.fromtimestamp(float(claims["exp"]), timezone.utc)
+    db = get_db()
+    await db.auth_revoked_tokens.update_one(
+        {"_id": claims["jti"]},
+        {"$set": {"usuario": usuario, "expireAt": expira_em}},
+        upsert=True,
+    )
+    await registrar_auditoria(
+        db,
+        acao="logout",
+        recurso="sessao_administrativa",
+        recurso_id=usuario,
+        titulo="Sessão administrativa encerrada",
+        detalhes="O token desta sessão foi revogado no servidor.",
+    )
+    return {"ok": True}

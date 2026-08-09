@@ -46,23 +46,43 @@ export class Storage extends StorageBase {
     }
   }
 
-  // Browsers have no Keychain — secure* helpers fall through to AsyncStorage.
+  // Credenciais administrativas ficam apenas na sessão desta aba.
   async secureGet<Fallback extends StorageItemValue>(
     key: string,
     fallback: Fallback,
   ): Promise<Fallback | null> {
-    return this.getItem(key, fallback);
+    try {
+      if (typeof sessionStorage === "undefined") return fallback;
+      return this.retrieve(sessionStorage.getItem(key), fallback);
+    } catch (e) {
+      this.warn("secureGet", key, e);
+      return fallback;
+    }
   }
 
   async secureSet<Value extends StorageItemValue>(
     key: string,
     value: Value,
   ): Promise<boolean> {
-    return this.setItem(key, value);
+    try {
+      if (typeof sessionStorage === "undefined") return false;
+      sessionStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch (e) {
+      this.warn("secureSet", key, e);
+      return false;
+    }
   }
 
   async secureRemove(key: string): Promise<boolean> {
-    return this.removeItem(key);
+    try {
+      if (typeof sessionStorage === "undefined") return false;
+      sessionStorage.removeItem(key);
+      return true;
+    } catch (e) {
+      this.warn("secureRemove", key, e);
+      return false;
+    }
   }
 }
 

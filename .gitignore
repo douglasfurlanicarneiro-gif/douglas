@@ -93,3 +93,4 @@ android-sdk/
 # Relatórios de QA gerados localmente
 test_reports/*.json
 test_reports/**/*.xml
+frontend/audit-*.json

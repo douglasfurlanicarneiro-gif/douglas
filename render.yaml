@@ -67,3 +67,15 @@ services:
       - path: /*
         name: Strict-Transport-Security
         value: "max-age=31536000"
+
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'sha256-67fhrP0+BkBqmgGGXTtgiVO/9EQs3QruYNU/7fnRkI8='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data: https://cdn.jsdelivr.net; connect-src 'self' https://lessence-furlani-api.onrender.com https://cdn.jsdelivr.net; manifest-src 'self'; worker-src 'self' blob:; upgrade-insecure-requests"
+
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: "same-origin-allow-popups"
+
+      - path: /*
+        name: X-Permitted-Cross-Domain-Policies
+        value: "none"
