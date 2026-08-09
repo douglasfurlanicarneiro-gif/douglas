@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
+from order_status import validar_transicao_status
 from security import require_atelie_auth
 from stock import quantidades_por_perfume, validar_estoque
 from utils import next_seq, serialize
@@ -146,22 +147,103 @@ async def _validar_status_estoque(
     )
 
 
-async def _aplicar_saida_estoque(db, pedido_id: str, itens: list[Any], status: str):
-    # Enquanto o pedido está pendente, a quantidade aparece apenas como
-    # reservada no resumo. A baixa física começa quando o preparo é iniciado.
+async def _sincronizar_movimentos_do_pedido(
+    db,
+    pedido_id: str,
+    itens: list[Any],
+    status: str,
+) -> None:
+    """Concilia a baixa do pedido com escritas repetíveis e recuperáveis."""
+    origem = f"pedido:{pedido_id}"
     if not _status_consume_estoque(status):
+        await db.movimentos.delete_many({"origem": origem})
         return
+
     agora = datetime.now(timezone.utc).isoformat()
-    for perfume_id, quantidade_ml in quantidades_por_perfume(itens).items():
-        await db.movimentos.insert_one({
-            "perfumeId": perfume_id,
-            "tipo": "saida",
-            "quantidadeMl": quantidade_ml,
-            "motivo": "Baixa automática ao iniciar preparação",
-            "categoria": "pedido",
-            "origem": f"pedido:{pedido_id}",
-            "data": agora,
-        })
+    quantidades = quantidades_por_perfume(itens)
+    for perfume_id, quantidade_ml in quantidades.items():
+        await db.movimentos.update_one(
+            {"origem": origem, "perfumeId": perfume_id},
+            {
+                "$set": {
+                    "tipo": "saida",
+                    "quantidadeMl": quantidade_ml,
+                    "motivo": "Baixa automática ao iniciar preparação",
+                    "categoria": "pedido",
+                    "data": agora,
+                },
+                "$setOnInsert": {
+                    "origem": origem,
+                    "perfumeId": perfume_id,
+                },
+            },
+            upsert=True,
+        )
+
+    filtro_obsoletos: dict[str, Any] = {"origem": origem}
+    if quantidades:
+        filtro_obsoletos["perfumeId"] = {"$nin": list(quantidades)}
+    await db.movimentos.delete_many(filtro_obsoletos)
+
+
+async def _persistir_pedido_e_estoque(
+    db,
+    *,
+    pedido_id: str,
+    existente: dict,
+    atualizacao: dict[str, Any],
+    itens: list[dict[str, Any]],
+    novo_status: str,
+) -> None:
+    """Atualiza pedido e estoque com CAS e compensação em caso de falha."""
+    status_anterior = str(existente.get("status", "pendente"))
+    validar_transicao_status(status_anterior, novo_status)
+
+    movimento_antecipado = _status_consume_estoque(novo_status)
+    if movimento_antecipado:
+        await _sincronizar_movimentos_do_pedido(
+            db, pedido_id, itens, novo_status
+        )
+
+    operacao: dict[str, Any] = {"$set": atualizacao}
+    if novo_status != status_anterior:
+        operacao["$push"] = {
+            "historicoStatus": {
+                "status": novo_status,
+                "data": datetime.now(timezone.utc).isoformat(),
+            }
+        }
+
+    try:
+        resultado = await db.pedidos.update_one(
+            {"_id": _oid(pedido_id), "status": status_anterior},
+            operacao,
+        )
+        if resultado.matched_count == 0:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "PEDIDO_ATUALIZADO_EM_OUTRA_SESSAO",
+                    "message": (
+                        "O pedido foi alterado em outra sessão. "
+                        "Atualize o painel antes de tentar novamente."
+                    ),
+                },
+            )
+    except Exception:
+        if movimento_antecipado:
+            await _sincronizar_movimentos_do_pedido(
+                db,
+                pedido_id,
+                list(existente.get("itens", [])),
+                status_anterior,
+            )
+        raise
+
+    # Em cancelamentos, remover a baixa após salvar mantém o saldo sempre
+    # conservador caso a operação precise ser repetida.
+    if not movimento_antecipado:
+        await _sincronizar_movimentos_do_pedido(db, pedido_id, itens, novo_status)
 
 
 @router.get("")
@@ -185,7 +267,14 @@ async def criar_pedido(payload: PedidoIn, _: str = Depends(require_atelie_auth))
         doc["historicoStatus"] = [{"status": payload.status, "data": agora}]
         resultado = await db.pedidos.insert_one(doc)
         pedido_id = str(resultado.inserted_id)
-        await _aplicar_saida_estoque(db, pedido_id, itens, payload.status)
+        try:
+            await _sincronizar_movimentos_do_pedido(
+                db, pedido_id, itens, payload.status
+            )
+        except Exception:
+            await db.pedidos.delete_one({"_id": resultado.inserted_id})
+            await _reverter_movimentos_do_pedido(db, pedido_id)
+            raise
         novo = await db.pedidos.find_one({"_id": resultado.inserted_id})
         return serialize(novo)
 
@@ -205,22 +294,17 @@ async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(r
             pedido_id=pedido_id,
             pedido_anterior=existente,
         )
-        await _reverter_movimentos_do_pedido(db, pedido_id)
-        await _aplicar_saida_estoque(db, pedido_id, itens, payload.status)
         # Campos opcionais não enviados pelo painel (como endereço de pedidos
         # antigos) não devem ser apagados durante uma simples troca de status.
         atualizacao = payload.model_dump(exclude_unset=True)
         atualizacao["itens"] = itens
-        if payload.status != existente.get("status"):
-            historico = existente.get("historicoStatus", [])
-            historico.append({
-                "status": payload.status,
-                "data": datetime.now(timezone.utc).isoformat(),
-            })
-            atualizacao["historicoStatus"] = historico
-        await db.pedidos.update_one(
-            {"_id": _oid(pedido_id)},
-            {"$set": atualizacao},
+        await _persistir_pedido_e_estoque(
+            db,
+            pedido_id=pedido_id,
+            existente=existente,
+            atualizacao=atualizacao,
+            itens=itens,
+            novo_status=payload.status,
         )
         atualizado = await db.pedidos.find_one({"_id": _oid(pedido_id)})
         return serialize(atualizado)

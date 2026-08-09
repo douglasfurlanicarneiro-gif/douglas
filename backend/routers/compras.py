@@ -16,8 +16,7 @@ from locks import distributed_lock, stock_lock
 from payments.base import PaymentProviderError
 from payments.service import iniciar_pagamento
 from rate_limit import checkout_rate_limit
-from routers.pedidos import (_aplicar_saida_estoque,
-                             _reverter_movimentos_do_pedido,
+from routers.pedidos import (_persistir_pedido_e_estoque,
                              _validar_status_estoque)
 from security import require_atelie_auth
 from shipping.melhor_envio import MelhorEnvioError, cotar_frete
@@ -475,18 +474,15 @@ async def atualizar_status_compra(compra_id: str, payload: CompraStatusIn, _: st
             pedido_id=compra_id,
             pedido_anterior=pedido,
         )
-        await _reverter_movimentos_do_pedido(db, compra_id)
-        await _aplicar_saida_estoque(db, compra_id, itens, payload.status)
-
         atualizacao = {"status": payload.status}
-        if payload.status != pedido.get("status"):
-            historico = pedido.get("historicoStatus", [])
-            historico.append({
-                "status": payload.status,
-                "data": datetime.now(timezone.utc).isoformat(),
-            })
-            atualizacao["historicoStatus"] = historico
-        await db.pedidos.update_one({"_id": oid}, {"$set": atualizacao})
+        await _persistir_pedido_e_estoque(
+            db,
+            pedido_id=compra_id,
+            existente=pedido,
+            atualizacao=atualizacao,
+            itens=itens,
+            novo_status=payload.status,
+        )
         return serialize(await db.pedidos.find_one({"_id": oid}))
 
 

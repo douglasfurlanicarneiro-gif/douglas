@@ -1,3 +1,5 @@
+import type { OrderStatus } from './types';
+
 export const COLORS = {
   ink: '#15130F',
   background: '#D8CBB9',
@@ -67,6 +69,26 @@ export const STATUS = [
   { id: 'entregue', label: 'Entregue', color: '#8FA07A' },
   { id: 'cancelado', label: 'Cancelado', color: '#C1552F' },
 ] as const;
+
+export const ORDER_STATUS_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pendente: ['pagamento_confirmado', 'cancelado'],
+  pagamento_confirmado: ['preparando', 'cancelado'],
+  preparando: ['pronto', 'cancelado'],
+  pronto: ['enviado', 'entregue', 'cancelado'],
+  enviado: ['entregue'],
+  entregue: [],
+  cancelado: [],
+};
+
+export const statusPermitidosNoPainel = (
+  atual?: OrderStatus,
+): OrderStatus[] => {
+  if (!atual) return ['pendente'];
+  return [
+    atual,
+    ...ORDER_STATUS_TRANSITIONS[atual].filter((status) => status !== 'cancelado'),
+  ];
+};
 
 export const FAMILIAS = [
   'Almiscarado',

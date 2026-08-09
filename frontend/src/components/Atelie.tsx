@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import {
   COLORS, SPACING, RADIUS, STATUS, FAMILIAS, CONCENTRACOES, OCASIOES, FONT_SIZES,
+  statusPermitidosNoPainel,
   brl, familiasDoPerfume, fmtDate, nomeConcentracao, padSeq,
 } from '../theme';
 import { BottomSheet } from './BottomSheet';
@@ -1158,7 +1159,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
       )}
       <Field label="Status">
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-          {STATUS.map((s) => (
+          {STATUS.filter((s) => statusPermitidosNoPainel(initial?.status).includes(s.id)).map((s) => (
             <Pressable key={s.id} onPress={() => set('status', s.id)} style={[styles.miniChip, f.status === s.id && { backgroundColor: s.color, borderColor: s.color }]}>
               <Text style={{ color: f.status === s.id ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{s.label}</Text>
             </Pressable>
