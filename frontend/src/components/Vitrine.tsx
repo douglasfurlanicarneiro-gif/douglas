@@ -984,7 +984,7 @@ export function Vitrine({
                       }}
                       style={[
                         styles.quickFilterButton,
-                        styles.quickFilterGrow,
+                        styles.quickFilterPrimary,
                         familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && disponibilidadeAtiva === 'pronta'
@@ -1022,7 +1022,7 @@ export function Vitrine({
                       }}
                       style={[
                         styles.quickFilterButton,
-                        styles.quickFilterGrow,
+                        styles.quickFilterPrimary,
                         familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && disponibilidadeAtiva === 'encomenda'
@@ -1058,7 +1058,7 @@ export function Vitrine({
                         setOcasiaoAtiva('Todas');
                         setDisponibilidadeAtiva('todas');
                       }}
-                      style={[styles.quickFilterButton, styles.quickFilterGrow, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
+                      style={[styles.quickFilterButton, styles.quickFilterSecondary, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
                       testID="filter-favorites"
                       accessibilityRole="button"
                       accessibilityLabel="Mostrar perfumes favoritos"
@@ -1076,7 +1076,7 @@ export function Vitrine({
                         if (familiaAtiva === 'Favoritos') setFamiliaAtiva('Todas');
                         setFiltersOpen(true);
                       }}
-                      style={[styles.quickFilterButton, styles.quickFilterGrow, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
+                      style={[styles.quickFilterButton, styles.quickFilterCompact, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
                       testID="filter-open"
                       accessibilityRole="button"
                       accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
@@ -1738,9 +1738,11 @@ const styles = StyleSheet.create({
   quizTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
   quizSubtitle: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   quickFilters: { paddingVertical: 8, marginBottom: SPACING.sm },
-  quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  quickFilterButton: { minHeight: 40, minWidth: 0, paddingHorizontal: 8, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
-  quickFilterGrow: { flex: 1 },
+  quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  quickFilterButton: { minHeight: 40, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
+  quickFilterPrimary: { flex: 1.22 },
+  quickFilterSecondary: { flex: 1 },
+  quickFilterCompact: { flex: 0.82 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   quickFilterTextActive: { color: COLORS.ink },
