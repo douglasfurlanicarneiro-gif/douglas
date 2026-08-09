@@ -25,6 +25,7 @@ from config import (
     MELHOR_ENVIO_REDIRECT_URI,
     MELHOR_ENVIO_USER_AGENT,
 )
+from secret_store import decrypt_secret, encrypt_secret
 
 INTEGRATION_ID = "melhor_envio"
 OAUTH_SCOPES = "shipping-calculate"
@@ -185,8 +186,14 @@ async def _salvar_tokens(db, payload: dict[str, Any]) -> None:
         {"_id": INTEGRATION_ID},
         {
             "$set": {
-                "accessToken": payload["access_token"],
-                "refreshToken": payload.get("refresh_token"),
+                "accessToken": encrypt_secret(
+                    str(payload["access_token"]),
+                    context="melhor-envio-access-token",
+                ),
+                "refreshToken": encrypt_secret(
+                    str(payload.get("refresh_token") or ""),
+                    context="melhor-envio-refresh-token",
+                ),
                 "tokenType": payload.get("token_type", "Bearer"),
                 "expiraEm": datetime.now(timezone.utc)
                 + timedelta(seconds=max(60, expires_in)),
@@ -233,14 +240,20 @@ async def obter_access_token(db) -> str:
         if expira_em.tzinfo is None:
             expira_em = expira_em.replace(tzinfo=timezone.utc)
         if expira_em <= datetime.now(timezone.utc) + timedelta(minutes=5):
-            refresh_token = integration.get("refreshToken")
+            refresh_token = decrypt_secret(
+                integration.get("refreshToken"),
+                context="melhor-envio-refresh-token",
+            )
             if not refresh_token:
                 raise MelhorEnvioError(
                     "A integração do frete precisa ser autorizada novamente.",
                     503,
                 )
             return await _renovar_token(db, str(refresh_token))
-    return str(integration["accessToken"])
+    return decrypt_secret(
+        integration["accessToken"],
+        context="melhor-envio-access-token",
+    )
 
 
 def _dimensoes_produto(ml: int) -> tuple[int, int, int, float]:
@@ -312,7 +325,10 @@ async def cotar_frete(
     )
     if response.status_code == 401:
         integration = await db.integracoes.find_one({"_id": INTEGRATION_ID})
-        refresh_token = (integration or {}).get("refreshToken")
+        refresh_token = decrypt_secret(
+            (integration or {}).get("refreshToken"),
+            context="melhor-envio-refresh-token",
+        )
         if refresh_token and not MELHOR_ENVIO_ACCESS_TOKEN:
             token = await _renovar_token(db, str(refresh_token))
             response = await _run_request(

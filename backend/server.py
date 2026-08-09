@@ -81,8 +81,12 @@ async def _criar_indices():
     await db.auth_login_attempts.create_index("expireAt", expireAfterSeconds=0)
     await db.auth_revoked_tokens.create_index("expireAt", expireAfterSeconds=0)
     await db.api_rate_limits.create_index("expiresAt", expireAfterSeconds=0)
-    await db.pedidos.create_index("seq")
+    await db.oauth_states.create_index("expiraEm", expireAfterSeconds=0)
+    await db.perfumes.create_index([("publicavel", 1), ("arquivadoEm", 1)])
+    await db.perfumes.create_index([("arquivadoEm", 1), ("nome", 1)])
+    await db.pedidos.create_index([("arquivadoEm", 1), ("seq", -1)])
     await db.pedidos.create_index("status")
+    await db.pedidos.create_index([("status", 1), ("arquivadoEm", 1)])
     await db.pedidos.create_index(
         "checkoutIdempotencyKey",
         unique=True,
@@ -94,9 +98,12 @@ async def _criar_indices():
         unique=True,
         sparse=True,
     )
-    await db.movimentos.create_index("perfumeId")
+    await db.movimentos.create_index([("perfumeId", 1), ("data", -1)])
     await db.movimentos.create_index("origem")
     await db.operacoes_sistema.create_index("data")
+    await db.opinioes.create_index([("arquivadoEm", 1), ("data", -1)])
+    await db.sugestoes.create_index([("arquivadoEm", 1), ("data", -1)])
+    await db.clientes.create_index("contato")
     await db.fornecedores.create_index("nome")
     await db.cotacoes_fornecedores.create_index([("fornecedorId", 1), ("data", -1)])
     await db.cotacoes_fornecedores.create_index([("perfumeId", 1), ("data", -1)])
@@ -179,8 +186,16 @@ app.add_middleware(GZipMiddleware, minimum_size=1_000, compresslevel=6)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Accept",
+        "Content-Type",
+        "Idempotency-Key",
+        "X-Atelie-Token",
+        "X-Request-ID",
+    ],
+    expose_headers=["X-Request-ID"],
+    max_age=600,
 )
 
 

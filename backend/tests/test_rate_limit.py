@@ -45,3 +45,22 @@ def test_rate_limit_bloqueia_somente_depois_do_limite(monkeypatch):
 
     assert error.value.status_code == 429
     assert int(error.value.headers["Retry-After"]) > 0
+
+
+def test_rate_limit_continua_protegendo_quando_banco_falha(monkeypatch):
+    class BrokenCollection:
+        async def find_one_and_update(self, *_args, **_kwargs):
+            raise RuntimeError("banco temporariamente indisponível")
+
+    class BrokenDb:
+        api_rate_limits = BrokenCollection()
+
+    rate_limit._fallback_counters.clear()
+    monkeypatch.setattr(rate_limit, "get_db", lambda: BrokenDb())
+    dependency = rate_limit.rate_limit("fallback-teste", max_requests=1, window_seconds=3600)
+
+    asyncio.run(dependency(FakeRequest()))
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(dependency(FakeRequest()))
+
+    assert error.value.status_code == 429
