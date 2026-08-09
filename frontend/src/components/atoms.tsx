@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, TextInputProps, TextStyle } from 'react-native';
-import { FontAwesome } from '@expo/vector-icons';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Haptics from 'expo-haptics';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
@@ -18,15 +18,20 @@ export const inputStyle: TextStyle = {
 };
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  const child = React.isValidElement<{ accessibilityLabel?: string }>(children)
-    ? React.cloneElement(children, {
-      accessibilityLabel: children.props.accessibilityLabel || label,
-    })
-    : children;
+  const childArray = React.Children.toArray(children);
+  const inputIndex = childArray.findIndex((child) => (
+    React.isValidElement<TextInputProps>(child) && child.type === TInput
+  ));
+  const labelledChildren = childArray.map((child, index) => {
+    if (index !== inputIndex || !React.isValidElement<TextInputProps>(child)) return child;
+    return React.cloneElement(child, {
+      accessibilityLabel: child.props.accessibilityLabel || label,
+    });
+  });
   return (
     <View style={{ marginBottom: SPACING.md }}>
       <Text style={{ ...TYPOGRAPHY.label, color: COLORS.muted, marginBottom: 4 }}>{label}</Text>
-      {child}
+      {labelledChildren}
     </View>
   );
 }

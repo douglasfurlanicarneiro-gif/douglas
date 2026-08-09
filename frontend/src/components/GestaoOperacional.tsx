@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { AppText as Text } from './Typography';
 import { AccessiblePressable as Pressable } from './AccessiblePressable';
 import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';

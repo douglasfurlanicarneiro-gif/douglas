@@ -50,7 +50,7 @@ export default function Root({ children }: PropsWithChildren) {
         <link rel="preconnect" href="https://lessence-furlani-api.onrender.com" crossOrigin="anonymous" />
         <link rel="icon" type="image/png" sizes="192x192" href="/favicon-light.png?v=2" />
         <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-light.png?v=2" />
-        <link rel="preload" as="image" href="/launch-logo-light.png?v=2" />
+        <link rel="preload" as="image" href="/app-icon-512-light.png?v=2" />
         {/*
           Disable body scrolling on web to make ScrollView components work correctly.
           If you want to enable scrolling, remove `ScrollViewStyleReset` and
@@ -175,7 +175,7 @@ export default function Root({ children }: PropsWithChildren) {
       >
         <div id="brand-preloader" aria-hidden="true">
           <div className="brand-preloader-stage">
-            <img src="/launch-logo-light.png?v=2" alt="" />
+            <img src="/app-icon-512-light.png?v=2" alt="" />
           </div>
           <div className="brand-preloader-caption">UMA EXPERIÊNCIA EM PERFUMARIA</div>
         </div>

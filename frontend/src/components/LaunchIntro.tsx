@@ -136,7 +136,9 @@ export function LaunchIntro({
     >
       <View style={styles.stage}>
         <Animated.Image
-          source={require('../../assets/images/splash-image-light.png')}
+          source={Platform.OS === 'web'
+            ? { uri: '/app-icon-512-light.png?v=2' }
+            : require('../../assets/images/splash-image-light.png')}
           resizeMode="contain"
           onLoad={handleLogoLoad}
           onError={handleLogoError}

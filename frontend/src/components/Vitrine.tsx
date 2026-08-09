@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Feather, FontAwesome } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
-import QRCode from 'react-native-qrcode-svg';
 import { COLORS, SPACING, RADIUS, FONT_SIZES, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
@@ -24,6 +24,7 @@ import {
 import type { Acompanhamento, Compra, ConfiguracoesLojaPublicas, Perfume } from '../types';
 
 type VitrineItem = Perfume;
+const LazyPixQrCode = React.lazy(() => import('./PixQrCode'));
 type AvailabilityFilter = 'pronta' | 'encomenda' | 'todas';
 const FAVORITES_KEY = 'favorite-perfumes-v1';
 const ORDERS_KEY_PREFIX = 'customer-orders-v';
@@ -193,8 +194,8 @@ function VitrineCard({
           <Pressable
             onPress={onDetails}
             testID={`details-title-${item.id}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Conhecer ${item.nome}`}
+            accessible={false}
+            focusable={false}
           >
             <Text style={styles.cardTitle} numberOfLines={2}>{item.nome}</Text>
           </Pressable>
@@ -1550,12 +1551,14 @@ export function Vitrine({
                 </View>
               </View>
               <View style={styles.qrFrame}>
-                <QRCode
-                  value={manualPixCode}
-                  size={176}
-                  color={COLORS.ink}
-                  backgroundColor={COLORS.white}
-                />
+                <React.Suspense fallback={<ActivityIndicator color={COLORS.gold} />}>
+                  <LazyPixQrCode
+                    value={manualPixCode}
+                    size={176}
+                    color={COLORS.ink}
+                    backgroundColor={COLORS.white}
+                  />
+                </React.Suspense>
               </View>
               <Text style={styles.pixHint}>Escaneie o QR Code ou copie o código para pagar pelo aplicativo do seu banco.</Text>
               <Pressable

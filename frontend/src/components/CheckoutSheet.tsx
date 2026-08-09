@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import Feather from '@expo/vector-icons/Feather';
 import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
 import { storage } from '../utils/storage';
 import type { CheckoutPayload, Compra, OpcaoFrete, Perfume, PriceOption } from '../types';
@@ -550,6 +550,7 @@ export function CheckoutSheet({
             <Field label="Celular / WhatsApp"><TInput keyboardType="phone-pad" autoComplete="tel" value={form.whatsapp} onChangeText={(whatsapp) => setForm({ ...form, whatsapp })} /></Field>
             <Field label="E-mail">
               <TInput
+                accessibilityLabel="E-mail"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={form.email}
@@ -646,7 +647,7 @@ export function CheckoutSheet({
               <View>
                 <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>ENDEREÇO</Text>
                 <Field label="CEP">
-                  <TInput keyboardType="numeric" autoComplete="postal-code" maxLength={9} value={form.endereco.cep} onChangeText={handleCep} />
+                  <TInput accessibilityLabel="CEP" keyboardType="numeric" autoComplete="postal-code" maxLength={9} value={form.endereco.cep} onChangeText={handleCep} />
                   {cepLoading && <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 5 }}>Buscando endereço…</Text>}
                   {!!cepError && <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 5 }}>{cepError}</Text>}
                 </Field>
