@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { Platform } from "react-native";
 
 import { useAppFonts } from "@/src/hooks/use-app-fonts";
+import { AppErrorBoundary } from "@/src/components/AppErrorBoundary";
 
 
 // Keep the native splash visible from cold start until icon fonts register.
@@ -29,5 +30,9 @@ export default function RootLayout() {
   // e, ocasionalmente, uma tela vazia. O splash nativo continua aguardando.
   if (Platform.OS !== "web" && !loaded && !error) return null;
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <AppErrorBoundary>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AppErrorBoundary>
+  );
 }

@@ -36,6 +36,9 @@ export function PrimaryButton({ label, onPress, disabled, testID }: { label: str
       onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       disabled={disabled}
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       style={({ pressed }) => [
         { backgroundColor: disabled ? COLORS.border : COLORS.gold, opacity: pressed ? 0.85 : 1, borderRadius: 12, minHeight: 48, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', flex: 1 },
       ]}
@@ -57,6 +60,8 @@ export function SecondaryButton({ label, onPress, testID }: { label: string; onP
     <Pressable
       onPress={() => { void Haptics.selectionAsync(); onPress(); }}
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => [
         { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, opacity: pressed ? 0.85 : 1, borderRadius: 12, minHeight: 48, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', justifyContent: 'center', flex: 1 },
       ]}
@@ -112,6 +117,9 @@ export function Chip({ label, active, onPress, testID }: { label: string; active
     <Pressable
       onPress={() => { void Haptics.selectionAsync(); onPress(); }}
       testID={testID}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: !!active }}
       style={{
         height: 36,
         paddingHorizontal: 14,

@@ -26,23 +26,72 @@ export function BottomSheet({
   contentContainerStyle,
 }: Props) {
   const scrollRef = useRef<ScrollView>(null);
+  const closeRef = useRef<React.ElementRef<typeof Pressable>>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!visible) return;
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+    }
     const timer = setTimeout(() => {
       scrollRef.current?.scrollTo({ y: 0, animated: false });
+      if (Platform.OS === 'web') {
+        const target = closeRef.current as unknown as HTMLElement | null;
+        target?.focus?.();
+      }
     }, 50);
-    return () => clearTimeout(timer);
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+    };
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      clearTimeout(timer);
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        document.removeEventListener('keydown', handleKeyDown);
+        previousFocusRef.current?.focus?.();
+        previousFocusRef.current = null;
+      }
+    };
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={styles.backdrop} onPress={onClose} testID="bottom-sheet-backdrop">
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      accessibilityViewIsModal
+    >
+      <Pressable
+        style={styles.backdrop}
+        onPress={onClose}
+        testID="bottom-sheet-backdrop"
+        accessible={false}
+      >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.avoider}>
-          <Pressable style={[styles.sheet, tone === 'light' && styles.sheetLight, compact && styles.sheetCompact]} onPress={() => {}} testID={testID}>
+          <Pressable
+            style={[styles.sheet, tone === 'light' && styles.sheetLight, compact && styles.sheetCompact]}
+            onPress={() => {}}
+            testID={testID}
+            accessibilityLabel={title}
+          >
             <View style={[styles.header, tone === 'light' && styles.headerLight]}>
               <Text style={[styles.title, tone === 'light' && styles.titleLight]} numberOfLines={1}>{title}</Text>
-              <Pressable onPress={onClose} hitSlop={12} testID="bottom-sheet-close">
+              <Pressable
+                ref={closeRef}
+                onPress={onClose}
+                hitSlop={12}
+                testID="bottom-sheet-close"
+                accessibilityRole="button"
+                accessibilityLabel={`Fechar ${title}`}
+                accessibilityHint="Fecha esta janela e volta para a tela anterior"
+              >
                 <Feather name="x" size={20} color={COLORS.muted} />
               </Pressable>
             </View>

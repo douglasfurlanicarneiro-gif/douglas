@@ -9,14 +9,17 @@ Variáveis de ambiente necessárias (ver config.py):
 """
 import asyncio
 import logging
+import time
+from uuid import uuid4
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 
 from availability import ensure_initial_ready_delivery
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
-from database import get_db
+from database import close_client, get_db
 from locks import stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
                      clientes, compras, custos, fornecedores, frete, insumos,
@@ -167,10 +170,12 @@ async def lifespan(_: FastAPI):
         bootstrap_task.cancel()
         with suppress(asyncio.CancelledError):
             await bootstrap_task
+    close_client()
 
 
 app = FastAPI(title="L’Essence Furlani API", lifespan=lifespan)
 
+app.add_middleware(GZipMiddleware, minimum_size=1_000, compresslevel=6)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
@@ -181,7 +186,31 @@ app.add_middleware(
 
 @app.middleware("http")
 async def security_headers(request, call_next):
-    response = await call_next(request)
+    request_id = uuid4().hex[:16]
+    started_at = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        elapsed_ms = (time.perf_counter() - started_at) * 1_000
+        logger.exception(
+            "request_failed method=%s path=%s duration_ms=%.1f request_id=%s",
+            request.method,
+            request.url.path,
+            elapsed_ms,
+            request_id,
+        )
+        raise
+    elapsed_ms = (time.perf_counter() - started_at) * 1_000
+    if request.url.path not in {"/health", "/health/ready"}:
+        logger.info(
+            "request method=%s path=%s status=%s duration_ms=%.1f request_id=%s",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed_ms,
+            request_id,
+        )
+    response.headers.setdefault("X-Request-ID", request_id)
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")

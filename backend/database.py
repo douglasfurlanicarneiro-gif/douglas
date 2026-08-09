@@ -29,3 +29,11 @@ def get_client() -> AsyncIOMotorClient:
 
 def get_db() -> AsyncIOMotorDatabase:
     return get_client()[DB_NAME]
+
+
+def close_client() -> None:
+    """Fecha o pool compartilhado durante o encerramento do servidor."""
+    global _client
+    if _client is not None:
+        _client.close()
+        _client = None
