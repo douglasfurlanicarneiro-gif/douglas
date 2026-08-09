@@ -298,7 +298,11 @@ export const listSugestoes = () => request<Sugestao[]>('/sugestoes', {}, true);
 export const deleteSugestao = (id: string) => request<{ status: string }>(`/sugestoes/${id}`, { method: 'DELETE' }, true);
 
 // Compras
-export const createCompra = (data: CheckoutPayload) => request<Compra>('/compras', { method: 'POST', body: JSON.stringify(data) });
+export const createCompra = (data: CheckoutPayload, idempotencyKey: string) => request<Compra>('/compras', {
+  method: 'POST',
+  headers: { 'Idempotency-Key': idempotencyKey },
+  body: JSON.stringify(data),
+});
 export const confirmarPagamentoInfinitePay = (data: {
   orderNsu: string;
   transactionNsu: string;

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
@@ -10,6 +10,17 @@ import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';
 import { AppText as Text } from './Typography';
 
 const CUSTOMER_KEY = 'checkout-customer-v1';
+const CHECKOUT_ATTEMPT_KEY = 'checkout-attempt-v1';
+
+type CheckoutAttempt = {
+  key: string;
+  signature: string;
+};
+
+function createCheckoutAttemptKey() {
+  const random = `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+  return `checkout-${Date.now().toString(36)}-${random}`;
+}
 
 export type CartItem = {
   perfume: Perfume;
@@ -83,6 +94,7 @@ export function CheckoutSheet({
   const [freteSelecionado, setFreteSelecionado] = useState<OpcaoFrete | null>(null);
   const [freteRefresh, setFreteRefresh] = useState(0);
   const [prazoEncomendaAceito, setPrazoEncomendaAceito] = useState(false);
+  const checkoutAttemptRef = useRef<CheckoutAttempt | null>(null);
   const contemSobEncomenda = useMemo(
     () => items.some((item) => item.perfume.prontaEntrega !== true),
     [items],
@@ -319,7 +331,31 @@ export function CheckoutSheet({
             }
           : {}),
       };
-      const order = await createCompra(payload);
+      const signature = JSON.stringify(payload);
+      if (!checkoutAttemptRef.current) {
+        const savedAttempt = await storage.getItem(CHECKOUT_ATTEMPT_KEY, '');
+        if (savedAttempt) {
+          try {
+            const parsed = JSON.parse(savedAttempt) as CheckoutAttempt;
+            if (parsed.key && parsed.signature === signature) {
+              checkoutAttemptRef.current = parsed;
+            }
+          } catch {
+            await storage.removeItem(CHECKOUT_ATTEMPT_KEY);
+          }
+        }
+      }
+      if (checkoutAttemptRef.current?.signature !== signature) {
+        checkoutAttemptRef.current = {
+          key: createCheckoutAttemptKey(),
+          signature,
+        };
+        await storage.setItem(
+          CHECKOUT_ATTEMPT_KEY,
+          JSON.stringify(checkoutAttemptRef.current),
+        );
+      }
+      const order = await createCompra(payload, checkoutAttemptRef.current.key);
       await storage.setItem(CUSTOMER_KEY, JSON.stringify(form));
       const paymentMessage = order.pagamento?.checkoutUrl
         ? 'Seu pedido está salvo. Escolha Pix ou cartão na InfinitePay; após a aprovação, a confirmação será automática.'
@@ -329,6 +365,8 @@ export function CheckoutSheet({
           ? 'Nossa equipe entrará em contato pelo WhatsApp para combinar o pagamento e os próximos passos.'
           : 'Em breve você receberá pelo WhatsApp a confirmação do pedido e os próximos passos.';
       await onSuccess(order, paymentMessage);
+      checkoutAttemptRef.current = null;
+      await storage.removeItem(CHECKOUT_ATTEMPT_KEY);
       if (order.pagamento?.checkoutUrl) {
         const checkoutUrl = order.pagamento.checkoutUrl;
         const parsed = new URL(checkoutUrl);

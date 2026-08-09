@@ -70,6 +70,11 @@ async def _criar_indices():
     await db.api_rate_limits.create_index("expiresAt", expireAfterSeconds=0)
     await db.pedidos.create_index("seq")
     await db.pedidos.create_index("status")
+    await db.pedidos.create_index(
+        "checkoutIdempotencyKey",
+        unique=True,
+        sparse=True,
+    )
     await db.pedidos.create_index("pagamento.transactionNsu", sparse=True)
     await db.pedidos.create_index(
         "codigoAcompanhamento",

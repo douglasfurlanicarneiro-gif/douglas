@@ -12,6 +12,14 @@ def serialize(doc: dict | None) -> dict | None:
     limpo = dict(doc)
     if "_id" in limpo:
         limpo["id"] = str(limpo.pop("_id"))
+    # Metadados internos de proteção contra duplicidade nunca fazem parte do
+    # contrato público nem do payload administrativo.
+    for campo in (
+        "checkoutIdempotencyKey",
+        "checkoutPayloadHash",
+        "checkoutEstado",
+    ):
+        limpo.pop(campo, None)
     return limpo
 
 

@@ -1,16 +1,18 @@
+import hashlib
+import json
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from config import INFINITEPAY_HANDLE
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
-from locks import stock_lock
+from locks import distributed_lock, stock_lock
 from payments.base import PaymentProviderError
 from payments.service import iniciar_pagamento
 from rate_limit import checkout_rate_limit
@@ -24,6 +26,8 @@ from utils import next_seq, serialize
 
 router = APIRouter(prefix="/api/compras", tags=["compras"])
 PRAZO_ENCOMENDA_DIAS = 14
+IDEMPOTENCY_LOCK_WAIT_SECONDS = 20
+IDEMPOTENCY_LOCK_LEASE_SECONDS = 60
 
 
 class EnderecoIn(BaseModel):
@@ -112,6 +116,28 @@ def _validar_aceite_prazo_encomenda(
     return tem_sob_encomenda
 
 
+def _checkout_payload_hash(payload: CompraIn) -> str:
+    """Identifica os dados comerciais sem persistir uma segunda cópia da PII."""
+    canonical = json.dumps(
+        payload.model_dump(mode="json"),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _validar_reuso_idempotente(pedido: dict, payload_hash: str) -> None:
+    if pedido.get("checkoutPayloadHash") != payload_hash:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Esta tentativa de checkout já foi usada com outros dados. "
+                "Atualize o carrinho e tente novamente."
+            ),
+        )
+
+
 @router.get("")
 async def listar_compras(_: str = Depends(require_atelie_auth)):
     db = get_db()
@@ -120,11 +146,48 @@ async def listar_compras(_: str = Depends(require_atelie_auth)):
 
 
 @router.post("", dependencies=[Depends(checkout_rate_limit)])
-async def criar_compra(payload: CompraIn):
-    return await _criar_compra(payload)
+async def criar_compra(
+    payload: CompraIn,
+    idempotency_key: str = Header(
+        ...,
+        alias="Idempotency-Key",
+        min_length=16,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9._:-]+$",
+    ),
+):
+    db = get_db()
+    payload_hash = _checkout_payload_hash(payload)
+    lock_suffix = hashlib.sha256(idempotency_key.encode("utf-8")).hexdigest()
+    async with distributed_lock(
+        db,
+        f"checkout:{lock_suffix}",
+        wait_seconds=IDEMPOTENCY_LOCK_WAIT_SECONDS,
+        lease_seconds=IDEMPOTENCY_LOCK_LEASE_SECONDS,
+        busy_detail=(
+            "Este pedido ainda está sendo processado. "
+            "Aguarde alguns segundos e tente novamente."
+        ),
+    ):
+        existente = await db.pedidos.find_one(
+            {"checkoutIdempotencyKey": idempotency_key}
+        )
+        if existente:
+            _validar_reuso_idempotente(existente, payload_hash)
+            return serialize(existente)
+        return await _criar_compra(
+            payload,
+            idempotency_key=idempotency_key,
+            payload_hash=payload_hash,
+        )
 
 
-async def _criar_compra(payload: CompraIn):
+async def _criar_compra(
+    payload: CompraIn,
+    *,
+    idempotency_key: str | None = None,
+    payload_hash: str | None = None,
+):
     db = get_db()
     itens_entrada = payload.itens or [
         ItemCompraIn(perfumeId=payload.perfumeId or "", ml=payload.ml or 0, quantidade=1)
@@ -243,6 +306,12 @@ async def _criar_compra(payload: CompraIn):
     ).isoformat()
     doc["codigoAcompanhamento"] = secrets.token_urlsafe(12)
     doc["historicoStatus"] = [{"status": "pendente", "data": agora}]
+    if idempotency_key and payload_hash:
+        doc["checkoutIdempotencyKey"] = idempotency_key
+        doc["checkoutPayloadHash"] = payload_hash
+        doc["checkoutEstado"] = (
+            "processando_pagamento" if payload.formaPagamento else "concluido"
+        )
 
     config_loja = await db.configuracoes.find_one({"_id": "loja"}) or {}
     if payload.formaPagamento == "cartao" and not (
@@ -354,7 +423,10 @@ async def _criar_compra(payload: CompraIn):
             async with stock_lock(db):
                 await db.pedidos.delete_one({"_id": resultado.inserted_id})
             raise HTTPException(status_code=502, detail=str(exc)) from exc
-        await db.pedidos.update_one({"_id": resultado.inserted_id}, {"$set": {"pagamento": pagamento}})
+        await db.pedidos.update_one(
+            {"_id": resultado.inserted_id},
+            {"$set": {"pagamento": pagamento, "checkoutEstado": "concluido"}},
+        )
 
     nova = await db.pedidos.find_one({"_id": resultado.inserted_id})
     return serialize(nova)
