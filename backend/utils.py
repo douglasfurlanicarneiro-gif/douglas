@@ -15,6 +15,36 @@ def serialize(doc: dict | None) -> dict | None:
     return limpo
 
 
+def pagamento_publico(pagamento: dict | None) -> dict | None:
+    """Remove identificadores internos ao expor um pagamento ao cliente.
+
+    O checkout e o codigo Pix precisam continuar disponiveis enquanto o pedido
+    aguarda pagamento. NSU, slug, IDs de cobranca e referencias administrativas
+    ficam restritos ao painel autenticado.
+    """
+    if not pagamento:
+        return pagamento
+    campos_permitidos = (
+        "metodo",
+        "provedor",
+        "status",
+        "valor",
+        "checkoutUrl",
+        "pixCopiaECola",
+        "recebedor",
+        "instituicao",
+        "captureMethod",
+        "parcelas",
+        "pagoEm",
+        "observacao",
+    )
+    return {
+        campo: pagamento.get(campo)
+        for campo in campos_permitidos
+        if campo in pagamento
+    }
+
+
 async def next_seq(db: AsyncIOMotorDatabase, nome: str) -> int:
     """Contador atômico por coleção (usado para os números sequenciais
     "Nº 007" exibidos no catálogo e nos pedidos)."""

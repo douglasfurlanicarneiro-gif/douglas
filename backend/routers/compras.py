@@ -13,6 +13,7 @@ from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
 from payments.base import PaymentProviderError
 from payments.service import iniciar_pagamento
+from rate_limit import checkout_rate_limit
 from routers.pedidos import (_aplicar_saida_estoque,
                              _reverter_movimentos_do_pedido,
                              _validar_status_estoque)
@@ -118,7 +119,7 @@ async def listar_compras(_: str = Depends(require_atelie_auth)):
     return [serialize(c) for c in compras]
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(checkout_rate_limit)])
 async def criar_compra(payload: CompraIn):
     return await _criar_compra(payload)
 

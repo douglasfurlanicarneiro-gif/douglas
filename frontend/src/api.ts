@@ -34,6 +34,7 @@ const TOKEN_KEY = 'atelie-token-v1';
 const REQUEST_TIMEOUT_MS = 15000;
 const READ_REQUEST_TIMEOUT_MS = 65000;
 const COLD_START_TIMEOUT_MS = 65000;
+let sessionExpiredHandler: (() => void) | null = null;
 
 type VitrineResponse = {
   atualizadoEm: string | null;
@@ -79,6 +80,9 @@ function apiErrorMessage(body: unknown): string {
 export async function saveToken(token: string) { await storage.secureSet(TOKEN_KEY, token); }
 export async function getToken(): Promise<string | null> { return storage.secureGet(TOKEN_KEY, null); }
 export async function clearToken() { await storage.secureRemove(TOKEN_KEY); }
+export function setSessionExpiredHandler(handler: (() => void) | null) {
+  sessionExpiredHandler = handler;
+}
 
 async function request<T>(
   path: string,
@@ -101,6 +105,10 @@ async function request<T>(
     const response = await fetch(`${API}${path}`, { ...opts, headers, signal: controller.signal });
     const body = await response.json().catch(() => null);
     if (!response.ok) {
+      if (needsAuth && response.status === 401) {
+        await clearToken();
+        sessionExpiredHandler?.();
+      }
       const detail = apiErrorMessage(body);
       throw new ApiError(detail || 'Não foi possível concluir a solicitação.', response.status);
     }
@@ -269,16 +277,17 @@ export const createOpiniao = (data: Omit<Opiniao, 'id' | 'data'>) => request<Opi
 export const deleteOpiniao = (id: string) => request<{ status: string }>(`/opinioes/${id}`, { method: 'DELETE' }, true);
 
 // Vitrine
-export async function getVitrine(): Promise<VitrineResponse> {
+export async function getVitrine(atualizar = false): Promise<VitrineResponse> {
+  const path = atualizar ? '/vitrine?atualizar=true' : '/vitrine';
   try {
-    return await request<VitrineResponse>('/vitrine', {}, false, COLD_START_TIMEOUT_MS);
+    return await request<VitrineResponse>(path, {}, false, COLD_START_TIMEOUT_MS);
   } catch (error) {
     if (!(error instanceof ApiError) || ![0, 408, 502, 503, 504].includes(error.status)) {
       throw error;
     }
     // O plano gratuito do Render pode estar terminando de acordar. Uma segunda
     // tentativa curta evita obrigar o cliente a fechar e abrir o aplicativo.
-    return request<VitrineResponse>('/vitrine', {}, false, 20000);
+    return request<VitrineResponse>(path, {}, false, 20000);
   }
 }
 export const publishVitrine = () => request<{ atualizadoEm: string; itensPublicados: number }>('/vitrine/publish', { method: 'POST' }, true);
@@ -355,6 +364,15 @@ export const listInsumos = () => request<Insumo[]>('/admin/insumos', {}, true);
 export const createInsumo = (data: {
   nome: string; categoria: Insumo['categoria']; unidade: Insumo['unidade']; custoUnitario: number; estoqueMinimo: number; estoqueInicial: number; fornecedorId?: string | null; perfumeId?: string | null; tamanhoMl?: number | null; observacoes: string; ativo: boolean;
 }) => request<Insumo>('/admin/insumos', { method: 'POST', body: JSON.stringify(data) }, true);
+export const updateInsumo = (
+  id: string,
+  data: Omit<Insumo, 'id' | 'saldoAtual' | 'valorEstoque' | 'criadoEm' | 'atualizadoEm'>,
+) => request<Insumo>(`/admin/insumos/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
+export const archiveInsumo = (id: string) => request<{ status: string }>(
+  `/admin/insumos/${id}`,
+  { method: 'DELETE' },
+  true,
+);
 export const moveInsumo = (id: string, data: { tipo: 'entrada' | 'saida'; quantidade: number; motivo: string }) => request(`/admin/insumos/${id}/movimentos`, { method: 'POST', body: JSON.stringify(data) }, true);
 export const simulateProducao = (data: { perfumeId: string; ml: number; quantidade: number }) => request<PlanoProducao>('/admin/insumos/producao/simular', { method: 'POST', body: JSON.stringify(data) }, true);
 export const registerProducao = (data: { perfumeId: string; ml: number; quantidade: number }) => request<PlanoProducao>('/admin/insumos/producao/registrar', { method: 'POST', body: JSON.stringify(data) }, true);

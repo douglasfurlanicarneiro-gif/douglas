@@ -37,7 +37,7 @@ jobs:
             -A "GitHub-Actions-Keep-Alive" \
             -o /dev/null \
             -w "%{http_code}" \
-            "https://lessence-furlani-api.onrender.com/") || CURL_EXIT=$?
+            "https://lessence-furlani-api.onrender.com/health/ready") || CURL_EXIT=$?
 
           echo "Resposta da API: HTTP $HTTP_STATUS"
 

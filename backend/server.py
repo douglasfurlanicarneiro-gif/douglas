@@ -5,7 +5,7 @@ Deploy no Render: Root Directory = backend, Start Command =
 
 Variáveis de ambiente necessárias (ver config.py):
     MONGO_URL, DB_NAME, JWT_SECRET, ATELIE_ADMIN_USER, ATELIE_ADMIN_PASSWORD,
-    CORS_ORIGINS (opcional, default "*")
+    CORS_ORIGINS (opcional; por padrão, somente a vitrine oficial e ambiente local)
 """
 import asyncio
 import logging
@@ -66,6 +66,7 @@ async def _criar_indices():
     db = get_db()
     await db.admins.create_index("usuario", unique=True)
     await db.auth_login_attempts.create_index("bloqueadoAte")
+    await db.api_rate_limits.create_index("expiresAt", expireAfterSeconds=0)
     await db.pedidos.create_index("seq")
     await db.pedidos.create_index("status")
     await db.pedidos.create_index("pagamento.transactionNsu", sparse=True)
@@ -150,6 +151,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    if request.headers.get("x-atelie-token"):
+        response.headers.setdefault("Cache-Control", "no-store")
+    return response
 
 app.include_router(auth.router)
 app.include_router(catalogo_estoque.router)

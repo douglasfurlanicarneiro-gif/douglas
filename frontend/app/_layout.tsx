@@ -1,7 +1,7 @@
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
-import { LogBox } from "react-native";
+import { LogBox, Platform } from "react-native";
 
 import { useAppFonts } from "@/src/hooks/use-app-fonts";
 
@@ -27,7 +27,11 @@ export default function RootLayout() {
 
   // If the CDN is unreachable we fall through on error rather than wedging
   // the app — icons will tofu, but the app still boots.
-  if (!loaded && !error) return null;
+  // Na web o HTML já é renderizado estaticamente. O primeiro render do
+  // navegador precisa manter a mesma árvore mesmo enquanto as fontes terminam
+  // de registrar; retornar null aqui causava hydration mismatch (React #418)
+  // e, ocasionalmente, uma tela vazia. O splash nativo continua aguardando.
+  if (Platform.OS !== "web" && !loaded && !error) return null;
 
   return <Stack screenOptions={{ headerShown: false }} />;
 }

@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 
 from database import get_db
+from rate_limit import shipping_rate_limit
 from security import require_atelie_auth
 from shipping.melhor_envio import (
     MelhorEnvioError,
@@ -78,7 +79,7 @@ async def itens_para_cotacao(db, itens: list[ItemFreteIn]) -> list[dict[str, Any
     return resultado
 
 
-@router.post("/api/frete/cotar")
+@router.post("/api/frete/cotar", dependencies=[Depends(shipping_rate_limit)])
 async def cotar(payload: CotacaoFreteIn):
     db = get_db()
     itens = await itens_para_cotacao(db, payload.itens)

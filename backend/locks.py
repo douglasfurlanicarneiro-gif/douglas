@@ -18,21 +18,29 @@ from pymongo import ReturnDocument
 from pymongo.errors import DuplicateKeyError
 
 
-_process_fallback_lock = asyncio.Lock()
+_process_fallback_locks: dict[str, asyncio.Lock] = {}
 _LOCK_ID = "estoque-global"
 logger = logging.getLogger("atelie.stock-lock")
 
 
 @asynccontextmanager
-async def _fallback_lock():
+async def _fallback_lock(lock_id: str):
     """Mantém testes e ambientes sem Mongo funcionais."""
-    async with _process_fallback_lock:
+    lock = _process_fallback_locks.setdefault(lock_id, asyncio.Lock())
+    async with lock:
         yield
 
 
 @asynccontextmanager
-async def stock_lock(db, *, wait_seconds: float = 5, lease_seconds: int = 60):
-    """Adquire uma trava de estoque compartilhada por todas as instâncias.
+async def distributed_lock(
+    db,
+    lock_id: str,
+    *,
+    wait_seconds: float = 5,
+    lease_seconds: int = 60,
+    busy_detail: str = "Esta operação já está sendo executada. Tente novamente em instantes.",
+):
+    """Adquire uma trava nomeada compartilhada por todas as instâncias.
 
     A coleção é criada automaticamente pelo MongoDB. Em objetos falsos usados
     por testes unitários, a trava local é suficiente e evita exigir uma
@@ -40,7 +48,7 @@ async def stock_lock(db, *, wait_seconds: float = 5, lease_seconds: int = 60):
     """
     collection = getattr(db, "system_locks", None)
     if collection is None or not hasattr(collection, "find_one_and_update"):
-        async with _fallback_lock():
+        async with _fallback_lock(lock_id):
             yield
         return
 
@@ -53,7 +61,7 @@ async def stock_lock(db, *, wait_seconds: float = 5, lease_seconds: int = 60):
         try:
             document = await collection.find_one_and_update(
                 {
-                    "_id": _LOCK_ID,
+                    "_id": lock_id,
                     "$or": [
                         {"owner": {"$exists": False}},
                         {"owner": None},
@@ -82,10 +90,7 @@ async def stock_lock(db, *, wait_seconds: float = 5, lease_seconds: int = 60):
     if not acquired:
         raise HTTPException(
             status_code=503,
-            detail=(
-                "O estoque está sendo atualizado neste momento. "
-                "Aguarde alguns segundos e tente novamente."
-            ),
+            detail=busy_detail,
         )
 
     try:
@@ -93,7 +98,7 @@ async def stock_lock(db, *, wait_seconds: float = 5, lease_seconds: int = 60):
     finally:
         try:
             await collection.update_one(
-                {"_id": _LOCK_ID, "owner": owner},
+                {"_id": lock_id, "owner": owner},
                 {
                     "$unset": {"owner": "", "expiresAt": ""},
                     "$set": {"updatedAt": datetime.now(timezone.utc)},
@@ -102,4 +107,20 @@ async def stock_lock(db, *, wait_seconds: float = 5, lease_seconds: int = 60):
         except Exception:
             # A operação protegida já terminou; não transforme uma falha de
             # liberação em erro para o cliente. O lease expira sozinho.
-            logger.exception("Não foi possível liberar a trava de estoque.")
+            logger.exception("Não foi possível liberar a trava distribuída %s.", lock_id)
+
+
+@asynccontextmanager
+async def stock_lock(db, *, wait_seconds: float = 5, lease_seconds: int = 60):
+    """Adquire a trava usada por reservas e movimentações de estoque."""
+    async with distributed_lock(
+        db,
+        _LOCK_ID,
+        wait_seconds=wait_seconds,
+        lease_seconds=lease_seconds,
+        busy_detail=(
+            "O estoque está sendo atualizado neste momento. "
+            "Aguarde alguns segundos e tente novamente."
+        ),
+    ):
+        yield

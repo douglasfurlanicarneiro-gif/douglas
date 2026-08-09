@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from config import INFINITEPAY_HANDLE
@@ -12,8 +12,9 @@ from database import get_db
 from locks import stock_lock
 from payments.infinitepay import (InfinitePayError, token_webhook_valido,
                                   valor_em_centavos, verificar_pagamento)
+from rate_limit import payment_rate_limit
 from stock import pedido_tem_reserva_ativa, validar_estoque
-from utils import serialize
+from utils import pagamento_publico, serialize
 
 router = APIRouter(prefix="/api/pagamentos", tags=["pagamentos"])
 
@@ -54,7 +55,9 @@ def _pedido_publico(pedido: dict) -> dict:
         "data",
         "historicoStatus",
     )
-    return {campo: dados.get(campo) for campo in campos if campo in dados}
+    resposta = {campo: dados.get(campo) for campo in campos if campo in dados}
+    resposta["pagamento"] = pagamento_publico(dados.get("pagamento"))
+    return resposta
 
 
 async def _confirmar_pagamento(
@@ -216,7 +219,7 @@ async def webhook_infinitepay(
     return {"recebido": True, "pago": True, "pedidoId": str(pedido["_id"])}
 
 
-@router.post("/infinitepay/confirmar")
+@router.post("/infinitepay/confirmar", dependencies=[Depends(payment_rate_limit)])
 async def confirmar_retorno_infinitepay(payload: InfinitePayConfirmacaoIn):
     pedido = await _confirmar_pagamento(
         order_nsu=payload.orderNsu,

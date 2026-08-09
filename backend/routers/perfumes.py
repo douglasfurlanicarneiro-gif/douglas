@@ -9,7 +9,7 @@ from pymongo import UpdateOne
 
 from database import get_db
 from availability import apply_ready_delivery
-from routers.vitrine import publicar_snapshot
+from routers.vitrine import marcar_vitrine_pendente, publicar_snapshot
 from security import require_atelie_auth
 from utils import next_seq, serialize
 
@@ -174,6 +174,7 @@ async def criar_perfume(payload: PerfumeIn, _: str = Depends(require_atelie_auth
     doc = payload.model_dump()
     doc["seq"] = await next_seq(db, "perfumes")
     resultado = await db.perfumes.insert_one(doc)
+    await marcar_vitrine_pendente(db)
     novo = await db.perfumes.find_one({"_id": resultado.inserted_id})
     return serialize(novo)
 
@@ -184,6 +185,7 @@ async def atualizar_perfume(perfume_id: str, payload: PerfumeIn, _: str = Depend
     resultado = await db.perfumes.update_one({"_id": _oid(perfume_id)}, {"$set": payload.model_dump()})
     if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Perfume não encontrado.")
+    await marcar_vitrine_pendente(db)
     atualizado = await db.perfumes.find_one({"_id": _oid(perfume_id)})
     return serialize(atualizado)
 
@@ -194,6 +196,7 @@ async def apagar_perfume(perfume_id: str, _: str = Depends(require_atelie_auth))
     resultado = await db.perfumes.delete_one({"_id": _oid(perfume_id)})
     if resultado.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Perfume não encontrado.")
+    await marcar_vitrine_pendente(db)
     return {"status": "Perfume apagado."}
 
 
@@ -265,6 +268,8 @@ async def bulk_import(payload: BulkImportPayload, _: str = Depends(require_ateli
             "seq": seq,
         })
         adicionados += 1
+    if adicionados:
+        await marcar_vitrine_pendente(db)
     return {"adicionados": adicionados}
 
 
@@ -287,6 +292,7 @@ async def definir_pronta_entrega(
         "quantidadeMl": 0,
         "data": datetime.now(timezone.utc).isoformat(),
     })
+    await marcar_vitrine_pendente(db)
     return result
 
 
@@ -368,6 +374,8 @@ async def padronizar_tamanhos(_: str = Depends(require_atelie_auth)):
             continue
         await db.perfumes.update_one({"_id": p["_id"]}, {"$set": {"precos": novos}})
         atualizados += 1
+    if atualizados:
+        await marcar_vitrine_pendente(db)
     return {
         "atualizados": atualizados,
         "precosPadrao": [{"ml": ml, "preco": preco} for ml, preco in precos_padrao.items()],
@@ -378,6 +386,8 @@ async def padronizar_tamanhos(_: str = Depends(require_atelie_auth)):
 async def padronizar_metadados(_: str = Depends(require_atelie_auth)):
     db = get_db()
     resultado = await _garantir_metadados_padronizados(db)
+    if resultado.get("atualizados"):
+        await marcar_vitrine_pendente(db)
     return {
         **resultado,
         "concentracoes": ["Eau De Parfum", "Eau De Toilette", "Elixir"],

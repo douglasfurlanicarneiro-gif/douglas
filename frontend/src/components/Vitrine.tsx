@@ -14,6 +14,7 @@ import { CartItem, CheckoutSheet } from './CheckoutSheet';
 import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
 import { storage } from '../utils/storage';
 import { tamanhoDisponivel } from '../utils/availability';
+import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
 import {
   instagramLink,
   publicStoreConfig,
@@ -325,7 +326,7 @@ export function Vitrine({
     return () => clearTimeout(timer);
   }, [orderSuccess, pagamentoConfirmado]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forceRefresh = false) => {
     if (retryTimerRef.current) {
       clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
@@ -333,7 +334,7 @@ export function Vitrine({
     try {
       // A identidade da loja é atualizada sem bloquear o catálogo.
       onRefreshStoreConfig?.().catch(() => undefined);
-      const r = await getVitrine();
+      const r = await getVitrine(forceRefresh);
       hasCatalogRef.current = true;
       retryAttemptRef.current = 0;
       setSnapshot(r);
@@ -378,6 +379,18 @@ export function Vitrine({
   useEffect(() => () => {
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
   }, []);
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof document === 'undefined') return;
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') void load();
+    };
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnFocus);
+    return () => {
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [load]);
   useEffect(() => {
     if (!loading) onReady?.();
   }, [loading, onReady]);
@@ -606,7 +619,7 @@ export function Vitrine({
   const addOrderCode = (code: string) => {
     setOrderCodes((current) => {
       const next = [code, ...current.filter((saved) => saved !== code)].slice(0, 30);
-      void storage.setItem(ordersKeyRef.current, next);
+      void storage.setItem(ordersKeyRef.current, JSON.stringify(next));
       return next;
     });
   };
@@ -614,7 +627,7 @@ export function Vitrine({
   const removeOrderCode = (code: string) => {
     setOrderCodes((current) => {
       const next = current.filter((saved) => saved !== code);
-      void storage.setItem(ordersKeyRef.current, next);
+      void storage.setItem(ordersKeyRef.current, JSON.stringify(next));
       return next;
     });
   };
@@ -751,6 +764,12 @@ export function Vitrine({
     );
   };
 
+  const refreshCatalog = useCallback(async () => {
+    setRefreshing(true);
+    await load(true);
+  }, [load]);
+  const pullToRefresh = useWebPullToRefresh(refreshing, refreshCatalog);
+
   if (loading) {
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
@@ -779,7 +798,20 @@ export function Vitrine({
         <Feather name="user" size={14} color={STOREFRONT_COLORS.muted} />
       </Pressable>
 
-      <FlatList
+      <View style={{ flex: 1 }} {...pullToRefresh.panHandlers}>
+        {(refreshing || pullToRefresh.pullDistance > 0) && Platform.OS === 'web' && (
+          <View style={styles.pullRefreshIndicator} pointerEvents="none">
+            <ActivityIndicator size="small" color={COLORS.gold} animating={refreshing} />
+            <Text style={styles.pullRefreshText}>
+              {refreshing
+                ? 'Atualizando vitrine…'
+                : pullToRefresh.pullDistance >= pullToRefresh.releaseDistance
+                  ? 'Solte para atualizar'
+                  : 'Puxe para atualizar'}
+            </Text>
+          </View>
+        )}
+        <FlatList
         data={filtrados}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
@@ -792,7 +824,9 @@ export function Vitrine({
             onToggleFavorite={() => toggleFavorite(item.id)}
           />
         )}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={COLORS.gold} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshCatalog} tintColor={COLORS.gold} />}
+        onScroll={pullToRefresh.onScroll}
+        scrollEventThrottle={16}
         ListHeaderComponent={
           <View>
             <View style={styles.brandHeader}>
@@ -967,7 +1001,8 @@ export function Vitrine({
           )
         }
         contentContainerStyle={{ paddingHorizontal: SPACING.lg, paddingBottom: 160 }}
-      />
+        />
+      </View>
 
       {/* Atendimento e sugestões em um único ponto de contato */}
       <Pressable
@@ -1472,6 +1507,8 @@ export function Vitrine({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: STOREFRONT_COLORS.background },
+  pullRefreshIndicator: { position: 'absolute', zIndex: 20, top: 6, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, minHeight: 34, borderRadius: RADIUS.pill, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border },
+  pullRefreshText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption },
   brandHeader: { alignItems: 'center', paddingHorizontal: 56, paddingTop: 26, paddingBottom: 20 },
   storeLogo: { width: 118, height: 86, marginBottom: 4 },
   eyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 5, fontWeight: '500' },

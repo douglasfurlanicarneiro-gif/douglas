@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from availability import apply_ready_delivery_by_ids
 from database import get_db
 from locks import stock_lock
+from routers.vitrine import marcar_vitrine_pendente
 from security import require_atelie_auth
 from utils import serialize
 
@@ -159,6 +160,7 @@ async def atualizar_disponibilidade(
             perfumes_afetados=result["prontaEntrega"] + result["sobEncomenda"],
             quantidade_ml=0,
         )
+        await marcar_vitrine_pendente(db)
     return result
 
 

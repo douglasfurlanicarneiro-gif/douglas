@@ -25,8 +25,18 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.getenv("JWT_EXPIRE_HOURS", "72"))
 
 # --- CORS ---
-# Em produção, prefira restringir a origens conhecidas em vez de "*".
-CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",")]
+# O padrão já é restrito à vitrine oficial e aos endereços de desenvolvimento.
+# Instalações com outro domínio devem informar CORS_ORIGINS explicitamente.
+_DEFAULT_CORS_ORIGINS = ",".join((
+    "https://lessence-furlani-vitrine.onrender.com",
+    "http://localhost:8081",
+    "http://localhost:8082",
+))
+CORS_ORIGINS = [
+    origem.strip()
+    for origem in os.getenv("CORS_ORIGINS", _DEFAULT_CORS_ORIGINS).split(",")
+    if origem.strip()
+]
 
 # --- Frete / Melhor Envio ---
 # O Sandbox e a produção são ambientes independentes. Para entrar em produção,

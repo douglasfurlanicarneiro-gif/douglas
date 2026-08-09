@@ -175,3 +175,22 @@ def test_confirmacao_rejeita_valor_diferente(monkeypatch):
         )
     assert erro.value.status_code == 409
     assert not db.pedidos.updates
+
+
+def test_confirmacao_publica_oculta_nsu_e_slug():
+    resposta = pagamentos._pedido_publico({
+        "_id": ObjectId(),
+        "status": "pagamento_confirmado",
+        "pagamento": {
+            "provedor": "infinitepay",
+            "status": "pago",
+            "parcelas": 2,
+            "transactionNsu": "interno",
+            "invoiceSlug": "interno",
+        },
+    })
+
+    assert resposta["pagamento"]["status"] == "pago"
+    assert resposta["pagamento"]["parcelas"] == 2
+    assert "transactionNsu" not in resposta["pagamento"]
+    assert "invoiceSlug" not in resposta["pagamento"]

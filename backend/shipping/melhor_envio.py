@@ -364,6 +364,24 @@ async def cotar_frete(
             }
         )
 
+    # A experiência da vitrine trabalha com duas escolhas claras. Mesmo que o
+    # Melhor Envio devolva vários serviços/transportadoras, mostramos apenas a
+    # opção mais rápida e a alternativa de menor custo entre as demais.
+    if len(opcoes_base) > 2:
+        mais_rapida = min(
+            opcoes_base,
+            key=lambda item: (item["prazoTransportadora"], item["precoTransportadora"]),
+        )
+        demais = [
+            item for item in opcoes_base
+            if item["serviceId"] != mais_rapida["serviceId"]
+        ]
+        mais_economica = min(
+            demais,
+            key=lambda item: (item["precoTransportadora"], item["prazoTransportadora"]),
+        )
+        opcoes_base = [mais_rapida, mais_economica]
+
     prioritario_id = None
     if len(opcoes_base) > 1:
         prioritario_id = min(

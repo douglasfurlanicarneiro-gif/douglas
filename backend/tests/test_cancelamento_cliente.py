@@ -5,7 +5,7 @@ from fastapi import HTTPException
 import pytest
 
 from routers import acompanhamento
-from routers.acompanhamento import pode_cancelar_pedido
+from routers.acompanhamento import _resposta_publica, pode_cancelar_pedido
 
 
 def test_cliente_pode_cancelar_enquanto_aguarda_pagamento():
@@ -22,6 +22,25 @@ def test_cliente_nao_pode_cancelar_depois_da_confirmacao():
         "cancelado",
     ):
         assert pode_cancelar_pedido({"status": status}) is False
+
+
+def test_acompanhamento_nao_expoe_identificadores_internos_do_pagamento():
+    resposta = _resposta_publica({
+        "_id": ObjectId(),
+        "status": "pendente",
+        "pagamento": {
+            "status": "aguardando_pagamento",
+            "checkoutUrl": "https://checkout.infinitepay.com.br/seguro",
+            "transactionNsu": "interno",
+            "invoiceSlug": "interno",
+            "cobrancaId": "interno",
+        },
+    })
+
+    assert resposta["pagamento"]["checkoutUrl"].startswith("https://")
+    assert "transactionNsu" not in resposta["pagamento"]
+    assert "invoiceSlug" not in resposta["pagamento"]
+    assert "cobrancaId" not in resposta["pagamento"]
 
 
 class FakePedidos:

@@ -17,7 +17,7 @@ import {
   getCatalogoEstoqueResumo, completarEstoqueProntaEntrega, zerarEstoqueSobEncomenda,
   listPedidos, createPedido, updatePedido, deletePedido, getClientePorContato,
   listOpinioes, deleteOpiniao,
-  publishVitrine, listSugestoes, deleteSugestao, listCompras, deleteCompra,
+  listSugestoes, deleteSugestao, listCompras, deleteCompra,
   downloadBackup, getMetricas, resetAllOrders,
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
   aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
@@ -26,6 +26,7 @@ import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
 import { CustosView, FornecedoresView, InsumosView } from './GestaoOperacional';
+import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'availability' }
@@ -1003,6 +1004,20 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
         );
       })}
       {!pedidoRecebido && <Pressable onPress={addItem} testID="pedido-add-item"><Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label, marginBottom: SPACING.md }}>+ adicionar item</Text></Pressable>}
+      {pedidoRecebido && (initial?.email || initial?.whatsapp || initial?.contato) && (
+        <View style={styles.orderDeliveryCard}>
+          <View style={styles.orderDeliveryIcon}>
+            <Feather name="user" size={17} color={COLORS.gold} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderDeliveryTitle}>Contato informado no checkout</Text>
+            {!!(initial.whatsapp || initial.contato) && (
+              <Text style={styles.orderDeliveryMeta}>WhatsApp: {initial.whatsapp || initial.contato}</Text>
+            )}
+            {!!initial.email && <Text style={styles.orderDeliveryMeta}>E-mail: {initial.email}</Text>}
+          </View>
+        </View>
+      )}
       {pedidoRecebido && initial?.entrega && (
         <View style={styles.orderDeliveryCard}>
           <View style={styles.orderDeliveryIcon}>
@@ -1021,6 +1036,56 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
                     initial.entrega.prazoDias === 1 ? 'dia útil' : 'dias úteis'
                   }`}
             </Text>
+            {initial.entrega.tipo !== 'retirada' && (
+              <>
+                <Text style={styles.orderDeliveryMeta}>
+                  {initial.entrega.transportadora} · {initial.entrega.servico}
+                </Text>
+                <Text style={styles.orderDeliveryMeta}>
+                  Transportadora {brl(initial.entrega.precoTransportadora || 0)}
+                  {' · '}embalagem {brl(initial.entrega.taxaEmbalagem || 0)}
+                  {Number(initial.entrega.valorAjuste || 0) > 0
+                    ? ` · acréscimo ${initial.entrega.tipoAjuste === 'percentual'
+                      ? `${initial.entrega.valorAjuste}%`
+                      : brl(initial.entrega.valorAjuste || 0)}`
+                    : ''}
+                </Text>
+              </>
+            )}
+          </View>
+        </View>
+      )}
+      {pedidoRecebido && initial?.temSobEncomenda && (
+        <View style={styles.orderDeliveryCard}>
+          <View style={styles.orderDeliveryIcon}>
+            <Feather name="clock" size={17} color={COLORS.gold} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderDeliveryTitle}>Pedido com item sob encomenda</Text>
+            <Text style={styles.orderDeliveryMeta}>
+              Cliente confirmou prazo de até {initial.prazoEncomendaDias || 14} dias para produção e maturação, além do prazo da transportadora.
+            </Text>
+          </View>
+        </View>
+      )}
+      {pedidoRecebido && initial?.pagamento && (
+        <View style={styles.orderDeliveryCard}>
+          <View style={styles.orderDeliveryIcon}>
+            <Feather name="credit-card" size={17} color={COLORS.gold} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderDeliveryTitle}>Pagamento</Text>
+            <Text style={styles.orderDeliveryMeta}>
+              {String(initial.pagamento.metodo || initial.formaPagamento || '').toUpperCase()}
+              {' · '}{initial.pagamento.provedor || 'Confirmação manual'}
+              {' · '}{initial.pagamento.status || 'pendente'}
+            </Text>
+            {!!initial.pagamento.parcelas && initial.pagamento.parcelas > 1 && (
+              <Text style={styles.orderDeliveryMeta}>{initial.pagamento.parcelas} parcelas</Text>
+            )}
+            {!!initial.pagamento.transactionNsu && (
+              <Text style={styles.orderDeliveryMeta}>Transação: {initial.pagamento.transactionNsu}</Text>
+            )}
           </View>
         </View>
       )}
@@ -1230,7 +1295,6 @@ export function Atelie({
   const [catalogoEstoque, setCatalogoEstoque] = useState<CatalogoEstoqueResumo | null>(null);
   const [sheet, setSheet] = useState<SheetType>(null);
   const [search, setSearch] = useState('');
-  const [publicando, setPublicando] = useState(false);
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [metricPeriod, setMetricPeriod] = useState<'7d' | '30d' | 'mes' | 'todos'>('30d');
   const [freteConfig, setFreteConfig] = useState<ConfiguracaoFrete | null>(null);
@@ -1335,6 +1399,12 @@ export function Atelie({
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const refreshPanel = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+  }, [load]);
+  const pullToRefresh = useWebPullToRefresh(refreshing, refreshPanel);
 
   const changeMetricPeriod = async (period: '7d' | '30d' | 'mes' | 'todos') => {
     setMetricPeriod(period);
@@ -1548,10 +1618,9 @@ export function Atelie({
   };
   const doPadronizar = async () => {
     const r = await padronizarTamanhos();
-    await publishVitrine();
     setSheet({
       type: 'info',
-      label: `Preços padrão aplicados a ${r.atualizados} perfume(s) e vitrine republicada: 30ml por R$ 50, 50ml por R$ 80 e 100ml por R$ 120.`,
+      label: `Preços padrão aplicados a ${r.atualizados} perfume(s). A vitrine será atualizada automaticamente: 30ml por R$ 50, 50ml por R$ 80 e 100ml por R$ 120.`,
     });
     load();
   };
@@ -1614,12 +1683,11 @@ export function Atelie({
       onConfirm: async () => {
         try {
           const result = await atualizarDisponibilidadeCatalogo(ids);
-          await publishVitrine();
           setSheet({
             type: 'info',
             label: (
               `Disponibilidade salva: ${result.prontaEntrega} em pronta entrega e `
-              + `${result.sobEncomenda} sob encomenda. A vitrine já foi atualizada.`
+              + `${result.sobEncomenda} sob encomenda. A vitrine será atualizada automaticamente.`
             ),
           });
           await load();
@@ -1724,16 +1792,6 @@ export function Atelie({
     });
   };
   const doDelOpiniao = async (id: string) => { await deleteOpiniao(id); setSheet(null); load(); };
-  const doPublish = async () => {
-    setPublicando(true);
-    try {
-      await publishVitrine();
-      setSheet({ type: 'info', label: 'Vitrine publicada! Quem abrir o app vê a nova versão.' });
-      await load();
-    }
-    catch { setSheet({ type: 'info', label: 'Erro ao publicar. Tente de novo.' }); }
-    finally { setPublicando(false); }
-  };
   const doDelSugestao = async (id: string) => { await deleteSugestao(id); load(); };
   const doDelCompra = async (id: string) => { await deleteCompra(id); setSheet(null); load(); };
   const abrirPedido = (pedido: PedidoPainel) => {
@@ -2431,14 +2489,12 @@ export function Atelie({
               })}
             />
             <SystemAction
-              icon="share-2"
-              title="Publicar alterações na vitrine"
-              subtitle="Atualiza imediatamente o catálogo exibido aos clientes."
+              icon="refresh-cw"
+              title="Sincronização automática da vitrine"
+              subtitle="Alterações feitas em sequência são agrupadas e publicadas automaticamente."
               onPress={() => setSheet({
-                type: 'confirm',
-                label: `Publicar ${perfumes.filter((perfume) => perfume.publicavel !== false).length} perfume(s) na vitrine?`,
-                onConfirm: doPublish,
-                confirmLabel: 'Publicar vitrine',
+                type: 'info',
+                label: 'A publicação manual não é mais necessária. Depois da última alteração, o sistema aguarda alguns segundos e atualiza a vitrine automaticamente.',
               })}
             />
             <SystemAction
@@ -2740,26 +2796,38 @@ export function Atelie({
           <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '500' }}>Administração</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable
-            onPress={() => setSheet({ type: 'confirm', label: `Publicar ${perfumes.filter((p) => p.publicavel !== false).length} contratipo(s) na vitrine?`, onConfirm: doPublish, confirmLabel: publicando ? 'Publicando…' : 'Publicar' })}
-            style={styles.topBtn}
-            testID="publish-btn"
-          >
-            <Feather name="share-2" size={13} color={COLORS.gold} />
-            <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginLeft: 4 }}>Vitrine</Text>
-          </Pressable>
+          <View style={styles.topBtn} testID="auto-publish-status">
+            <Feather name="refresh-cw" size={13} color={COLORS.sage} />
+            <Text style={{ color: COLORS.sage, fontSize: FONT_SIZES.caption, marginLeft: 4 }}>Automática</Text>
+          </View>
           <Pressable onPress={onSair} style={styles.topBtn} testID="sair-btn">
             <Feather name="log-out" size={13} color={COLORS.muted} />
           </Pressable>
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 120 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={COLORS.gold} />}
-      >
-        {renderContent()}
-      </ScrollView>
+      <View style={{ flex: 1 }} {...pullToRefresh.panHandlers}>
+        {(refreshing || pullToRefresh.pullDistance > 0) && Platform.OS === 'web' && (
+          <View style={styles.pullRefreshIndicator} pointerEvents="none">
+            <ActivityIndicator size="small" color={COLORS.gold} animating={refreshing} />
+            <Text style={styles.pullRefreshText}>
+              {refreshing
+                ? 'Atualizando painel…'
+                : pullToRefresh.pullDistance >= pullToRefresh.releaseDistance
+                  ? 'Solte para atualizar'
+                  : 'Puxe para atualizar'}
+            </Text>
+          </View>
+        )}
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 120 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshPanel} tintColor={COLORS.gold} />}
+          onScroll={pullToRefresh.onScroll}
+          scrollEventThrottle={16}
+        >
+          {renderContent()}
+        </ScrollView>
+      </View>
 
       {tab !== 'dashboard' && tab !== 'opinioes' && tab !== 'sistema' && (
         <Pressable onPress={openCreate} style={styles.fab} testID="fab-add">
@@ -2851,6 +2919,8 @@ export function Atelie({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
+  pullRefreshIndicator: { position: 'absolute', zIndex: 20, top: 6, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, minHeight: 34, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  pullRefreshText: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.md },
   topBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   statCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg },
@@ -2864,7 +2934,7 @@ const styles = StyleSheet.create({
   metricChart: { height: 96, flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginTop: SPACING.sm, paddingTop: SPACING.xs, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   metricChartColumn: { flex: 1, minWidth: 4, height: 92, justifyContent: 'flex-end', alignItems: 'center' },
   metricChartBar: { width: '72%', minWidth: 3, maxWidth: 18, borderTopLeftRadius: 3, borderTopRightRadius: 3, backgroundColor: COLORS.gold },
-  metricChartLabel: { color: COLORS.muted, fontSize: 8, marginTop: 3, position: 'absolute', bottom: -13, width: 42, textAlign: 'center' },
+  metricChartLabel: { color: COLORS.muted, fontSize: FONT_SIZES.micro, marginTop: 3, position: 'absolute', bottom: -13, width: 42, textAlign: 'center' },
   rankingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   rankingNumber: { color: COLORS.gold, width: 22, fontSize: FONT_SIZES.label, fontWeight: '700' },
   rankingName: { color: COLORS.bone, flex: 1, fontSize: FONT_SIZES.label },

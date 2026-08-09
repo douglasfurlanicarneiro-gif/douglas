@@ -121,6 +121,9 @@ export type Pedido = {
   seq: number;
   cliente: string;
   contato: string;
+  nomeCompleto?: string;
+  whatsapp?: string;
+  email?: string;
   status: OrderStatus;
   observacoes: string;
   itens: PedidoItem[];
@@ -134,6 +137,11 @@ export type Pedido = {
   codigoAcompanhamento?: string;
   historicoStatus?: StatusHistoryItem[];
   pagamento?: PaymentDetails;
+  formaPagamento?: 'pix' | 'cartao';
+  temSobEncomenda?: boolean;
+  prazoEncomendaDias?: number;
+  aceitePrazoEncomenda?: boolean;
+  aceitePrazoEncomendaEm?: string | null;
   tipoEntrega?: 'entrega' | 'retirada';
   endereco?: {
     cep: string;

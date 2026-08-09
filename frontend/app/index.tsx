@@ -6,7 +6,7 @@ import { Vitrine } from '../src/components/Vitrine';
 import { BottomSheet } from '../src/components/BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton } from '../src/components/atoms';
 import { LaunchIntro } from '../src/components/LaunchIntro';
-import { ApiError, login, saveToken, getToken, clearToken, getConfiguracoesPublicas } from '../src/api';
+import { ApiError, login, saveToken, getToken, clearToken, getConfiguracoesPublicas, setSessionExpiredHandler } from '../src/api';
 import { DEFAULT_STORE_CONFIG, publicStoreConfig } from '../src/storeConfig';
 import type { ConfiguracoesLojaPublicas } from '../src/types';
 import { AppText as Text } from '../src/components/Typography';
@@ -67,11 +67,20 @@ function LoginForm({ onUnlock, onCancel }: { onUnlock: () => void; onCancel: () 
 }
 
 export default function Index() {
+  const [hydrated, setHydrated] = useState(Platform.OS !== 'web');
   const [modo, setModo] = useState<'vitrine' | 'atelie'>('vitrine');
   const [pedindoSenha, setPedindoSenha] = useState(false);
   const [checked, setChecked] = useState(false);
   const [showIntro, setShowIntro] = useState(Platform.OS !== 'web');
   const [storeConfig, setStoreConfig] = useState<ConfiguracoesLojaPublicas>(DEFAULT_STORE_CONFIG);
+
+  useEffect(() => {
+    // O Expo exporta um HTML estatico no servidor. No navegador, aguardamos a
+    // hidratacao antes de montar componentes que dependem de APIs nativas/web
+    // (SafeArea, Modal e StatusBar), evitando a arvore inicial divergente que
+    // podia resultar em tela vazia em alguns aparelhos.
+    setHydrated(true);
+  }, []);
 
   const finishWebPreloader = useCallback(() => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') return;
@@ -105,6 +114,14 @@ export default function Index() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    setSessionExpiredHandler(() => {
+      setModo('vitrine');
+      setPedindoSenha(false);
+    });
+    return () => setSessionExpiredHandler(null);
+  }, []);
+
   const sair = async () => { await clearToken(); setModo('vitrine'); };
   const finishIntro = useCallback(() => setShowIntro(false), []);
   const refreshStoreConfig = useCallback(async () => {
@@ -124,6 +141,10 @@ export default function Index() {
     const favicon = document.querySelector('link[rel="icon"]');
     favicon?.setAttribute('href', '/favicon-light.png?v=2');
   }, [storeConfig.nomeLoja]);
+
+  if (!hydrated) {
+    return <View style={{ flex: 1, backgroundColor: COLORS.background }} />;
+  }
 
   return (
     <SafeAreaProvider>

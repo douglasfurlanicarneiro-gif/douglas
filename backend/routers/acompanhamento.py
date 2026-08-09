@@ -1,11 +1,13 @@
 """Acompanhamento público e seguro de pedidos."""
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from database import get_db
 from locks import stock_lock
+from rate_limit import tracking_rate_limit
 from routers.pedidos import _reverter_movimentos_do_pedido
+from utils import pagamento_publico
 
 router = APIRouter(prefix="/api/acompanhamento", tags=["acompanhamento"])
 
@@ -27,7 +29,7 @@ def _resposta_publica(pedido: dict):
         "entrega": pedido.get("entrega"),
         "total": pedido.get("total", 0),
         "formaPagamento": pedido.get("formaPagamento"),
-        "pagamento": pedido.get("pagamento"),
+        "pagamento": pagamento_publico(pedido.get("pagamento")),
         "criadoEm": pedido.get("criadoEm", pedido.get("data")),
         "historicoStatus": pedido.get("historicoStatus", []),
     }
@@ -38,7 +40,7 @@ def pode_cancelar_pedido(pedido: dict) -> bool:
     return pedido.get("status", "pendente") == "pendente"
 
 
-@router.get("/{codigo}")
+@router.get("/{codigo}", dependencies=[Depends(tracking_rate_limit)])
 async def acompanhar_pedido(codigo: str):
     _validar_codigo(codigo)
 
@@ -51,7 +53,7 @@ async def acompanhar_pedido(codigo: str):
     return _resposta_publica(pedido)
 
 
-@router.post("/{codigo}/cancelar")
+@router.post("/{codigo}/cancelar", dependencies=[Depends(tracking_rate_limit)])
 async def cancelar_pedido_cliente(codigo: str):
     _validar_codigo(codigo)
 

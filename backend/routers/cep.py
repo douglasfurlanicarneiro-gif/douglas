@@ -2,12 +2,14 @@ import asyncio
 import re
 
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+
+from rate_limit import cep_rate_limit
 
 router = APIRouter(prefix="/api/cep", tags=["cep"])
 
 
-@router.get("/{cep}")
+@router.get("/{cep}", dependencies=[Depends(cep_rate_limit)])
 async def consultar_cep(cep: str):
     cep_limpo = re.sub(r"\D", "", cep)
     if len(cep_limpo) != 8:

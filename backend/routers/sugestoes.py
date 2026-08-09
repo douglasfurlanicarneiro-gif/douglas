@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 from bson import ObjectId
 from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from database import get_db
+from rate_limit import feedback_rate_limit
 from security import require_atelie_auth
 from utils import serialize
 
@@ -13,17 +14,18 @@ router = APIRouter(prefix="/api/sugestoes", tags=["sugestoes"])
 
 
 class SugestaoIn(BaseModel):
-    cliente: str = ""
-    contato: str = ""
-    mensagem: str
+    cliente: str = Field(default="", max_length=120)
+    contato: str = Field(default="", max_length=160)
+    mensagem: str = Field(min_length=1, max_length=2000)
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(feedback_rate_limit)])
 async def criar_sugestao(payload: SugestaoIn):
     if not payload.mensagem.strip():
         raise HTTPException(status_code=400, detail="Mensagem obrigatória.")
     db = get_db()
     doc = payload.model_dump()
+    doc = {chave: valor.strip() for chave, valor in doc.items()}
     doc["data"] = datetime.now(timezone.utc).isoformat()
     doc["lida"] = False
     resultado = await db.sugestoes.insert_one(doc)
