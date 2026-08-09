@@ -11,7 +11,7 @@ from database import get_db
 from availability import apply_ready_delivery
 from routers.vitrine import marcar_vitrine_pendente, publicar_snapshot
 from security import require_atelie_auth
-from utils import next_seq, serialize
+from utils import next_seq, reparar_sequencias, serialize
 
 router = APIRouter(prefix="/api/perfumes", tags=["perfumes"])
 
@@ -164,6 +164,9 @@ def _oid(perfume_id: str) -> ObjectId:
 async def listar_perfumes(_: str = Depends(require_atelie_auth)):
     db = get_db()
     await _garantir_metadados_padronizados(db)
+    sequencias_reparadas = await reparar_sequencias(db, "perfumes")
+    if sequencias_reparadas:
+        await marcar_vitrine_pendente(db)
     perfumes = await db.perfumes.find().sort("seq", 1).to_list(2000)
     return [serialize(p) for p in perfumes]
 

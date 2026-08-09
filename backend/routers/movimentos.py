@@ -196,7 +196,10 @@ async def resumo_estoque(_: str = Depends(require_atelie_auth)):
     saldo_atual = await mapa_saldo_fisico(db)
     reservado = await mapa_reservado(db)
 
-    ids = set(saldo_atual) | set(reservado)
+    # Todo perfume cadastrado pertence ao estoque, mesmo antes da primeira
+    # entrada. Assim itens novos aparecem explicitamente com saldo de 0 ml.
+    perfumes = await db.perfumes.find({}, {"_id": 1}).to_list(100_000)
+    ids = {str(perfume["_id"]) for perfume in perfumes} | set(saldo_atual) | set(reservado)
     return {
         perfume_id: {
             "saldoAtualMl": saldo_atual.get(perfume_id, 0),

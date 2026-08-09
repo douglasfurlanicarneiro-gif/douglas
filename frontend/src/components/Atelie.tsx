@@ -1295,6 +1295,7 @@ export function Atelie({
   const [catalogoEstoque, setCatalogoEstoque] = useState<CatalogoEstoqueResumo | null>(null);
   const [sheet, setSheet] = useState<SheetType>(null);
   const [search, setSearch] = useState('');
+  const [stockSearch, setStockSearch] = useState('');
   const [metricas, setMetricas] = useState<Metricas | null>(null);
   const [metricPeriod, setMetricPeriod] = useState<'7d' | '30d' | 'mes' | 'todos'>('30d');
   const [freteConfig, setFreteConfig] = useState<ConfiguracaoFrete | null>(null);
@@ -1839,6 +1840,16 @@ export function Atelie({
   };
 
   const perfumesFiltrados = perfumes.filter((p) => p.nome.toLowerCase().includes(search.toLowerCase()));
+  const perfumesEstoqueFiltrados = useMemo(() => {
+    const termo = stockSearch.trim().toLocaleLowerCase('pt-BR');
+    if (!termo) return perfumes;
+    const termoSemZeros = termo.replace(/^0+/, '');
+    return perfumes.filter((perfume) => (
+      perfume.nome.toLocaleLowerCase('pt-BR').includes(termo)
+      || String(perfume.seq).includes(termoSemZeros)
+      || padSeq(perfume.seq).includes(termo)
+    ));
+  }, [perfumes, stockSearch]);
 
   const sheetTitle = !sheet ? '' :
     sheet.type === 'perfume' ? (sheet.data ? 'Editar contratipo' : 'Novo contratipo') :
@@ -2082,8 +2093,20 @@ export function Atelie({
               Pedidos pendentes ou com pagamento confirmado ficam reservados. A baixa ocorre quando o pedido entra em preparação.
             </Text>
           </View>
+          <View style={styles.searchBox}>
+            <Feather name="search" size={16} color={COLORS.muted} />
+            <TextInput
+              value={stockSearch}
+              onChangeText={setStockSearch}
+              placeholder="Buscar perfume ou nÃºmero"
+              placeholderTextColor={COLORS.muted + 'BB'}
+              style={styles.searchInput}
+              testID="estoque-search"
+            />
+          </View>
           {perfumes.length === 0 && <EmptyState text="Cadastre um contratipo antes." />}
-          {perfumes.map((p) => {
+          {perfumes.length > 0 && perfumesEstoqueFiltrados.length === 0 && <EmptyState text="Nenhum perfume encontrado no estoque." />}
+          {perfumesEstoqueFiltrados.map((p) => {
             const resumo = resumoDe(p.id);
             const baixo = resumo.disponivelMl <= (p.estoqueMinimoMl || 0);
             const precisaRepor = Math.max(0, -resumo.disponivelMl);

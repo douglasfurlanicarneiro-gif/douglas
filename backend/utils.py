@@ -48,6 +48,22 @@ def pagamento_publico(pagamento: dict | None) -> dict | None:
 async def next_seq(db: AsyncIOMotorDatabase, nome: str) -> int:
     """Contador atômico por coleção (usado para os números sequenciais
     "Nº 007" exibidos no catálogo e nos pedidos)."""
+    # Bancos importados ou restaurados podem ter o contador atras do maior
+    # numero ja existente. Sincronizar antes do incremento evita reutilizar
+    # numeros antigos em novos registros.
+    colecao = getattr(db, nome, None)
+    if colecao is not None:
+        maiores = await colecao.find(
+            {"seq": {"$type": "number"}},
+            {"seq": 1},
+        ).sort("seq", -1).to_list(1)
+        maior_existente = int(maiores[0].get("seq", 0)) if maiores else 0
+        await db.counters.update_one(
+            {"_id": nome},
+            {"$max": {"seq": maior_existente}},
+            upsert=True,
+        )
+
     doc = await db.counters.find_one_and_update(
         {"_id": nome},
         {"$inc": {"seq": 1}},
@@ -55,3 +71,45 @@ async def next_seq(db: AsyncIOMotorDatabase, nome: str) -> int:
         return_document=ReturnDocument.AFTER,
     )
     return doc["seq"]
+
+
+def planejar_reparo_sequencias(documentos: list[dict]) -> tuple[list[tuple[object, int]], int]:
+    """Mantem o registro mais antigo e renumera somente duplicados/invalidos."""
+    ordenados = sorted(documentos, key=lambda item: str(item.get("_id", "")))
+    sequencias_validas = [
+        int(item["seq"])
+        for item in ordenados
+        if isinstance(item.get("seq"), int) and int(item["seq"]) > 0
+    ]
+    proximo = max(sequencias_validas, default=0)
+    usados: set[int] = set()
+    reparos: list[tuple[object, int]] = []
+
+    for item in ordenados:
+        seq = item.get("seq")
+        if isinstance(seq, int) and seq > 0 and seq not in usados:
+            usados.add(seq)
+            continue
+        proximo += 1
+        usados.add(proximo)
+        reparos.append((item["_id"], proximo))
+
+    return reparos, proximo
+
+
+async def reparar_sequencias(db: AsyncIOMotorDatabase, nome: str) -> int:
+    """Corrige sequencias duplicadas sem renumerar o catalogo inteiro."""
+    colecao = getattr(db, nome)
+    documentos = await colecao.find({}, {"_id": 1, "seq": 1}).to_list(100_000)
+    reparos, maior_seq = planejar_reparo_sequencias(documentos)
+    for documento_id, nova_seq in reparos:
+        await colecao.update_one(
+            {"_id": documento_id},
+            {"$set": {"seq": nova_seq}},
+        )
+    await db.counters.update_one(
+        {"_id": nome},
+        {"$max": {"seq": maior_seq}},
+        upsert=True,
+    )
+    return len(reparos)

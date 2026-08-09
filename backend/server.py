@@ -23,6 +23,7 @@ from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
                      movimentos, opinioes, pagamentos, pedidos, perfumes,
                      sugestoes, vitrine)
 from security import hash_password, verify_password
+from utils import reparar_sequencias
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("atelie")
@@ -100,7 +101,10 @@ async def _bootstrap_database() -> None:
             await _criar_indices()
             db = get_db()
             async with stock_lock(db):
+                sequencias_reparadas = await reparar_sequencias(db, "perfumes")
                 disponibilidade = await ensure_initial_ready_delivery(db)
+            if sequencias_reparadas:
+                await vitrine.marcar_vitrine_pendente(db)
     except TimeoutError:
         logger.error(
             "Bootstrap do banco excedeu %ss. A API continuará disponível e "
@@ -125,6 +129,11 @@ async def _bootstrap_database() -> None:
         disponibilidade.get("estoquesZerados", 0),
         disponibilidade.get("quantidadeZeradaMl", 0),
     )
+    if sequencias_reparadas:
+        logger.info(
+            "%s sequencia(s) duplicada(s) do catalogo foram corrigidas.",
+            sequencias_reparadas,
+        )
 
 
 @asynccontextmanager
