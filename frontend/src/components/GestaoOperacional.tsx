@@ -71,17 +71,42 @@ function InlineNotice({ text, error }: { text: string; error?: boolean }) {
   );
 }
 
-function Card({ title, subtitle, icon, children }: { title: string; subtitle?: string; icon: any; children: React.ReactNode }) {
+function Card({
+  title,
+  subtitle,
+  icon,
+  children,
+  collapsible = false,
+  collapsed = false,
+  onToggle,
+}: {
+  title: string;
+  subtitle?: string;
+  icon: any;
+  children: React.ReactNode;
+  collapsible?: boolean;
+  collapsed?: boolean;
+  onToggle?: () => void;
+}) {
+  const header = (
+    <View style={[styles.cardHeader, collapsed && styles.cardHeaderCollapsed]}>
+      <View style={styles.cardIcon}><Feather name={icon} size={16} color={COLORS.gold} /></View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        {!!subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
+      </View>
+      {collapsible && <Feather name={collapsed ? 'chevron-down' : 'chevron-up'} size={20} color={COLORS.gold} />}
+    </View>
+  );
+
   return (
     <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <View style={styles.cardIcon}><Feather name={icon} size={16} color={COLORS.gold} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>{title}</Text>
-          {!!subtitle && <Text style={styles.cardSubtitle}>{subtitle}</Text>}
-        </View>
-      </View>
-      {children}
+      {collapsible ? (
+        <Pressable onPress={onToggle} accessibilityRole="button" accessibilityState={{ expanded: !collapsed }}>
+          {header}
+        </Pressable>
+      ) : header}
+      {!collapsed && children}
     </View>
   );
 }
@@ -102,6 +127,8 @@ export function CustosView({ onChanged }: { onChanged?: () => void }) {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [profitabilityOpen, setProfitabilityOpen] = useState(false);
+  const [expandedPerfumeId, setExpandedPerfumeId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -141,7 +168,17 @@ export function CustosView({ onChanged }: { onChanged?: () => void }) {
   const avgMargin = configured.length
     ? configured.reduce((sum, item) => sum + item.margemPercentual, 0) / configured.length
     : 0;
-  const top = [...configured].sort((a, b) => b.lucro - a.lucro).slice(0, 12);
+  const profitabilityGroups = Object.values(
+    configured.reduce<Record<string, { perfumeId: string; nome: string; frascos: RentabilidadeItem[] }>>((groups, item) => {
+      if (!groups[item.perfumeId]) {
+        groups[item.perfumeId] = { perfumeId: item.perfumeId, nome: item.nome, frascos: [] };
+      }
+      groups[item.perfumeId].frascos.push(item);
+      return groups;
+    }, {}),
+  )
+    .map((group) => ({ ...group, frascos: [...group.frascos].sort((a, b) => b.ml - a.ml) }))
+    .sort((a, b) => Math.max(...b.frascos.map((item) => item.lucro)) - Math.max(...a.frascos.map((item) => item.lucro)));
 
   if (loading) return <ActivityIndicator color={COLORS.gold} style={{ margin: SPACING.xl }} />;
 
@@ -185,21 +222,47 @@ export function CustosView({ onChanged }: { onChanged?: () => void }) {
         <Text style={styles.helper}>O custo da essência e a concentração individual ficam no cadastro de cada perfume.</Text>
       </Card>
 
-      <Card title="Rentabilidade por frasco" subtitle="Estimativa com a configuração atual; pedidos novos congelam o custo no momento da venda." icon="trending-up">
-        {top.length === 0 ? (
+      <Card
+        title="Rentabilidade por frasco"
+        subtitle="Estimativa com a configuração atual; pedidos novos congelam o custo no momento da venda."
+        icon="trending-up"
+        collapsible
+        collapsed={!profitabilityOpen}
+        onToggle={() => setProfitabilityOpen((open) => !open)}
+      >
+        {profitabilityGroups.length === 0 ? (
           <Text style={styles.emptyText}>Cadastre o custo da essência em um perfume para começar a calcular lucro.</Text>
-        ) : top.map((item) => (
-          <View key={`${item.perfumeId}-${item.ml}`} style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rowTitle} numberOfLines={1}>{item.nome} · {item.ml} ml</Text>
-              <Text style={styles.rowMeta}>Venda {brl(item.preco)} · Custo {brl(item.custoTotal)}</Text>
+        ) : profitabilityGroups.map((group) => {
+          const expanded = expandedPerfumeId === group.perfumeId;
+          return (
+            <View key={group.perfumeId} style={styles.perfumeGroup}>
+              <Pressable
+                onPress={() => setExpandedPerfumeId(expanded ? null : group.perfumeId)}
+                style={[styles.perfumeHeader, expanded && styles.perfumeHeaderExpanded]}
+                accessibilityRole="button"
+                accessibilityState={{ expanded }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>{group.nome}</Text>
+                  <Text style={styles.rowMeta}>{group.frascos.length} {group.frascos.length === 1 ? 'frasco' : 'frascos'}</Text>
+                </View>
+                <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={18} color={COLORS.gold} />
+              </Pressable>
+              {expanded && group.frascos.map((item) => (
+                <View key={`${item.perfumeId}-${item.ml}`} style={styles.bottleRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>{item.ml} ml</Text>
+                    <Text style={styles.rowMeta}>Venda {brl(item.preco)} · Custo {brl(item.custoTotal)}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.profit}>{brl(item.lucro)}</Text>
+                    <Text style={styles.rowMeta}>{item.margemPercentual.toFixed(1)}%</Text>
+                  </View>
+                </View>
+              ))}
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={styles.profit}>{brl(item.lucro)}</Text>
-              <Text style={styles.rowMeta}>{item.margemPercentual.toFixed(1)}%</Text>
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </Card>
     </View>
   );
@@ -687,6 +750,7 @@ const styles = StyleSheet.create({
   page: { gap: SPACING.md },
   card: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.lg, gap: SPACING.sm },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
+  cardHeaderCollapsed: { marginBottom: 0 },
   cardIcon: { width: 34, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surfaceRaised },
   cardTitle: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700' },
   cardSubtitle: { color: COLORS.muted, fontSize: FONT_SIZES.bodySmall, marginTop: 2 },
@@ -700,6 +764,10 @@ const styles = StyleSheet.create({
   helper: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: SPACING.sm },
   sectionCaption: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700', letterSpacing: 1.1, marginBottom: SPACING.xs },
   row: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
+  perfumeGroup: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
+  perfumeHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, paddingVertical: SPACING.md },
+  perfumeHeaderExpanded: { paddingBottom: SPACING.sm },
+  bottleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginLeft: SPACING.md, paddingVertical: SPACING.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border },
   rowTitle: { color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '600' },
   rowMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   profit: { color: COLORS.sage, fontSize: FONT_SIZES.body, fontWeight: '700' },
