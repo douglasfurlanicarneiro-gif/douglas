@@ -8,6 +8,7 @@ from routers import vitrine
 class FakeConfiguracoes:
     def __init__(self):
         self.document = None
+        self.update_calls = 0
 
     async def find_one(self, query):
         if self.document and self.document.get("_id") == query.get("_id"):
@@ -15,6 +16,7 @@ class FakeConfiguracoes:
         return None
 
     async def update_one(self, query, update, upsert=False):
+        self.update_calls += 1
         if self.document is None:
             if not upsert:
                 return
@@ -88,3 +90,17 @@ def test_janela_de_agrupamento_evitas_publicacoes_intermediarias(monkeypatch):
 
     assert asyncio.run(vitrine.garantir_vitrine_atualizada(db)) is None
     assert db.configuracoes.document["pendente"] is True
+
+
+def test_leitura_do_estado_existente_nao_faz_escrita_desnecessaria():
+    db = FakeDb()
+    db.configuracoes.document = {
+        "_id": vitrine._PUBLICATION_STATE_ID,
+        "revisao": 4,
+        "pendente": False,
+    }
+
+    estado = asyncio.run(vitrine._estado_publicacao(db))
+
+    assert estado["revisao"] == 4
+    assert db.configuracoes.update_calls == 0

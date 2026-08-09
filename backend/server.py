@@ -13,7 +13,7 @@ import time
 from uuid import uuid4
 from contextlib import asynccontextmanager, suppress
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
@@ -34,6 +34,7 @@ logger = logging.getLogger("atelie")
 # O bootstrap acessa o MongoDB e pode levar alguns segundos quando o cluster
 # está acordando. Ele não deve impedir o Uvicorn de abrir a porta no Render.
 _BOOTSTRAP_TIMEOUT_SECONDS = 120
+_PROCESS_STARTED_AT = time.monotonic()
 
 
 async def _seed_admin():
@@ -227,6 +228,7 @@ async def security_headers(request, call_next):
             request_id,
         )
     response.headers.setdefault("X-Request-ID", request_id)
+    response.headers.setdefault("Server-Timing", f'app;dur={elapsed_ms:.1f}')
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
@@ -263,17 +265,30 @@ async def raiz():
 
 
 @app.get("/health")
-async def health():
+async def health(response: Response):
     """Health check leve, sem depender do MongoDB."""
-    return {"status": "ok"}
+    response.headers["Cache-Control"] = "no-store"
+    return {
+        "status": "ok",
+        "uptimeSeconds": round(time.monotonic() - _PROCESS_STARTED_AT, 1),
+    }
 
 
 @app.get("/health/ready")
-async def health_ready():
+async def health_ready(response: Response):
     """Confirma que a API e o MongoDB estão prontos para atender o app."""
+    started_at = time.perf_counter()
     try:
         await asyncio.wait_for(get_db().command("ping"), timeout=5)
     except Exception:
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail="Banco de dados indisponível.")
-    return {"status": "ready", "database": "ok"}
+    database_latency_ms = (time.perf_counter() - started_at) * 1_000
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Server-Timing"] = f'database;dur={database_latency_ms:.1f}'
+    return {
+        "status": "ready",
+        "database": "ok",
+        "databaseLatencyMs": round(database_latency_ms, 1),
+        "uptimeSeconds": round(time.monotonic() - _PROCESS_STARTED_AT, 1),
+    }

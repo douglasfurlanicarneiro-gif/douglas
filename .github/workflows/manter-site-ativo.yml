@@ -2,7 +2,7 @@ name: Manter API ativa
 
 on:
   schedule:
-    # Backup automático: tenta acessar a API a cada 10 minutos
+    # Mantém o serviço gratuito acordado e verifica a operação a cada 10 minutos.
     - cron: "7,17,27,37,47,57 * * * *"
 
   # Permite executar manualmente pelo botão "Run workflow"
@@ -53,3 +53,43 @@ jobs:
 
           echo "ERRO: API respondeu com HTTP $HTTP_STATUS."
           exit 1
+
+      - name: Confirmar vitrine e catálogo público
+        shell: bash
+        run: |
+          set -euo pipefail
+          CATALOG_FILE=$(mktemp)
+          trap 'rm -f "$CATALOG_FILE"' EXIT
+
+          STOREFRONT_STATUS=$(curl \
+            --location \
+            --silent \
+            --show-error \
+            --max-time 45 \
+            --connect-timeout 15 \
+            --retry 2 \
+            --retry-delay 3 \
+            --retry-all-errors \
+            -A "GitHub-Actions-Storefront-Monitor" \
+            -o /dev/null \
+            -w "%{http_code}" \
+            "https://lessence-furlani-vitrine.onrender.com/")
+
+          CATALOG_STATUS=$(curl \
+            --location \
+            --silent \
+            --show-error \
+            --max-time 60 \
+            --connect-timeout 15 \
+            --retry 2 \
+            --retry-delay 3 \
+            --retry-all-errors \
+            -A "GitHub-Actions-Catalog-Monitor" \
+            -o "$CATALOG_FILE" \
+            -w "%{http_code}" \
+            "https://lessence-furlani-api.onrender.com/api/vitrine")
+
+          test "$STOREFRONT_STATUS" = "200"
+          test "$CATALOG_STATUS" = "200"
+          python -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); assert data.get("atualizadoEm"); assert isinstance(data.get("itens"), list) and data["itens"], "catálogo vazio"' "$CATALOG_FILE"
+          echo "Vitrine e catálogo responderam corretamente."

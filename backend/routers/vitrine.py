@@ -1,9 +1,10 @@
 import asyncio
 from datetime import datetime, timedelta, timezone
 import logging
+import time
 import unicodedata
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from database import get_db
 from locks import distributed_lock
@@ -70,6 +71,9 @@ def _aplicar_disponibilidade(
 
 
 async def _estado_publicacao(db) -> dict:
+    existente = await db.configuracoes.find_one({"_id": _PUBLICATION_STATE_ID})
+    if existente:
+        return existente
     await db.configuracoes.update_one(
         {"_id": _PUBLICATION_STATE_ID},
         {"$setOnInsert": {"revisao": 0, "pendente": False}},
@@ -215,18 +219,26 @@ async def garantir_vitrine_atualizada(db, *, forcar: bool = False) -> dict | Non
 
 
 @router.get("")
-async def obter_vitrine(atualizar: bool = False):
+async def obter_vitrine(response: Response, atualizar: bool = False):
+    inicio = time.perf_counter()
     db = get_db()
-    await garantir_vitrine_atualizada(db, forcar=atualizar)
-    snapshot = await db.vitrine.find_one({"_id": "snapshot"})
+    # Estado da publicação, snapshot e saldos são independentes na leitura
+    # comum. Executá-los em paralelo elimina viagens sequenciais ao MongoDB,
+    # que eram o maior custo na primeira abertura da vitrine.
+    publicacao, snapshot, estoque_map, reservado_map = await asyncio.gather(
+        garantir_vitrine_atualizada(db, forcar=atualizar),
+        db.vitrine.find_one({"_id": "snapshot"}),
+        mapa_saldo_fisico(db),
+        mapa_reservado(db),
+    )
+    if publicacao:
+        # A publicação pode ter substituído o snapshot lido em paralelo.
+        snapshot = await db.vitrine.find_one({"_id": "snapshot"})
     if not snapshot:
         await publicar_snapshot(db, registrar_operacao=False)
         snapshot = await db.vitrine.find_one({"_id": "snapshot"})
         if not snapshot:
             return {"atualizadoEm": None, "itens": []}
-
-    estoque_map = await mapa_saldo_fisico(db)
-    reservado_map = await mapa_reservado(db)
 
     itens = [_item_publico(dict(item)) for item in snapshot.get("itens", [])]
     for item in itens:
@@ -238,6 +250,15 @@ async def obter_vitrine(atualizar: bool = False):
         )
 
     itens.sort(key=_alphabetical_name)
+    duracao_ms = (time.perf_counter() - inicio) * 1_000
+    response.headers["Server-Timing"] = f'catalog;dur={duracao_ms:.1f}'
+    response.headers["Cache-Control"] = (
+        "no-store"
+        if atualizar
+        else "public, max-age=2, s-maxage=2, must-revalidate"
+    )
+    if snapshot.get("atualizadoEm"):
+        response.headers["X-Catalog-Updated-At"] = str(snapshot["atualizadoEm"])
     return {"atualizadoEm": snapshot.get("atualizadoEm"), "itens": itens}
 
 
