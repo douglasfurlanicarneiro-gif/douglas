@@ -170,12 +170,14 @@ export function PerfumeDetailSheet({
   favorite,
   onClose,
   onToggleFavorite,
+  onReview,
   onBuy,
 }: {
   perfume: Perfume | null;
   favorite: boolean;
   onClose: () => void;
   onToggleFavorite: () => void;
+  onReview: () => void;
   onBuy: (ml: number, preco: number) => void;
 }) {
   return (
@@ -256,6 +258,9 @@ export function PerfumeDetailSheet({
                 </Pressable>
               );
             })}
+          </View>
+          <View style={styles.detailReviewAction}>
+            <SecondaryButton label="Avaliar esta fragrância" onPress={onReview} />
           </View>
         </View>
       )}
@@ -790,6 +795,7 @@ const styles = StyleSheet.create({
   noteLabel: { color: COLORS.muted, width: 72, flexShrink: 0, fontSize: FONT_SIZES.caption },
   noteValue: { color: COLORS.bone, flex: 1, fontSize: FONT_SIZES.bodySmall, fontStyle: 'italic' },
   sizeWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  detailReviewAction: { marginTop: SPACING.lg },
   sizeButton: { minWidth: 94, flexGrow: 1, paddingVertical: 11, alignItems: 'center', borderWidth: 1, borderColor: COLORS.gold, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
   sizeButtonPressed: { backgroundColor: COLORS.surfaceRaised },
   sizeText: { color: COLORS.bone, fontWeight: '700' },
