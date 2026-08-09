@@ -203,7 +203,7 @@ export function LaunchIntro({
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 9999,
     elevation: 9999,
     backgroundColor: COLORS.background,

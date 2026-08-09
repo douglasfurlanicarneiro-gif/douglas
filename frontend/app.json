@@ -8,7 +8,6 @@
     "backgroundColor": "#D8CBB9",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.emergent.contratipoapp.t1olda"
@@ -18,7 +17,6 @@
         "foregroundImage": "./assets/images/adaptive-icon-light.png",
         "backgroundColor": "#D8CBB9"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.emergent.contratipoapp.t1olda"
     },
     "web": {

@@ -23,11 +23,9 @@ import type {
   PlanoProducao,
 } from './types';
 
-const previewHostname = typeof window !== 'undefined' ? window.location.hostname : '';
-const isLocalWebPreview = previewHostname === 'localhost'
-  || previewHostname === '127.0.0.1'
-  || previewHostname.endsWith('.exp.direct');
-const BASE = isLocalWebPreview ? '' : (process.env.EXPO_PUBLIC_BACKEND_URL || '');
+// Usa a API configurada também no preview local. Se a variável não existir,
+// mantém chamadas relativas para instalações com proxy no mesmo domínio.
+const BASE = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 export const API = `${BASE}/api`;
 
 const TOKEN_KEY = 'atelie-token-v1';

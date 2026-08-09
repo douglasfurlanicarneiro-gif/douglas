@@ -706,7 +706,7 @@ const styles = StyleSheet.create({
   resultMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
   orderCard: { backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, padding: SPACING.md },
   customerSwipeWrap: { position: 'relative', overflow: 'hidden', borderRadius: RADIUS.lg, marginBottom: SPACING.md, userSelect: 'none' },
-  customerSwipeActions: { ...StyleSheet.absoluteFillObject, alignItems: 'flex-end', borderRadius: RADIUS.lg, overflow: 'hidden' },
+  customerSwipeActions: { ...StyleSheet.absoluteFill, alignItems: 'flex-end', borderRadius: RADIUS.lg, overflow: 'hidden' },
   customerSwipeRemove: { width: CUSTOMER_ORDER_ACTION_WIDTH, flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.rust },
   customerSwipeRemoveText: { color: COLORS.inverse, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
