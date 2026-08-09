@@ -94,6 +94,15 @@ export function CheckoutSheet({
   const valorEntrega = tipoEntrega === 'entrega' ? (freteSelecionado?.preco || 0) : 0;
   const total = subtotal + valorEntrega;
   const pagamentoDisponivel = cartaoOnlineAtivo || pixManualAtivo;
+  const nomeEntregaSelecionada = tipoEntrega === 'retirada'
+    ? 'Retirada combinada'
+    : freteSelecionado?.nomeExibicao
+      || (freteSelecionado?.categoriaFrete === 'prioritaria' ? 'Entrega Prioritária' : 'Entrega Padrão');
+  const detalheEntregaSelecionada = tipoEntrega === 'retirada'
+    ? 'Local e horário combinados pelo WhatsApp'
+    : freteSelecionado
+      ? `Prazo estimado: ${freteSelecionado.prazoDias} ${freteSelecionado.prazoDias === 1 ? 'dia útil' : 'dias úteis'}`
+      : '';
 
   useEffect(() => {
     setForm((current) => ({
@@ -654,8 +663,34 @@ export function CheckoutSheet({
                 <Text style={styles.paymentSummaryLabel}>Produtos</Text>
                 <Text style={styles.paymentSummaryValue}>{brl(subtotal)}</Text>
               </View>
+              <View style={styles.paymentProductList}>
+                {items.map((item) => (
+                  <View key={`${item.perfume.id}-${item.option.ml}`} style={styles.paymentProductRow}>
+                    <View style={styles.paymentProductCopy}>
+                      <Text
+                        numberOfLines={2}
+                        style={[styles.paymentProductName, isWide && styles.paymentProductNameWide]}
+                      >
+                        {item.perfume.nome}
+                      </Text>
+                      <Text style={styles.paymentProductMeta}>
+                        {item.option.ml} ml · {item.quantidade === 1 ? '1 unidade' : `${item.quantidade} unidades`}
+                      </Text>
+                    </View>
+                    <Text style={styles.paymentProductValue}>
+                      {brl(item.option.preco * item.quantidade)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.paymentSummaryDivider} />
               <View style={[styles.paymentSummaryRow, styles.paymentSummaryDelivery]}>
-                <Text style={styles.paymentSummaryLabel}>{tipoEntrega === 'retirada' ? 'Retirada' : 'Entrega'}</Text>
+                <View style={styles.paymentDeliveryCopy}>
+                  <Text style={styles.paymentSummaryLabel}>{nomeEntregaSelecionada}</Text>
+                  {!!detalheEntregaSelecionada && (
+                    <Text style={styles.paymentDeliveryMeta}>{detalheEntregaSelecionada}</Text>
+                  )}
+                </View>
                 <Text style={[styles.paymentSummaryValue, tipoEntrega === 'retirada' && styles.paymentSummaryFree]}>
                   {tipoEntrega === 'retirada' ? 'Grátis' : brl(valorEntrega)}
                 </Text>
@@ -981,8 +1016,49 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  paymentProductList: {
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  paymentProductRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: SPACING.md,
+  },
+  paymentProductCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  paymentProductName: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.bone,
+  },
+  paymentProductNameWide: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.bone,
+  },
+  paymentProductMeta: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.muted,
+    marginTop: 2,
+  },
+  paymentProductValue: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.bone,
+  },
   paymentSummaryDelivery: {
-    marginTop: SPACING.sm,
+    alignItems: 'flex-start',
+  },
+  paymentDeliveryCopy: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: SPACING.md,
+  },
+  paymentDeliveryMeta: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.muted,
+    marginTop: 2,
   },
   paymentSummaryLabel: {
     ...TYPOGRAPHY.body,
