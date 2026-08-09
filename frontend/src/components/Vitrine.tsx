@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking, Platform, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Image } from 'expo-image';
@@ -128,14 +128,6 @@ const normalize = (value: string) => value
   .replace(/[\u0300-\u036f]/g, '')
   .toLowerCase();
 
-const resumirCategorias = (valores: string[], limite: number, singular: string, plural: string) => {
-  if (!valores.length) return '';
-  const visiveis = valores.slice(0, limite);
-  const restantes = valores.length - visiveis.length;
-  if (restantes <= 0) return visiveis.join(' · ');
-  return `${visiveis.join(' · ')} · +${restantes} ${restantes === 1 ? singular : plural}`;
-};
-
 const iconeOcasiao = (ocasiao: string): FeatherIconName => ({
   Academia: 'activity',
   Casual: 'coffee',
@@ -172,6 +164,7 @@ function VitrineCard({
   onToggleFavorite: () => void;
 }) {
   const { width } = useWindowDimensions();
+  const mobileCard = width < 640;
   const wideCard = width >= 760;
   const narrowCard = width < 380;
   const compactTypography = width < 430;
@@ -211,11 +204,16 @@ function VitrineCard({
         )}
       </Pressable>
 
-      <View style={[styles.productTop, wideCard && styles.productTopWide]}>
+      <View style={[
+        styles.productTop,
+        mobileCard && styles.productTopMobile,
+        wideCard && styles.productTopWide,
+      ]}>
         <Pressable
           style={[
             styles.imageFrame,
-            narrowCard && styles.imageFrameNarrow,
+            mobileCard && styles.imageFrameMobile,
+            narrowCard && styles.imageFrameMobileNarrow,
             wideCard && styles.imageFrameWide,
           ]}
           onPress={onDetails}
@@ -233,13 +231,18 @@ function VitrineCard({
           )}
         </Pressable>
 
-        <View style={[styles.productInfo, wideCard && styles.productInfoWide]}>
+        <View style={[
+          styles.productInfo,
+          mobileCard && styles.productInfoMobile,
+          wideCard && styles.productInfoWide,
+        ]}>
           <Text style={styles.inspirationText} numberOfLines={1}>
             {inspirationLabel}
           </Text>
 
           <Pressable
             onPress={onDetails}
+            style={styles.titlePressable}
             testID={`details-title-${item.id}`}
             accessible={false}
             focusable={false}
@@ -250,7 +253,7 @@ function VitrineCard({
                 compactTypography && styles.cardTitleMobile,
                 wideCard && styles.cardTitleWide,
               ]}
-              numberOfLines={wideCard ? 3 : 2}
+              numberOfLines={mobileCard || wideCard ? 3 : 2}
             >
               {nomeExibicao}
             </Text>
@@ -350,6 +353,8 @@ export function Vitrine({
   onReady?: () => void;
 }) {
   const { width: viewportWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const mobileViewport = viewportWidth < 640;
   const narrowViewport = viewportWidth < 410;
   const currentStore = publicStoreConfig(storeConfig);
   const brand = storeNameParts(currentStore.nomeLoja);
@@ -1026,6 +1031,7 @@ export function Vitrine({
                         styles.quickFilterButton,
                         narrowViewport && styles.quickFilterButtonNarrow,
                         styles.quickFilterPrimary,
+                        mobileViewport && styles.quickFilterButtonMobile,
                         familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && disponibilidadeAtiva === 'pronta'
@@ -1067,6 +1073,7 @@ export function Vitrine({
                         styles.quickFilterButton,
                         narrowViewport && styles.quickFilterButtonNarrow,
                         styles.quickFilterPrimary,
+                        mobileViewport && styles.quickFilterButtonMobile,
                         familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && disponibilidadeAtiva === 'encomenda'
@@ -1104,7 +1111,13 @@ export function Vitrine({
                         setOcasiaoAtiva('Todas');
                         setDisponibilidadeAtiva('todas');
                       }}
-                      style={[styles.quickFilterButton, narrowViewport && styles.quickFilterButtonNarrow, styles.quickFilterSecondary, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
+                      style={[
+                        styles.quickFilterButton,
+                        narrowViewport && styles.quickFilterButtonNarrow,
+                        styles.quickFilterSecondary,
+                        mobileViewport && styles.quickFilterButtonMobile,
+                        familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive,
+                      ]}
                       testID="filter-favorites"
                       accessibilityRole="button"
                       accessibilityLabel="Mostrar perfumes favoritos"
@@ -1122,7 +1135,13 @@ export function Vitrine({
                         if (familiaAtiva === 'Favoritos') setFamiliaAtiva('Todas');
                         setFiltersOpen(true);
                       }}
-                      style={[styles.quickFilterButton, narrowViewport && styles.quickFilterButtonNarrow, styles.quickFilterCompact, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
+                      style={[
+                        styles.quickFilterButton,
+                        narrowViewport && styles.quickFilterButtonNarrow,
+                        styles.quickFilterCompact,
+                        mobileViewport && styles.quickFilterButtonMobile,
+                        filtrosAtivos > 0 && styles.quickFilterButtonActive,
+                      ]}
                       testID="filter-open"
                       accessibilityRole="button"
                       accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
@@ -1162,22 +1181,17 @@ export function Vitrine({
             </View>
           )
         }
-        contentContainerStyle={styles.catalogContent}
+        contentContainerStyle={[
+          styles.catalogContent,
+          { paddingBottom: 122 + insets.bottom },
+        ]}
         />
       </View>
 
-      {/* Atendimento e sugestões em um único ponto de contato */}
-      <Pressable
-        onPress={() => setContactOpen(true)}
-        style={styles.fabSuggestion}
-        testID="contact-fab"
-        accessibilityRole="button"
-        accessibilityLabel="Abrir atendimento"
-      >
-        <Feather name="message-circle" size={22} color={COLORS.ink} />
-      </Pressable>
-
-      <View style={styles.bottomNav}>
+      <View style={[
+        styles.bottomNav,
+        { paddingBottom: Math.max(insets.bottom, 12) },
+      ]}>
         <View style={styles.navItem}>
           <Feather name="home" size={22} color={COLORS.gold} />
           <Text style={styles.navTextActive}>Vitrine</Text>
@@ -1209,6 +1223,16 @@ export function Vitrine({
             )}
           </View>
           <Text style={styles.navText}>Pedidos</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => setContactOpen(true)}
+          style={styles.navItem}
+          testID="contact-fab"
+          accessibilityRole="button"
+          accessibilityLabel="Abrir atendimento"
+        >
+          <Feather name="message-circle" size={22} color={STOREFRONT_COLORS.muted} />
+          <Text style={styles.navText}>Atendimento</Text>
         </Pressable>
       </View>
 
@@ -1766,10 +1790,10 @@ export function Vitrine({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: STOREFRONT_COLORS.background },
+  screen: { flex: 1, overflow: 'hidden', backgroundColor: STOREFRONT_COLORS.background },
   pullRefreshIndicator: { position: 'absolute', zIndex: 20, top: 6, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, minHeight: 34, borderRadius: RADIUS.pill, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border },
   pullRefreshText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption },
-  catalogContent: { width: '100%', maxWidth: 1080, alignSelf: 'center', paddingHorizontal: SPACING.lg, paddingBottom: 160 },
+  catalogContent: { width: '100%', maxWidth: 1080, alignSelf: 'center', paddingHorizontal: SPACING.lg },
   headerControls: { width: '100%' },
   brandHeader: { alignItems: 'center', paddingHorizontal: 56, paddingTop: 26, paddingBottom: 20 },
   storeLogo: { width: 118, height: 86, marginBottom: 4 },
@@ -1779,14 +1803,15 @@ const styles = StyleSheet.create({
   atelieAccess: { position: 'absolute', top: 51, right: SPACING.lg, zIndex: 40, width: 32, height: 32, borderRadius: 16, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, alignItems: 'center', justifyContent: 'center' },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 11, height: 60, paddingHorizontal: 18, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.md, marginBottom: 12 },
   searchInput: { flex: 1, color: STOREFRONT_COLORS.ink, paddingVertical: 15, fontSize: FONT_SIZES.body },
-  quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 60, paddingHorizontal: 18, paddingVertical: 6, borderRadius: RADIUS.md, backgroundColor: STOREFRONT_COLORS.surfaceRaised, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold + '88', marginBottom: 12 },
+  quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 60, paddingHorizontal: 18, paddingVertical: 10, borderRadius: RADIUS.md, backgroundColor: STOREFRONT_COLORS.surfaceRaised, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold + '88', marginBottom: 12 },
   quizIcon: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   quizTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
   quizSubtitle: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   quickFilters: { paddingVertical: 8, marginBottom: SPACING.sm },
-  quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  quickFilterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   quickFilterButton: { minHeight: 40, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   quickFilterButtonNarrow: { paddingHorizontal: 3, gap: 2 },
+  quickFilterButtonMobile: { flexGrow: 1, flexShrink: 1, flexBasis: '46%', minWidth: 128, paddingHorizontal: 10, gap: 5 },
   quickFilterPrimary: { flex: 1.22 },
   quickFilterSecondary: { flex: 1 },
   quickFilterCompact: { flex: 0.82 },
@@ -1820,6 +1845,7 @@ const styles = StyleSheet.create({
   contactFallbackText: { color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.lg },
   contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
+    width: '100%',
     backgroundColor: PRODUCT_CARD_COLORS.background,
     borderWidth: 1,
     borderColor: PRODUCT_CARD_COLORS.border,
@@ -1835,16 +1861,20 @@ const styles = StyleSheet.create({
   cardWide: { padding: SPACING.lg },
   cardFavorite: { position: 'absolute', right: 14, top: 14, zIndex: 4, width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold },
   productTop: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md },
+  productTopMobile: { flexDirection: 'column', gap: 0 },
   productTopWide: { gap: SPACING.lg },
   imageFrame: { width: 118, height: 208, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
-  imageFrameNarrow: { width: 108, height: 196 },
+  imageFrameMobile: { width: '100%', height: 220 },
+  imageFrameMobileNarrow: { height: 200 },
   imageFrameWide: { width: 210, height: 250 },
   productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
   imagePlaceholderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
   productInfo: { flex: 1, minWidth: 0, paddingTop: 2, paddingRight: 34 },
+  productInfoMobile: { width: '100%', paddingTop: SPACING.md, paddingRight: 0 },
   productInfoWide: { paddingRight: 46 },
-  cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.heading, lineHeight: 22, fontWeight: '700', marginTop: 3 },
+  titlePressable: { width: '100%', minWidth: 0 },
+  cardTitle: { flexShrink: 1, color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.heading, lineHeight: 22, fontWeight: '700', marginTop: 3 },
   cardTitleMobile: { fontSize: FONT_SIZES.subtitle, lineHeight: 20 },
   cardTitleWide: { fontSize: FONT_SIZES.titleLarge, lineHeight: 28 },
   inspirationText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, lineHeight: 15, letterSpacing: 1.1, marginTop: 1, fontWeight: '600' },
@@ -1868,8 +1898,7 @@ const styles = StyleSheet.create({
   detailsButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: SPACING.md, marginTop: SPACING.md, borderRadius: RADIUS.md, backgroundColor: PRODUCT_CARD_COLORS.gold },
   detailsButtonPressed: { opacity: 0.86 },
   detailsText: { color: COLORS.ink, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
-  fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
   navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
   navTextActive: { color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 3 },
   navText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
