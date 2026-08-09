@@ -6,14 +6,10 @@ import logging
 from fastapi import HTTPException, Request
 from pymongo import ReturnDocument
 
+from client_identity import anonymous_client_key
 from database import get_db
 
 logger = logging.getLogger("atelie.rate-limit")
-
-
-def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-    return forwarded or (request.client.host if request.client else "unknown")
 
 
 def rate_limit(scope: str, *, max_requests: int, window_seconds: int):
@@ -23,7 +19,8 @@ def rate_limit(scope: str, *, max_requests: int, window_seconds: int):
     async def dependency(request: Request) -> None:
         now = datetime.now(timezone.utc)
         bucket = int(now.timestamp()) // window_seconds
-        key = f"{safe_scope}:{_client_ip(request)}:{bucket}"
+        client_key = anonymous_client_key(request, safe_scope)
+        key = f"{safe_scope}:{client_key}:{bucket}"
         try:
             result = await get_db().api_rate_limits.find_one_and_update(
                 {"_id": key},

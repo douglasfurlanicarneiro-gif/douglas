@@ -37,6 +37,9 @@ def test_rate_limit_bloqueia_somente_depois_do_limite(monkeypatch):
     asyncio.run(dependency(FakeRequest()))
     asyncio.run(dependency(FakeRequest()))
 
+    stored_key = next(iter(db.api_rate_limits.documents))
+    assert "203.0.113.8" not in stored_key
+
     with pytest.raises(HTTPException) as error:
         asyncio.run(dependency(FakeRequest()))
 

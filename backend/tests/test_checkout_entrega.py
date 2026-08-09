@@ -76,6 +76,19 @@ def test_entrega_aceita_endereco_e_frete():
     assert compra.tipoEntrega == "entrega"
     assert compra.freteEscolhido.serviceId == 3
 
+    persistido = compra.model_dump(
+        exclude={"perfumeId", "perfumeNome", "ml", "preco", "itens", "freteEscolhido"}
+    )
+    assert persistido["endereco"] == {
+        "cep": "03630010",
+        "endereco": "Rua Cirino de Abreu",
+        "numero": "10",
+        "complemento": "",
+        "bairro": "Guaiaúna",
+        "cidade": "São Paulo",
+        "estado": "SP",
+    }
+
 
 def test_sob_encomenda_exige_confirmacao_do_prazo():
     itens = [{"tipoAtendimento": "sob_encomenda", "prontaEntrega": False}]

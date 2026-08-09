@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from audit import registrar_auditoria
+from client_identity import anonymous_client_key
 from database import get_db
 from security import (
     create_token,
@@ -25,15 +26,8 @@ class LoginPayload(BaseModel):
 
 
 def _login_key(request: Request, usuario: str) -> str:
-    forwarded = [
-        item.strip()
-        for item in request.headers.get("x-forwarded-for", "").split(",")
-        if item.strip()
-    ]
-    ip = forwarded[-1] if forwarded else (
-        request.client.host if request.client else "unknown"
-    )
-    return f"{ip}:{usuario.strip().casefold()}"
+    usuario_normalizado = usuario.strip().casefold()
+    return anonymous_client_key(request, f"login:{usuario_normalizado}")
 
 
 @router.post("/login")

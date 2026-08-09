@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, PanResponder, View, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl, useWindowDimensions, Linking, Platform } from 'react-native';
+import { Animated, PanResponder, View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, useWindowDimensions, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -9,6 +9,7 @@ import {
   brl, familiasDoPerfume, fmtDate, nomeConcentracao, padSeq,
 } from '../theme';
 import { BottomSheet } from './BottomSheet';
+import { AccessiblePressable as Pressable } from './AccessiblePressable';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
@@ -636,7 +637,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
           <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>ml</Text>
           <TInput style={{ flex: 1 }} keyboardType="decimal-pad" value={String(p.preco)} onChangeText={(v) => setPreco(i, 'preco', Number(v) || 0)} placeholder="Preço" />
           {f.precos.length > 1 && (
-            <Pressable onPress={() => rmPreco(i)} hitSlop={8}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>
+            <Pressable onPress={() => rmPreco(i)} hitSlop={8} accessibilityLabel={`Remover tamanho ${f.precos[i]?.ml || ''} mililitros`}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>
           )}
         </View>
       ))}
@@ -952,7 +953,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
                 <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }} numberOfLines={1}>{p?.nome || 'Selecionar perfume'}</Text>
                 {!pedidoRecebido && <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>{editando ? 'toque para fechar' : 'toque para trocar'}</Text>}
               </Pressable>
-              {!pedidoRecebido && <Pressable onPress={() => rmItem(i)} hitSlop={8}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>}
+              {!pedidoRecebido && <Pressable onPress={() => rmItem(i)} hitSlop={8} accessibilityLabel="Remover item do pedido"><Feather name="x" size={16} color={COLORS.rust} /></Pressable>}
             </View>
             {editando && (
               <View style={{ marginTop: SPACING.sm }}>
@@ -2094,8 +2095,8 @@ export function Atelie({
                       </Text>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 12 }}>
-                      <Pressable onPress={() => setSheet({ type: 'perfume', data: p })} hitSlop={8} testID={`edit-${p.id}`}><Feather name="edit-2" size={16} color={COLORS.muted} /></Pressable>
-                      <Pressable onPress={() => setSheet({ type: 'confirm', label: `Arquivar "${p.nome}"? Ele sairá da vitrine, mas o histórico será preservado.`, onConfirm: () => doDeletePerfume(p.id), danger: true, confirmLabel: 'Arquivar perfume', safetyText: 'O perfume poderá ser restaurado e seus pedidos e movimentos de estoque não serão apagados.' })} hitSlop={8} testID={`archive-${p.id}`}><Feather name="archive" size={16} color={COLORS.muted} /></Pressable>
+                      <Pressable onPress={() => setSheet({ type: 'perfume', data: p })} hitSlop={8} testID={`edit-${p.id}`} accessibilityLabel={`Editar ${p.nome}`}><Feather name="edit-2" size={16} color={COLORS.muted} /></Pressable>
+                      <Pressable onPress={() => setSheet({ type: 'confirm', label: `Arquivar "${p.nome}"? Ele sairá da vitrine, mas o histórico será preservado.`, onConfirm: () => doDeletePerfume(p.id), danger: true, confirmLabel: 'Arquivar perfume', safetyText: 'O perfume poderá ser restaurado e seus pedidos e movimentos de estoque não serão apagados.' })} hitSlop={8} testID={`archive-${p.id}`} accessibilityLabel={`Arquivar ${p.nome}`}><Feather name="archive" size={16} color={COLORS.muted} /></Pressable>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
@@ -2258,7 +2259,7 @@ export function Atelie({
                 testID="orders-search"
               />
               {!!orderSearch && (
-                <Pressable onPress={() => setOrderSearch('')} hitSlop={8}>
+                <Pressable onPress={() => setOrderSearch('')} hitSlop={8} accessibilityLabel="Limpar busca de pedidos">
                   <Feather name="x" size={14} color={COLORS.muted} />
                 </Pressable>
               )}
@@ -2381,7 +2382,7 @@ export function Atelie({
               <View key={o.id} style={styles.rowCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p?.nome || 'Perfume removido'}</Text>
-                  <Pressable onPress={() => setSheet({ type: 'confirm', label: 'Arquivar esta avaliação? Ela deixará de aparecer, mas o registro será preservado.', onConfirm: () => doDelOpiniao(o.id), confirmLabel: 'Arquivar avaliação' })} hitSlop={8}>
+                  <Pressable onPress={() => setSheet({ type: 'confirm', label: 'Arquivar esta avaliação? Ela deixará de aparecer, mas o registro será preservado.', onConfirm: () => doDelOpiniao(o.id), confirmLabel: 'Arquivar avaliação' })} hitSlop={8} accessibilityLabel={`Arquivar avaliação de ${o.cliente || 'cliente anônimo'}`}>
                     <Feather name="archive" size={14} color={COLORS.muted} />
                   </Pressable>
                 </View>
@@ -2405,6 +2406,7 @@ export function Atelie({
                     confirmLabel: 'Arquivar sugestão',
                   })}
                   hitSlop={8}
+                  accessibilityLabel={`Arquivar sugestão de ${s.cliente || 'cliente anônimo'}`}
                 >
                   <Feather name="archive" size={14} color={COLORS.muted} />
                 </Pressable>

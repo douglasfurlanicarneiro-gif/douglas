@@ -69,5 +69,11 @@ def test_sessao_revogada_e_versao_antiga_sao_rejeitadas(monkeypatch):
     assert antiga.value.status_code == 401
 
 
-def test_limitador_de_login_usa_ip_real_acrescentado_pelo_proxy():
-    assert _login_key(RequisicaoFalsa(), " Admin ") == "203.0.113.8:admin"
+def test_limitador_de_login_anonimiza_ip_e_normaliza_usuario():
+    primeira = _login_key(RequisicaoFalsa(), " Admin ")
+    segunda = _login_key(RequisicaoFalsa(), "admin")
+
+    assert primeira == segunda
+    assert len(primeira) == 32
+    assert "198.51.100.1" not in primeira
+    assert "203.0.113.8" not in primeira
