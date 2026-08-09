@@ -27,6 +27,7 @@ export function BottomSheet({
 }: Props) {
   const scrollRef = useRef<ScrollView>(null);
   const closeRef = useRef<React.ElementRef<typeof Pressable>>(null);
+  const sheetRef = useRef<React.ElementRef<typeof Pressable>>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -44,7 +45,30 @@ export function BottomSheet({
       }
     }, 50);
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
+      if (event.key === 'Escape') {
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const sheet = sheetRef.current as unknown as HTMLElement | null;
+      if (!sheet) return;
+      const focusable = Array.from(sheet.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true');
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const current = document.activeElement;
+      if (!sheet.contains(current)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && current === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && current === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       document.addEventListener('keydown', handleKeyDown);
@@ -76,6 +100,7 @@ export function BottomSheet({
       >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.avoider}>
           <Pressable
+            ref={sheetRef}
             style={[styles.sheet, tone === 'light' && styles.sheetLight, compact && styles.sheetCompact]}
             onPress={() => {}}
             testID={testID}

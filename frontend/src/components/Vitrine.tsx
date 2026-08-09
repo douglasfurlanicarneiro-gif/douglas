@@ -157,7 +157,15 @@ function VitrineCard({
   const familiasResumo = resumirCategorias(familias, 2, 'família', 'famílias');
   return (
     <View style={styles.card} testID={`vitrine-card-${item.id}`}>
-      <Pressable onPress={onToggleFavorite} style={styles.cardFavorite} hitSlop={8} testID={`favorite-${item.id}`}>
+      <Pressable
+        onPress={onToggleFavorite}
+        style={styles.cardFavorite}
+        hitSlop={8}
+        testID={`favorite-${item.id}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${favorite ? 'Remover' : 'Adicionar'} ${item.nome} ${favorite ? 'dos' : 'aos'} favoritos`}
+        accessibilityState={{ selected: favorite }}
+      >
         {favorite ? (
           <FontAwesome name="heart" size={18} color={COLORS.favorite} />
         ) : (
@@ -165,7 +173,13 @@ function VitrineCard({
         )}
       </Pressable>
       <View style={styles.productTop}>
-        <Pressable style={styles.imageFrame} onPress={onDetails} testID={`details-image-${item.id}`}>
+        <Pressable
+          style={styles.imageFrame}
+          onPress={onDetails}
+          testID={`details-image-${item.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Conhecer ${item.nome}`}
+        >
           {item.imagemUrl ? (
             <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="cover" transition={180} />
           ) : (
@@ -176,7 +190,12 @@ function VitrineCard({
           )}
         </Pressable>
         <View style={styles.productInfo}>
-          <Pressable onPress={onDetails} testID={`details-title-${item.id}`}>
+          <Pressable
+            onPress={onDetails}
+            testID={`details-title-${item.id}`}
+            accessibilityRole="button"
+            accessibilityLabel={`Conhecer ${item.nome}`}
+          >
             <Text style={styles.cardTitle} numberOfLines={2}>{item.nome}</Text>
           </Pressable>
           <Text style={styles.occasionLabel}>CLIMA & OCASIÃO</Text>
@@ -201,6 +220,9 @@ function VitrineCard({
                 disabled={!disponivel}
                 onPress={() => onBuy(pr.ml, pr.preco)}
                 testID={`buy-${item.id}-${pr.ml}`}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}, ${pr.ml} mililitros, ${brl(pr.preco)}`}
+                accessibilityState={{ disabled: !disponivel }}
                 style={({ pressed }) => [
                   styles.sizeButton,
                   pressed && disponivel && styles.sizeButtonPressed,
@@ -229,11 +251,22 @@ function VitrineCard({
       )}
 
       <View style={styles.cardActions}>
-        <Pressable onPress={onReview} style={styles.reviewButton} testID={`review-trigger-${item.id}`}>
+        <Pressable
+          onPress={onReview}
+          style={styles.reviewButton}
+          testID={`review-trigger-${item.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Avaliar ${item.nome}`}
+        >
           <Feather name="star" size={13} color={COLORS.gold} />
           <Text style={styles.reviewText}>Avaliar</Text>
         </Pressable>
-        <Pressable onPress={onDetails} style={styles.detailsButton}>
+        <Pressable
+          onPress={onDetails}
+          style={styles.detailsButton}
+          accessibilityRole="button"
+          accessibilityLabel={`Conhecer a fragrância ${item.nome}`}
+        >
           <Text style={styles.detailsText}>Conhecer a fragrância</Text>
           <Feather name="arrow-right" size={13} color={COLORS.gold} />
         </Pressable>
@@ -840,6 +873,8 @@ export function Vitrine({
         style={styles.atelieAccess}
         testID="atelie-access-button"
         hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel="Abrir painel de controle"
       >
         <Feather name="user" size={14} color={STOREFRONT_COLORS.muted} />
       </Pressable>
@@ -873,6 +908,10 @@ export function Vitrine({
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshCatalog} tintColor={COLORS.gold} />}
         onScroll={pullToRefresh.onScroll}
         scrollEventThrottle={16}
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        updateCellsBatchingPeriod={40}
+        windowSize={7}
         ListHeaderComponent={
           <View>
             <View style={styles.brandHeader}>
@@ -901,9 +940,16 @@ export function Vitrine({
                     placeholderTextColor={STOREFRONT_COLORS.muted}
                     style={styles.searchInput}
                     testID="vitrine-search"
+                    accessibilityLabel="Buscar fragrância, nota ou ocasião"
                   />
                 </View>
-                <Pressable onPress={() => setQuizOpen(true)} style={styles.quizBanner} testID="quiz-open">
+                <Pressable
+                  onPress={() => setQuizOpen(true)}
+                  style={styles.quizBanner}
+                  testID="quiz-open"
+                  accessibilityRole="button"
+                  accessibilityLabel="Encontre seu perfume com uma seleção personalizada"
+                >
                   <View style={styles.quizIcon}>
                     <Feather name="compass" size={19} color={COLORS.gold} />
                   </View>
@@ -930,6 +976,9 @@ export function Vitrine({
                           && styles.quickFilterButtonActive,
                       ]}
                       testID="filter-ready-delivery"
+                      accessibilityRole="button"
+                      accessibilityLabel="Mostrar perfumes a pronta entrega"
+                      accessibilityState={{ selected: disponibilidadeAtiva === 'pronta' }}
                     >
                       <Feather
                         name="package"
@@ -965,6 +1014,9 @@ export function Vitrine({
                           && styles.quickFilterButtonActive,
                       ]}
                       testID="filter-made-to-order"
+                      accessibilityRole="button"
+                      accessibilityLabel="Mostrar perfumes sob encomenda"
+                      accessibilityState={{ selected: disponibilidadeAtiva === 'encomenda' }}
                     >
                       <Feather
                         name="clock"
@@ -995,6 +1047,9 @@ export function Vitrine({
                       }}
                       style={[styles.quickFilterButton, styles.quickFilterGrow, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
                       testID="filter-favorites"
+                      accessibilityRole="button"
+                      accessibilityLabel="Mostrar perfumes favoritos"
+                      accessibilityState={{ selected: familiaAtiva === 'Favoritos' }}
                     >
                       {familiaAtiva === 'Favoritos' ? (
                         <FontAwesome name="heart" size={14} color={COLORS.favorite} />
@@ -1010,6 +1065,8 @@ export function Vitrine({
                       }}
                       style={[styles.quickFilterButton, styles.quickFilterGrow, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
                       testID="filter-open"
+                      accessibilityRole="button"
+                      accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
                     >
                       <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />
                       <Text style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]}>Filtros</Text>
@@ -1070,6 +1127,8 @@ export function Vitrine({
           onPress={() => cartCount ? setCartOpen(true) : setInfo('Seu carrinho está vazio. Escolha um tamanho para começar.')}
           style={styles.navItem}
           testID="cart-button"
+          accessibilityRole="button"
+          accessibilityLabel={`Abrir carrinho, ${cartCount} ${cartCount === 1 ? 'item' : 'itens'}`}
         >
           <View>
             <Feather name="shopping-cart" size={23} color={STOREFRONT_COLORS.muted} />
@@ -1081,6 +1140,8 @@ export function Vitrine({
           onPress={openOrders}
           style={styles.navItem}
           testID="orders-button"
+          accessibilityRole="button"
+          accessibilityLabel={`Abrir pedidos, ${orderCodes.length} ${orderCodes.length === 1 ? 'pedido salvo' : 'pedidos salvos'}`}
         >
           <View>
             <Feather name="package" size={22} color={STOREFRONT_COLORS.muted} />
@@ -1207,7 +1268,13 @@ export function Vitrine({
             Escolha o melhor canal para conversar com a {currentStore.nomeLoja}.
           </Text>
           {!!supportNumber && (
-            <Pressable onPress={openStoreWhatsapp} style={styles.contactAction} testID="contact-whatsapp">
+            <Pressable
+              onPress={openStoreWhatsapp}
+              style={styles.contactAction}
+              testID="contact-whatsapp"
+              accessibilityRole="link"
+              accessibilityLabel="Falar no WhatsApp"
+            >
               <View style={styles.contactActionIcon}><Feather name="message-circle" size={17} color={COLORS.gold} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.contactActionTitle}>WhatsApp</Text>
@@ -1217,7 +1284,13 @@ export function Vitrine({
             </Pressable>
           )}
           {!!instagramUrl && (
-            <Pressable onPress={openStoreInstagram} style={styles.contactAction} testID="contact-instagram">
+            <Pressable
+              onPress={openStoreInstagram}
+              style={styles.contactAction}
+              testID="contact-instagram"
+              accessibilityRole="link"
+              accessibilityLabel="Abrir Instagram"
+            >
               <View style={styles.contactActionIcon}><Feather name="instagram" size={17} color={COLORS.gold} /></View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.contactActionTitle}>Instagram</Text>
@@ -1233,6 +1306,8 @@ export function Vitrine({
             }}
             style={styles.contactAction}
             testID="contact-suggestion"
+            accessibilityRole="button"
+            accessibilityLabel="Enviar sugestão de perfume"
           >
             <View style={styles.contactActionIcon}><Feather name="star" size={17} color={COLORS.gold} /></View>
             <View style={{ flex: 1 }}>
@@ -1248,10 +1323,12 @@ export function Vitrine({
             }}
             style={styles.contactAction}
             testID="contact-faq"
+            accessibilityRole="button"
+            accessibilityLabel="Abrir Central de Ajuda"
           >
             <View style={styles.contactActionIcon}><Feather name="help-circle" size={17} color={COLORS.gold} /></View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.contactActionTitle}>Dúvidas e prazos</Text>
+              <Text style={styles.contactActionTitle}>Central de Ajuda</Text>
               <Text style={styles.contactActionSubtitle}>Entrega, pagamento, acompanhamento e trocas</Text>
             </View>
             <Feather name="chevron-right" size={15} color={COLORS.muted} />
@@ -1275,6 +1352,7 @@ export function Vitrine({
                 onPress={() => setFaqExpanded(expanded ? null : index)}
                 style={[styles.faqItem, expanded && styles.faqItemExpanded]}
                 accessibilityRole="button"
+                accessibilityLabel={item.question}
                 accessibilityState={{ expanded }}
                 testID={`faq-item-${index}`}
               >
@@ -1296,6 +1374,8 @@ export function Vitrine({
             }}
             style={styles.contactAction}
             testID="faq-privacy"
+            accessibilityRole="button"
+            accessibilityLabel="Abrir privacidade e seus dados"
           >
             <View style={styles.contactActionIcon}><Feather name="shield" size={17} color={COLORS.gold} /></View>
             <View style={{ flex: 1 }}>
@@ -1312,6 +1392,8 @@ export function Vitrine({
               }}
               style={[styles.contactAction, styles.faqWhatsapp]}
               testID="faq-whatsapp"
+              accessibilityRole="link"
+              accessibilityLabel="Falar no WhatsApp"
             >
               <View style={styles.contactActionIcon}><Feather name="message-circle" size={17} color={COLORS.gold} /></View>
               <View style={{ flex: 1 }}>
@@ -1483,6 +1565,8 @@ export function Vitrine({
                 }}
                 style={({ pressed }) => [styles.copyPixButton, pressed && { opacity: 0.82 }]}
                 testID="copy-pix-code"
+                accessibilityRole="button"
+                accessibilityLabel={pixCopied ? 'Código Pix copiado' : 'Copiar código Pix'}
               >
                 <Feather name={pixCopied ? 'check' : 'copy'} size={16} color={COLORS.ink} />
                 <Text style={styles.copyPixText}>{pixCopied ? 'Código Pix copiado' : 'Copiar código Pix'}</Text>
@@ -1501,6 +1585,8 @@ export function Vitrine({
               onPress={() => void Linking.openURL(automaticCheckoutUrl)}
               style={[styles.copyPixButton, styles.paymentContinueButton]}
               testID="continue-infinitepay"
+              accessibilityRole="link"
+              accessibilityLabel="Pagar na InfinitePay"
             >
               <Feather name="external-link" size={16} color={COLORS.ink} />
               <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.copyPixText}>Pagar na InfinitePay</Text>
@@ -1536,6 +1622,8 @@ export function Vitrine({
                     }}
                     style={styles.shareCodeButton}
                     testID="share-tracking-code"
+                    accessibilityRole="button"
+                    accessibilityLabel="Compartilhar código do pedido"
                   >
                     <Feather name="share-2" size={14} color={COLORS.gold} />
                     <Text style={styles.shareCodeText}>Compartilhar código</Text>

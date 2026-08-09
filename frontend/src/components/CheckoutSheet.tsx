@@ -417,6 +417,9 @@ export function CheckoutSheet({
       <Pressable
         key={opcao.serviceId}
         onPress={() => setFreteSelecionado(opcao)}
+        accessibilityRole="radio"
+        accessibilityLabel={`${displayName}, prazo estimado ${opcao.prazoDias} ${opcao.prazoDias === 1 ? 'dia útil' : 'dias úteis'}, ${brl(opcao.preco)}`}
+        accessibilityState={{ selected: active }}
         style={{
           padding: 13,
           borderRadius: 12,
@@ -506,14 +509,29 @@ export function CheckoutSheet({
                     <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }}>{item.perfume.nome}</Text>
                     <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label }}>{item.option.ml}ml · {brl(item.option.preco)}</Text>
                   </View>
-                  <Pressable onPress={() => onChangeQuantity(index, item.quantidade - 1)} hitSlop={8}>
+                  <Pressable
+                    onPress={() => onChangeQuantity(index, item.quantidade - 1)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Diminuir quantidade de ${item.perfume.nome}`}
+                  >
                     <Feather name="minus-circle" size={20} color={COLORS.muted} />
                   </Pressable>
                   <Text style={{ color: COLORS.bone, minWidth: 18, textAlign: 'center' }}>{item.quantidade}</Text>
-                  <Pressable onPress={() => onChangeQuantity(index, item.quantidade + 1)} hitSlop={8}>
+                  <Pressable
+                    onPress={() => onChangeQuantity(index, item.quantidade + 1)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Aumentar quantidade de ${item.perfume.nome}`}
+                  >
                     <Feather name="plus-circle" size={20} color={COLORS.gold} />
                   </Pressable>
-                  <Pressable onPress={() => onRemove(index)} hitSlop={8}>
+                  <Pressable
+                    onPress={() => onRemove(index)}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remover ${item.perfume.nome} do carrinho`}
+                  >
                     <Feather name="trash-2" size={18} color={COLORS.rust} />
                   </Pressable>
                 </View>
@@ -584,6 +602,9 @@ export function CheckoutSheet({
                   <Pressable
                     key={method.id}
                     onPress={() => selectDeliveryType(method.id)}
+                    accessibilityRole="radio"
+                    accessibilityLabel={`${method.title}, ${method.meta}`}
+                    accessibilityState={{ selected: active }}
                     style={{
                       flex: 1,
                       padding: SPACING.md,
@@ -649,6 +670,8 @@ export function CheckoutSheet({
                 {!freteLoading && displayedShippingOptions.length > 0 && (
                   <Pressable
                     onPress={() => setFreteRefresh((current) => current + 1)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Atualizar valores do frete"
                     style={{
                       alignSelf: 'flex-end',
                       flexDirection: 'row',

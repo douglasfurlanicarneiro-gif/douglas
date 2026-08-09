@@ -18,10 +18,15 @@ export const inputStyle: TextStyle = {
 };
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const child = React.isValidElement<{ accessibilityLabel?: string }>(children)
+    ? React.cloneElement(children, {
+      accessibilityLabel: children.props.accessibilityLabel || label,
+    })
+    : children;
   return (
     <View style={{ marginBottom: SPACING.md }}>
       <Text style={{ ...TYPOGRAPHY.label, color: COLORS.muted, marginBottom: 4 }}>{label}</Text>
-      {children}
+      {child}
     </View>
   );
 }

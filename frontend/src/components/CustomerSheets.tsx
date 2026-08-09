@@ -171,7 +171,13 @@ export function PerfumeDetailSheet({
                 <Feather name="image" size={34} color={COLORS.muted} />
               </View>
             )}
-            <Pressable onPress={onToggleFavorite} style={styles.heartButton}>
+            <Pressable
+              onPress={onToggleFavorite}
+              style={styles.heartButton}
+              accessibilityRole="button"
+              accessibilityLabel={`${favorite ? 'Remover' : 'Adicionar'} ${perfume.nome} ${favorite ? 'dos' : 'aos'} favoritos`}
+              accessibilityState={{ selected: favorite }}
+            >
               {favorite ? (
                 <FontAwesome name="heart" size={20} color={COLORS.favorite} />
               ) : (
@@ -215,6 +221,9 @@ export function PerfumeDetailSheet({
                   key={opcao.ml}
                   disabled={!disponivel}
                   onPress={() => onBuy(opcao.ml, opcao.preco)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${perfume.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${perfume.nome}, ${opcao.ml} mililitros, ${brl(opcao.preco)}`}
+                  accessibilityState={{ disabled: !disponivel }}
                   style={({ pressed }) => [
                     styles.sizeButton,
                     pressed && disponivel && styles.sizeButtonPressed,
@@ -312,7 +321,13 @@ export function QuizSheet({
             <Text style={styles.resultTitle}>Sua seleção L’Essence</Text>
             <Text style={styles.resultSub}>Escolhemos estas fragrâncias especialmente para você.</Text>
             {recomendados.map(({ perfume }, index) => (
-              <Pressable key={perfume.id} onPress={() => onDetails(perfume)} style={styles.resultCard}>
+              <Pressable
+                key={perfume.id}
+                onPress={() => onDetails(perfume)}
+                style={styles.resultCard}
+                accessibilityRole="button"
+                accessibilityLabel={`Conhecer ${perfume.nome}`}
+              >
                 <View style={styles.resultNumber}><Text style={styles.resultNumberText}>{index + 1}</Text></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.resultName}>{perfume.nome}</Text>
@@ -401,6 +416,8 @@ export function OrdersSheet({
           }}
           style={styles.recoveryLink}
           testID="order-recovery-open"
+          accessibilityRole="button"
+          accessibilityLabel="Adicionar pedido de outro aparelho"
         >
           <Feather name="key" size={14} color={COLORS.gold} />
           <Text style={styles.recoveryLinkText}>Adicionar pedido de outro aparelho</Text>
@@ -572,6 +589,8 @@ export function OrdersSheet({
                 onPress={() => talkAboutOrder(order)}
                 style={styles.whatsappButton}
                 testID={`order-whatsapp-${order.codigoAcompanhamento}`}
+                accessibilityRole="link"
+                accessibilityLabel={`Falar sobre o pedido ${order.codigoAcompanhamento}`}
               >
                 <Feather name="message-circle" size={17} color={COLORS.ink} />
                 <Text style={styles.whatsappButtonText}>Falar sobre este pedido</Text>
@@ -586,6 +605,8 @@ export function OrdersSheet({
                 }}
                 style={styles.cancelOrderLink}
                 testID={`order-cancel-${order.codigoAcompanhamento}`}
+                accessibilityRole="button"
+                accessibilityLabel={`Cancelar pedido ${order.codigoAcompanhamento}`}
               >
                 <Text style={styles.cancelOrderLinkText}>Cancelar pedido</Text>
               </Pressable>
@@ -617,6 +638,9 @@ export function OrdersSheet({
                       cancellingCode === order.codigoAcompanhamento && { opacity: 0.55 },
                     ]}
                     testID={`order-cancel-confirm-${order.codigoAcompanhamento}`}
+                    accessibilityRole="button"
+                    accessibilityLabel="Confirmar cancelamento do pedido"
+                    accessibilityState={{ disabled: cancellingCode === order.codigoAcompanhamento }}
                   >
                     <Text style={styles.cancelConfirmButtonText}>
                       {cancellingCode === order.codigoAcompanhamento ? 'Cancelando…' : 'Sim, cancelar'}
@@ -655,6 +679,8 @@ export function OrdersSheet({
                     onPress={() => removeOrderFromDevice(order.codigoAcompanhamento)}
                     style={({ pressed }) => [styles.removeConfirmButton, pressed && { opacity: 0.85 }]}
                     testID={`order-remove-confirm-${order.codigoAcompanhamento}`}
+                    accessibilityRole="button"
+                    accessibilityLabel="Confirmar remoção deste aparelho"
                   >
                     <Text style={styles.removeConfirmButtonText}>Remover</Text>
                   </Pressable>
