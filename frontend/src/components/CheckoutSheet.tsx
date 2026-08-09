@@ -723,7 +723,11 @@ export function CheckoutSheet({
                 onPress={() => setStep('entrega')}
                 accessibilityRole="button"
                 accessibilityLabel="Voltar para a entrega"
-                style={({ pressed }) => [styles.paymentBackButton, pressed && styles.paymentButtonPressed]}
+                style={({ pressed }) => [
+                  styles.paymentBackButton,
+                  isWide && styles.paymentButtonWide,
+                  pressed && styles.paymentButtonPressed,
+                ]}
               >
                 <Feather name="arrow-left" size={isWide ? 25 : 20} color={COLORS.muted} />
                 <Text style={[styles.paymentBackText, isWide && styles.paymentActionTextWide]}>Voltar</Text>
@@ -736,6 +740,7 @@ export function CheckoutSheet({
                 accessibilityState={{ disabled: !complete || loading }}
                 style={({ pressed }) => [
                   styles.paymentSubmitButton,
+                  isWide && styles.paymentButtonWide,
                   (!complete || loading) && styles.paymentSubmitButtonDisabled,
                   pressed && complete && !loading && styles.paymentButtonPressed,
                 ]}
@@ -1024,7 +1029,7 @@ const styles = StyleSheet.create({
     gap: SPACING.lg,
   },
   paymentBackButton: {
-    flex: 1,
+    flex: 0.72,
     minWidth: 0,
     minHeight: 54,
     flexDirection: 'row',
@@ -1042,7 +1047,7 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
   },
   paymentSubmitButton: {
-    flex: 1,
+    flex: 1.28,
     minWidth: 0,
     minHeight: 54,
     flexDirection: 'row',
@@ -1052,6 +1057,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     borderRadius: RADIUS.md,
     backgroundColor: COLORS.gold,
+  },
+  paymentButtonWide: {
+    flex: 1,
   },
   paymentSubmitButtonDisabled: {
     backgroundColor: COLORS.border,
