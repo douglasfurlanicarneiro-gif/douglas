@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Linking, Platform, Pressable, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
 import { storage } from '../utils/storage';
 import type { CheckoutPayload, Compra, OpcaoFrete, Perfume, PriceOption } from '../types';
-import { brl, COLORS, SPACING, FONT_SIZES } from '../theme';
+import { brl, COLORS, SPACING, FONT_SIZES, RADIUS, TYPOGRAPHY } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';
 import { AppText as Text } from './Typography';
@@ -68,6 +68,8 @@ export function CheckoutSheet({
   cartaoOnlineAtivo,
   pixManualAtivo,
 }: Props) {
+  const { width } = useWindowDimensions();
+  const isWide = width >= 768;
   const [form, setForm] = useState<CustomerForm>(EMPTY_FORM);
   const [step, setStep] = useState<CheckoutStep>('dados');
   const [tipoEntrega, setTipoEntrega] = useState<DeliveryType>('entrega');
@@ -387,9 +389,15 @@ export function CheckoutSheet({
   };
 
   return (
-    <BottomSheet visible={visible} onClose={onClose} title="Carrinho e pagamento" testID="checkout-sheet">
+    <BottomSheet
+      visible={visible}
+      onClose={onClose}
+      title="Carrinho e pagamento"
+      testID="checkout-sheet"
+      contentContainerStyle={[styles.checkoutContent, isWide && styles.checkoutContentWide]}
+    >
       <View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.lg }}>
+        <View style={[styles.steps, isWide && styles.stepsWide]}>
           {steps.map((item, index) => {
             const active = step === item.id;
             const enabled = item.id === 'dados'
@@ -397,27 +405,25 @@ export function CheckoutSheet({
               || (item.id === 'pagamento' && dadosCompletos && entregaCompleta);
             return (
               <React.Fragment key={item.id}>
-                {index > 0 && <View style={{ flex: 1, height: 1, backgroundColor: COLORS.border }} />}
+                {index > 0 && <View style={[styles.stepConnector, isWide && styles.stepConnectorWide]} />}
                 <Pressable
                   disabled={!enabled}
                   onPress={() => setStep(item.id)}
-                  style={{ alignItems: 'center', opacity: enabled ? 1 : 0.45 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Etapa ${index + 1}: ${item.label}`}
+                  accessibilityState={{ selected: active, disabled: !enabled }}
+                  style={[styles.stepButton, { opacity: enabled ? 1 : 0.45 }]}
                 >
-                  <View style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 14,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: active ? COLORS.gold : COLORS.surface,
-                    borderWidth: 1,
-                    borderColor: active ? COLORS.gold : COLORS.border,
-                  }}>
-                    <Text style={{ color: active ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '700' }}>
+                  <View style={[
+                    styles.stepCircle,
+                    isWide && styles.stepCircleWide,
+                    active && styles.stepCircleActive,
+                  ]}>
+                    <Text style={[styles.stepNumber, active && styles.stepNumberActive]}>
                       {index + 1}
                     </Text>
                   </View>
-                  <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 4 }}>
+                  <Text style={[styles.stepLabel, isWide && styles.stepLabelWide, active && styles.stepLabelActive]}>
                     {item.label}
                   </Text>
                 </Pressable>
@@ -600,62 +606,64 @@ export function CheckoutSheet({
         )}
 
         {step === 'pagamento' && (
-          <View>
-            <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>
+          <View style={styles.paymentStep}>
+            <Text style={[styles.paymentEyebrow, isWide && styles.paymentEyebrowWide]}>
               PAGAMENTO
             </Text>
-            <Field label="Forma de pagamento">
-              <Pressable
-                onPress={() => pagamentoDisponivel && setForm({ ...form, formaPagamento: cartaoOnlineAtivo ? 'cartao' : 'pix' })}
-                style={{
-                  paddingVertical: 14,
-                  paddingHorizontal: SPACING.md,
-                  alignItems: 'center',
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: pagamentoDisponivel ? COLORS.gold : COLORS.border,
-                  backgroundColor: pagamentoDisponivel ? COLORS.gold : COLORS.surface,
-                }}
-              >
-                <Text style={{ color: pagamentoDisponivel ? COLORS.ink : COLORS.muted, fontWeight: '600' }}>
-                  {cartaoOnlineAtivo ? 'Pix ou cartão · InfinitePay' : pixManualAtivo ? 'Pix' : 'Pagamento indisponível'}
+            <View style={[styles.securePaymentCard, isWide && styles.securePaymentCardWide]}>
+              <View style={[styles.securePaymentIcon, isWide && styles.securePaymentIconWide]}>
+                <Feather name="shield" size={isWide ? 62 : 38} color={COLORS.gold} />
+                <View style={styles.securePaymentLock}>
+                  <Feather name="lock" size={isWide ? 21 : 14} color={COLORS.muted} />
+                </View>
+              </View>
+              <View style={styles.securePaymentCopy}>
+                <Text style={[styles.securePaymentTitle, isWide && styles.securePaymentTitleWide]}>Pagamento seguro</Text>
+                <Text style={[styles.securePaymentText, isWide && styles.securePaymentTextWide]}>
+                  {cartaoOnlineAtivo
+                    ? 'Você será direcionado para concluir o pagamento em um ambiente seguro. Assim que o pagamento for aprovado, seu pedido será confirmado automaticamente.'
+                    : pixManualAtivo
+                      ? 'Finalize o pagamento por Pix usando o QR Code ou o código copia e cola. Depois do recebimento, confirmaremos o pedido.'
+                      : 'O pagamento está temporariamente indisponível. Entre em contato com a loja para concluir seu pedido.'}
                 </Text>
-              </Pressable>
-            </Field>
+              </View>
+            </View>
             {!cartaoOnlineAtivo && pixManualAtivo && (
-              <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: -8, marginBottom: SPACING.md }}>
+              <Text style={styles.manualPaymentHint}>
                 Pagamento por Pix com confirmação manual. O checkout automático está temporariamente indisponível.
               </Text>
             )}
             {!pagamentoDisponivel && (
-              <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
-                <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' }}>Pagamento temporariamente indisponível</Text>
-                <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 4 }}>Entre em contato com a loja para combinar o pagamento.</Text>
+              <View style={styles.paymentUnavailable}>
+                <Text style={styles.paymentUnavailableTitle}>Pagamento temporariamente indisponível</Text>
+                <Text style={styles.paymentUnavailableText}>Entre em contato com a loja para combinar o pagamento.</Text>
               </View>
             )}
-            {cartaoOnlineAtivo && form.formaPagamento === 'cartao' && (
-              <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
-                <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' }}>Pagamento automático pela InfinitePay</Text>
-                <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 4 }}>No ambiente seguro da InfinitePay, escolha Pix ou cartão. A confirmação do pedido será automática.</Text>
-              </View>
-            )}
-            <Field label="Observações (opcional)"><TInput multiline style={{ minHeight: 72, textAlignVertical: 'top' }} value={form.observacoes} onChangeText={(observacoes) => setForm({ ...form, observacoes })} /></Field>
+            <Field label="Observações do pedido (opcional)">
+              <TInput
+                multiline
+                placeholder="Escreva aqui..."
+                style={[styles.orderNotes, isWide && styles.orderNotesWide]}
+                value={form.observacoes}
+                onChangeText={(observacoes) => setForm({ ...form, observacoes })}
+              />
+            </Field>
 
-            <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.md }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ color: COLORS.muted }}>Produtos</Text>
-                <Text style={{ color: COLORS.bone }}>{brl(subtotal)}</Text>
+            <View style={[styles.paymentSummary, isWide && styles.paymentSummaryWide]}>
+              <View style={styles.paymentSummaryRow}>
+                <Text style={styles.paymentSummaryLabel}>Produtos</Text>
+                <Text style={styles.paymentSummaryValue}>{brl(subtotal)}</Text>
               </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 11 }}>
-                <Text style={{ color: COLORS.muted }}>{tipoEntrega === 'retirada' ? 'Retirada' : 'Entrega'}</Text>
-                <Text style={{ color: tipoEntrega === 'retirada' ? COLORS.sage : COLORS.bone }}>
+              <View style={[styles.paymentSummaryRow, styles.paymentSummaryDelivery]}>
+                <Text style={styles.paymentSummaryLabel}>{tipoEntrega === 'retirada' ? 'Retirada' : 'Entrega'}</Text>
+                <Text style={[styles.paymentSummaryValue, tipoEntrega === 'retirada' && styles.paymentSummaryFree]}>
                   {tipoEntrega === 'retirada' ? 'Grátis' : brl(valorEntrega)}
                 </Text>
               </View>
-              <View style={{ height: 1, backgroundColor: COLORS.border, marginBottom: 11 }} />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '600' }}>Total</Text>
-                <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.heading, fontWeight: '700' }}>{brl(total)}</Text>
+              <View style={styles.paymentSummaryDivider} />
+              <View style={styles.paymentSummaryTotalRow}>
+                <Text style={[styles.paymentSummaryTotalLabel, isWide && styles.paymentSummaryTotalLabelWide]}>Total</Text>
+                <Text style={[styles.paymentSummaryTotal, isWide && styles.paymentSummaryTotalWide]}>{brl(total)}</Text>
               </View>
             </View>
 
@@ -710,17 +718,45 @@ export function CheckoutSheet({
             )}
 
             {!!error && <Text style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <SecondaryButton label="Voltar" onPress={() => setStep('entrega')} />
-              <PrimaryButton
-                label={loading
-                  ? 'Abrindo pagamento…'
-                  : cartaoOnlineAtivo
-                    ? `Pagar · ${brl(total)}`
-                    : `Finalizar · ${brl(total)}`}
+            <View style={[styles.paymentActions, isWide && styles.paymentActionsWide]}>
+              <Pressable
+                onPress={() => setStep('entrega')}
+                accessibilityRole="button"
+                accessibilityLabel="Voltar para a entrega"
+                style={({ pressed }) => [styles.paymentBackButton, pressed && styles.paymentButtonPressed]}
+              >
+                <Feather name="arrow-left" size={isWide ? 25 : 20} color={COLORS.muted} />
+                <Text style={[styles.paymentBackText, isWide && styles.paymentActionTextWide]}>Voltar</Text>
+              </Pressable>
+              <Pressable
                 onPress={submit}
                 disabled={!complete || loading}
-              />
+                accessibilityRole="button"
+                accessibilityLabel={`${loading ? 'Abrindo pagamento' : 'Ir para pagamento'}, total ${brl(total)}`}
+                accessibilityState={{ disabled: !complete || loading }}
+                style={({ pressed }) => [
+                  styles.paymentSubmitButton,
+                  (!complete || loading) && styles.paymentSubmitButtonDisabled,
+                  pressed && complete && !loading && styles.paymentButtonPressed,
+                ]}
+              >
+                <View style={styles.paymentActionSpacer} />
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.72}
+                  style={[styles.paymentSubmitText, isWide && styles.paymentActionTextWide]}
+                >
+                  {loading ? 'Abrindo pagamento…' : `Ir para pagamento · ${brl(total)}`}
+                </Text>
+                <Feather name="arrow-right" size={isWide ? 25 : 20} color={COLORS.inverse} />
+              </Pressable>
+            </View>
+
+            <View style={[styles.paymentBrand, isWide && styles.paymentBrandWide]} accessibilityElementsHidden>
+              <Text style={[styles.paymentBrandName, isWide && styles.paymentBrandNameWide]}>L’ESSENCE</Text>
+              <Text style={styles.paymentBrandSubtitle}>FURLANI PARFUM</Text>
+              <View style={styles.paymentBrandOrnament} />
             </View>
           </View>
         )}
@@ -728,3 +764,342 @@ export function CheckoutSheet({
     </BottomSheet>
   );
 }
+
+const styles = StyleSheet.create({
+  checkoutContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.xxl,
+  },
+  checkoutContentWide: {
+    width: '100%',
+    maxWidth: 1480,
+    alignSelf: 'center',
+    paddingHorizontal: 56,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xl,
+  },
+  steps: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.xl,
+    paddingHorizontal: SPACING.xs,
+  },
+  stepsWide: {
+    marginBottom: 36,
+    paddingHorizontal: 34,
+  },
+  stepConnector: {
+    flex: 1,
+    height: 1,
+    marginTop: 15,
+    backgroundColor: COLORS.border,
+  },
+  stepConnectorWide: {
+    marginTop: 23,
+  },
+  stepButton: {
+    minWidth: 54,
+    alignItems: 'center',
+  },
+  stepCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  stepCircleWide: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+  },
+  stepCircleActive: {
+    backgroundColor: COLORS.gold,
+    borderColor: COLORS.gold,
+  },
+  stepNumber: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.muted,
+  },
+  stepNumberActive: {
+    color: COLORS.ink,
+  },
+  stepLabel: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.muted,
+    marginTop: SPACING.xs,
+  },
+  stepLabelWide: {
+    ...TYPOGRAPHY.body,
+    marginTop: SPACING.sm,
+  },
+  stepLabelActive: {
+    color: COLORS.gold,
+  },
+  paymentStep: {
+    width: '100%',
+  },
+  paymentEyebrow: {
+    ...TYPOGRAPHY.eyebrow,
+    color: COLORS.gold,
+    marginBottom: SPACING.md,
+  },
+  paymentEyebrowWide: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.gold,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+  },
+  securePaymentCard: {
+    minHeight: 112,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    shadowColor: COLORS.ink,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
+  securePaymentCardWide: {
+    minHeight: 164,
+    gap: 36,
+    paddingHorizontal: 34,
+    paddingVertical: 24,
+    marginBottom: SPACING.xl,
+  },
+  securePaymentIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceRaised,
+  },
+  securePaymentIconWide: {
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+  },
+  securePaymentLock: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 9,
+  },
+  securePaymentCopy: {
+    flex: 1,
+  },
+  securePaymentTitle: {
+    ...TYPOGRAPHY.subtitle,
+    color: COLORS.bone,
+    marginBottom: SPACING.xs,
+  },
+  securePaymentTitleWide: {
+    ...TYPOGRAPHY.titleLarge,
+    color: COLORS.bone,
+    marginBottom: SPACING.sm,
+  },
+  securePaymentText: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.bone,
+    maxWidth: 560,
+  },
+  securePaymentTextWide: {
+    ...TYPOGRAPHY.bodyLarge,
+    color: COLORS.bone,
+    lineHeight: 25,
+  },
+  manualPaymentHint: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.muted,
+    marginTop: -SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  paymentUnavailable: {
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.rust,
+    backgroundColor: COLORS.surface,
+    marginBottom: SPACING.md,
+  },
+  paymentUnavailableTitle: {
+    ...TYPOGRAPHY.label,
+    color: COLORS.bone,
+  },
+  paymentUnavailableText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.muted,
+    marginTop: SPACING.xs,
+  },
+  orderNotes: {
+    minHeight: 84,
+    textAlignVertical: 'top',
+    paddingTop: SPACING.md,
+  },
+  orderNotesWide: {
+    minHeight: 86,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  paymentSummary: {
+    padding: SPACING.lg,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    marginBottom: SPACING.lg,
+    shadowColor: COLORS.ink,
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1,
+  },
+  paymentSummaryWide: {
+    paddingHorizontal: 26,
+    paddingVertical: 18,
+    marginBottom: SPACING.xl,
+  },
+  paymentSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  paymentSummaryDelivery: {
+    marginTop: SPACING.sm,
+  },
+  paymentSummaryLabel: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.bone,
+  },
+  paymentSummaryValue: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.bone,
+  },
+  paymentSummaryFree: {
+    color: COLORS.sage,
+  },
+  paymentSummaryDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+    marginVertical: SPACING.md,
+  },
+  paymentSummaryTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  paymentSummaryTotalLabel: {
+    ...TYPOGRAPHY.subtitle,
+    color: COLORS.bone,
+  },
+  paymentSummaryTotalLabelWide: {
+    ...TYPOGRAPHY.heading,
+    color: COLORS.bone,
+  },
+  paymentSummaryTotal: {
+    ...TYPOGRAPHY.title,
+    color: COLORS.gold,
+  },
+  paymentSummaryTotalWide: {
+    fontSize: FONT_SIZES.display,
+    lineHeight: 34,
+  },
+  paymentActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  paymentActionsWide: {
+    gap: SPACING.lg,
+  },
+  paymentBackButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.gold,
+    backgroundColor: COLORS.surface,
+  },
+  paymentBackText: {
+    ...TYPOGRAPHY.subtitle,
+    color: COLORS.muted,
+  },
+  paymentSubmitButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.gold,
+  },
+  paymentSubmitButtonDisabled: {
+    backgroundColor: COLORS.border,
+  },
+  paymentButtonPressed: {
+    opacity: 0.84,
+  },
+  paymentActionSpacer: {
+    width: 20,
+  },
+  paymentSubmitText: {
+    ...TYPOGRAPHY.label,
+    flex: 1,
+    color: COLORS.ink,
+    textAlign: 'center',
+  },
+  paymentActionTextWide: {
+    ...TYPOGRAPHY.subtitle,
+  },
+  paymentBrand: {
+    alignItems: 'center',
+    marginTop: SPACING.xl,
+    paddingBottom: SPACING.md,
+  },
+  paymentBrandWide: {
+    marginTop: 34,
+  },
+  paymentBrandName: {
+    color: COLORS.bone,
+    fontSize: FONT_SIZES.subtitle,
+    lineHeight: 22,
+    letterSpacing: 2.4,
+  },
+  paymentBrandNameWide: {
+    fontSize: FONT_SIZES.title,
+    lineHeight: 27,
+  },
+  paymentBrandSubtitle: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.muted,
+    letterSpacing: 2.8,
+    marginTop: 1,
+  },
+  paymentBrandOrnament: {
+    width: 42,
+    height: 2,
+    marginTop: SPACING.sm,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.gold,
+  },
+});
