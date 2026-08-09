@@ -13,6 +13,22 @@ import { tamanhoDisponivel } from '../utils/availability';
 
 const CUSTOMER_ORDER_ACTION_WIDTH = 104;
 
+type PointerEventLike = {
+  nativeEvent?: {
+    pageX?: number;
+    pageY?: number;
+    clientX?: number;
+    clientY?: number;
+    pointerId?: number;
+  };
+  currentTarget?: { setPointerCapture?: (pointerId: number) => void };
+  pageX?: number;
+  pageY?: number;
+  clientX?: number;
+  clientY?: number;
+  preventDefault?: () => void;
+};
+
 function CustomerOrderSwipe({
   enabled,
   children,
@@ -68,7 +84,7 @@ function CustomerOrderSwipe({
     onPanResponderTerminationRequest: () => false,
   }), [animateTo, shouldCaptureHorizontalDrag, translateX]);
 
-  const pointerCoordinate = (event: any, axis: 'X' | 'Y') => (
+  const pointerCoordinate = (event: PointerEventLike, axis: 'X' | 'Y') => (
     event?.nativeEvent?.[`page${axis}`]
     ?? event?.nativeEvent?.[`client${axis}`]
     ?? event?.[`page${axis}`]
@@ -77,7 +93,7 @@ function CustomerOrderSwipe({
   );
 
   const webPointerHandlers = Platform.OS === 'web' ? {
-    onPointerDown: (event: any) => {
+    onPointerDown: (event: PointerEventLike) => {
       if (!enabled) return;
       pointerStartRef.current = {
         x: pointerCoordinate(event, 'X'),
@@ -86,9 +102,10 @@ function CustomerOrderSwipe({
       pointerLastXRef.current = 0;
       pointerDraggingRef.current = false;
       dragStartRef.current = openRef.current ? -CUSTOMER_ORDER_ACTION_WIDTH : 0;
-      event.currentTarget?.setPointerCapture?.(event.nativeEvent?.pointerId);
+      const pointerId = event.nativeEvent?.pointerId;
+      if (pointerId != null) event.currentTarget?.setPointerCapture?.(pointerId);
     },
-    onPointerMove: (event: any) => {
+    onPointerMove: (event: PointerEventLike) => {
       if (!enabled || !pointerStartRef.current) return;
       const dx = pointerCoordinate(event, 'X') - pointerStartRef.current.x;
       const dy = pointerCoordinate(event, 'Y') - pointerStartRef.current.y;

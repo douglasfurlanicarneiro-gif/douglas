@@ -278,7 +278,9 @@ export const deletePedido = (id: string) => request<{ status: string }>(`/pedido
 
 // Opinioes
 export const listOpinioes = () => request<Opiniao[]>('/opinioes');
+export const listOpinioesAdmin = () => request<Opiniao[]>('/opinioes/admin', {}, true);
 export const createOpiniao = (data: Omit<Opiniao, 'id' | 'data'>) => request<Opiniao>('/opinioes', { method: 'POST', body: JSON.stringify(data) });
+export const moderateOpiniao = (id: string, aprovada: boolean) => request<Opiniao>(`/opinioes/${id}/moderacao`, { method: 'PATCH', body: JSON.stringify({ aprovada }) }, true);
 export const deleteOpiniao = (id: string) => request<{ status: string }>(`/opinioes/${id}`, { method: 'DELETE' }, true);
 
 // Vitrine

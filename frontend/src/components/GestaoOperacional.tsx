@@ -33,6 +33,8 @@ import type {
   RentabilidadeItem,
 } from '../types';
 
+type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+
 const DEFAULT_COSTS: CustosConfig = {
   custoBasePorMl: 0,
   custoValvula: 0,
@@ -83,7 +85,7 @@ function Card({
 }: {
   title: string;
   subtitle?: string;
-  icon: any;
+  icon: FeatherIconName;
   children: React.ReactNode;
   collapsible?: boolean;
   collapsed?: boolean;

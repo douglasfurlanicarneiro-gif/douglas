@@ -18,7 +18,7 @@ import {
   atualizarDisponibilidadeCatalogo,
   getCatalogoEstoqueResumo, completarEstoqueProntaEntrega, zerarEstoqueSobEncomenda,
   listPedidos, createPedido, updatePedido, deletePedido, getClientePorContato,
-  listOpinioes, deleteOpiniao,
+  listOpinioesAdmin, moderateOpiniao, deleteOpiniao,
   listSugestoes, deleteSugestao, listCompras, deleteCompra,
   downloadBackup, getMetricas, resetAllOrders,
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
@@ -28,10 +28,27 @@ import {
 } from '../api';
 import type { RegistroArquivado, SolicitacaoPrivacidade } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
-import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, Perfume, Sugestao } from '../types';
+import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, PedidoItem, Perfume, PriceOption, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
 import { CustosView, FornecedoresView, InsumosView } from './GestaoOperacional';
 import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
+
+type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+type PerfumeFormState = Omit<Perfume, 'id' | 'seq' | 'inspiracao'> & {
+  id?: string;
+  seq?: number;
+  inspiracao?: string;
+};
+type PerfumeSaveData = PerfumeFormState & { inspiracao: string };
+type MovimentoDraft = Omit<Movimento, 'id' | 'origem' | 'data'>;
+type PedidoFormState = Partial<Pedido> & Pick<Pedido, 'cliente' | 'contato' | 'status' | 'observacoes' | 'itens'>;
+type PedidoSaveData = PedidoFormState & {
+  itens: PedidoItem[];
+  subtotalTabela: number;
+  ajusteManual: number;
+  total: number;
+};
+type PedidoEndereco = NonNullable<Pedido['endereco']>;
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'availability' }
@@ -109,7 +126,7 @@ function currentCatalogPrices(perfumes: Perfume[]) {
   return result;
 }
 
-function StatCard({ label, value, icon, alert }: { label: string; value: string | number; icon: any; alert?: boolean }) {
+function StatCard({ label, value, icon, alert }: { label: string; value: string | number; icon: FeatherIconName; alert?: boolean }) {
   return (
     <View style={[styles.statCard, alert && { borderColor: COLORS.rust }]}>
       <Feather name={icon} size={16} color={alert ? COLORS.rust : COLORS.gold} />
@@ -229,7 +246,7 @@ function SystemCard({
   subtitle,
   children,
 }: {
-  icon: any;
+  icon: FeatherIconName;
   title: string;
   subtitle: string;
   children: React.ReactNode;
@@ -257,7 +274,7 @@ function SystemAction({
   disabled,
   badge,
 }: {
-  icon: any;
+  icon: FeatherIconName;
   title: string;
   subtitle: string;
   onPress?: () => void;
@@ -541,8 +558,16 @@ function AvailabilityManager({
   );
 }
 
-function PerfumeForm({ initial, onSave, onCancel }: any) {
-  const [f, setF] = useState<any>(initial ? {
+function PerfumeForm({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial?: Perfume;
+  onSave: (data: PerfumeSaveData) => void;
+  onCancel: () => void;
+}) {
+  const [f, setF] = useState<PerfumeFormState>(initial ? {
     ...initial,
     familias: familiasDoPerfume(initial),
     concentracao: nomeConcentracao(initial.concentracao),
@@ -552,19 +577,22 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
     precos: [{ ml: 30, preco: 0 }], estoqueMinimoMl: 100, publicavel: false, prontaEntrega: false,
     custoEssenciaPorMl: 0, concentracaoPercentual: 25, fornecedorId: '', fornecedorCodigo: '',
   });
-  const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
-  const toggleOcasiao = (value: string) => setF((s: any) => {
+  const set = <K extends keyof PerfumeFormState>(k: K, v: PerfumeFormState[K]) => setF((s) => ({ ...s, [k]: v }));
+  const toggleOcasiao = (value: string) => setF((s) => {
     const atuais = Array.isArray(s.ocasioes) ? s.ocasioes : [];
     return { ...s, ocasioes: atuais.includes(value) ? atuais.filter((item: string) => item !== value) : [...atuais, value] };
   });
-  const toggleFamilia = (value: string) => setF((s: any) => {
+  const toggleFamilia = (value: string) => setF((s) => {
     const atuais = familiasDoPerfume(s);
     const familias = atuais.includes(value) ? atuais.filter((item: string) => item !== value) : [...atuais, value];
     return { ...s, familias, familia: familias[0] || '' };
   });
-  const setPreco = (i: number, k: string, v: any) => setF((s: any) => ({ ...s, precos: s.precos.map((p: any, idx: number) => idx === i ? { ...p, [k]: v } : p) }));
-  const addPreco = () => setF((s: any) => ({ ...s, precos: [...s.precos, { ml: 10, preco: 0 }] }));
-  const rmPreco = (i: number) => setF((s: any) => ({ ...s, precos: s.precos.filter((_: any, idx: number) => idx !== i) }));
+  const setPreco = <K extends keyof PriceOption>(i: number, k: K, v: PriceOption[K]) => setF((s) => ({
+    ...s,
+    precos: s.precos.map((price, idx) => idx === i ? { ...price, [k]: v } : price),
+  }));
+  const addPreco = () => setF((s) => ({ ...s, precos: [...s.precos, { ml: 10, preco: 0 }] }));
+  const rmPreco = (i: number) => setF((s) => ({ ...s, precos: s.precos.filter((_, idx) => idx !== i) }));
   return (
     <View>
       <Field label="Nome do contratipo"><TInput value={f.nome} onChangeText={(v) => set('nome', v)} placeholder="Ex: Âmbar Noturno" testID="perfume-nome" /></Field>
@@ -619,11 +647,11 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
       </Field>
       <View style={{ padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
         <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginBottom: 8 }}>PIRÂMIDE OLFATIVA</Text>
-        {[
+        {([
           { c: COLORS.topNote, label: 'Saída', k: 'notasSaida' },
           { c: COLORS.heartNote, label: 'Coração', k: 'notasCoracao' },
           { c: COLORS.baseNote, label: 'Fundo', k: 'notasFundo' },
-        ].map((row) => (
+        ] as const).map((row) => (
           <View key={row.k} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: row.c }} />
             <TInput style={{ flex: 1 }} value={f[row.k]} onChangeText={(v) => set(row.k, v)} placeholder={`Notas de ${row.label.toLowerCase()}`} />
@@ -631,7 +659,7 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
         ))}
       </View>
       <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginBottom: 6 }}>Tamanhos e preços</Text>
-      {f.precos.map((p: any, i: number) => (
+      {f.precos.map((p, i) => (
         <View key={i} style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 }}>
           <TInput style={{ width: 70 }} keyboardType="numeric" value={String(p.ml)} onChangeText={(v) => setPreco(i, 'ml', Number(v) || 0)} placeholder="ml" />
           <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>ml</Text>
@@ -700,7 +728,15 @@ function PerfumeForm({ initial, onSave, onCancel }: any) {
   );
 }
 
-function MovimentoForm({ perfumes, onSave, onCancel }: any) {
+function MovimentoForm({
+  perfumes,
+  onSave,
+  onCancel,
+}: {
+  perfumes: Perfume[];
+  onSave: (data: MovimentoDraft) => void;
+  onCancel: () => void;
+}) {
   const opcoes = [
     { id: 'entrada', label: 'Entrada', tipo: 'entrada', motivo: 'Entrada de estoque' },
     { id: 'perda', label: 'Perda', tipo: 'saida', motivo: 'Perda ou vazamento' },
@@ -708,7 +744,7 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
     { id: 'ajuste-negativo', label: 'Ajuste −', tipo: 'saida', motivo: 'Ajuste negativo de inventário' },
     { id: 'devolucao', label: 'Devolução', tipo: 'entrada', motivo: 'Devolução ao estoque' },
   ] as const;
-  const [f, setF] = useState({
+  const [f, setF] = useState<MovimentoDraft>({
     perfumeId: perfumes[0]?.id || '',
     tipo: 'entrada',
     quantidadeMl: 100,
@@ -727,7 +763,7 @@ function MovimentoForm({ perfumes, onSave, onCancel }: any) {
     <View>
       <Field label="Perfume">
         <ScrollView style={{ maxHeight: 200 }}>
-          {perfumes.map((p: any) => (
+          {perfumes.map((p) => (
             <Pressable key={p.id} onPress={() => setF({ ...f, perfumeId: p.id })} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border }}>
               <Text style={{ color: f.perfumeId === p.id ? COLORS.gold : COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>Nº{padSeq(p.seq)} · {p.nome}</Text>
             </Pressable>
@@ -847,8 +883,22 @@ function StockCountForm({ perfumes, resumo, initial, onSave, onCancel }: {
   );
 }
 
-function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
-  const [f, setF] = useState<any>(initial || { cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [] });
+function PedidoForm({
+  perfumes,
+  initial,
+  onSave,
+  onCancel,
+  onDelete,
+}: {
+  perfumes: Perfume[];
+  initial?: Pedido;
+  onSave: (data: PedidoSaveData) => void | Promise<void>;
+  onCancel: () => void;
+  onDelete?: (pedido: Pedido) => void | Promise<void>;
+}) {
+  const [f, setF] = useState<PedidoFormState>(initial || {
+    cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [],
+  });
   const pedidoRecebido = Boolean(initial?.id);
   const [valorPersonalizado, setValorPersonalizado] = useState(Boolean(initial?.id || initial?.ajusteManual));
   const [valorFinalInput, setValorFinalInput] = useState(
@@ -859,11 +909,11 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
   const [editandoEndereco, setEditandoEndereco] = useState(false);
   const [recuperandoEndereco, setRecuperandoEndereco] = useState(false);
   const [mensagemEndereco, setMensagemEndereco] = useState('');
-  const set = (k: string, v: any) => setF((s: any) => ({ ...s, [k]: v }));
-  const enderecoVazio = () => ({
+  const set = <K extends keyof PedidoFormState,>(k: K, v: PedidoFormState[K]) => setF((s) => ({ ...s, [k]: v }));
+  const enderecoVazio = (): PedidoEndereco => ({
     cep: '', endereco: '', numero: '', complemento: '', bairro: '', cidade: '', estado: '',
   });
-  const setEndereco = (k: string, v: string) => setF((s: any) => ({
+  const setEndereco = <K extends keyof PedidoEndereco,>(k: K, v: PedidoEndereco[K]) => setF((s) => ({
     ...s,
     endereco: { ...(s.endereco || enderecoVazio()), [k]: v },
   }));
@@ -882,7 +932,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
         setMensagemEndereco('O cadastro deste cliente não possui endereço salvo.');
         return;
       }
-      setF((current: any) => ({ ...current, endereco: { ...enderecoVazio(), ...cliente.endereco } }));
+      setF((current) => ({ ...current, endereco: { ...enderecoVazio(), ...cliente.endereco } }));
       setEditandoEndereco(true);
       setMensagemEndereco('Endereço recuperado do cadastro do cliente. Confira e salve o pedido.');
     } catch {
@@ -893,20 +943,23 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
   };
   const addItem = () => {
     if (!perfumes[0]) return;
-    setF((s: any) => ({ ...s, itens: [...s.itens, { perfumeId: perfumes[0].id, ml: perfumes[0].precos?.[0]?.ml || 30, quantidade: 1 }] }));
+    setF((s) => ({ ...s, itens: [...s.itens, { perfumeId: perfumes[0].id, ml: perfumes[0].precos?.[0]?.ml || 30, quantidade: 1 }] }));
     setSearchingIdx(f.itens.length);
     setQ('');
   };
-  const setItem = (i: number, k: string, v: any) => setF((s: any) => ({ ...s, itens: s.itens.map((it: any, idx: number) => idx === i ? { ...it, [k]: v } : it) }));
-  const rmItem = (i: number) => setF((s: any) => ({ ...s, itens: s.itens.filter((_: any, idx: number) => idx !== i) }));
-  const precoDo = (it: any) => {
+  const setItem = <K extends keyof PedidoItem,>(i: number, k: K, v: PedidoItem[K]) => setF((s) => ({
+    ...s,
+    itens: s.itens.map((it, idx) => idx === i ? { ...it, [k]: v } : it),
+  }));
+  const rmItem = (i: number) => setF((s) => ({ ...s, itens: s.itens.filter((_, idx) => idx !== i) }));
+  const precoDo = (it: PedidoItem) => {
     if (it.precoUnitario != null && Number.isFinite(Number(it.precoUnitario))) {
       return Number(it.precoUnitario);
     }
-    const p = perfumes.find((pf: any) => pf.id === it.perfumeId);
-    return p?.precos.find((pr: any) => pr.ml === Number(it.ml))?.preco || 0;
+    const p = perfumes.find((pf) => pf.id === it.perfumeId);
+    return p?.precos.find((pr) => pr.ml === Number(it.ml))?.preco || 0;
   };
-  const totalProdutos = f.itens.reduce((s: number, it: any) => s + precoDo(it) * it.quantidade, 0);
+  const totalProdutos = f.itens.reduce((sum, item) => sum + precoDo(item) * item.quantidade, 0);
   const totalCalculado = Math.round((totalProdutos + Number(f.frete || 0)) * 100) / 100;
   const valorDigitado = Number(valorFinalInput.replace(',', '.'));
   const valorDigitadoValido = valorFinalInput.trim().length > 0
@@ -916,10 +969,10 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
     ? Math.round(valorDigitado * 100) / 100
     : totalCalculado;
   const ajusteManual = Math.round((total - totalCalculado) * 100) / 100;
-  const pedidoParaSalvar = (status = f.status) => ({
+  const pedidoParaSalvar = (status = f.status): PedidoSaveData => ({
     ...f,
     status,
-    itens: f.itens.map((it: any) => {
+    itens: f.itens.map((it) => {
       const precoUnitario = precoDo(it);
       return {
         ...it,
@@ -931,14 +984,14 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
     ajusteManual,
     total,
   });
-  const filtrados = perfumes.filter((p: any) => p.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
+  const filtrados = perfumes.filter((p) => p.nome.toLowerCase().includes(q.toLowerCase())).slice(0, 40);
   return (
     <View>
       <Field label="Cliente"><TInput value={f.cliente} onChangeText={(v) => set('cliente', v)} testID="pedido-cliente" /></Field>
       <Field label="Contato (opcional)"><TInput value={f.contato} onChangeText={(v) => set('contato', v)} /></Field>
       <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginBottom: 6 }}>Itens do pedido</Text>
-      {f.itens.map((it: any, i: number) => {
-        const p = perfumes.find((pf: any) => pf.id === it.perfumeId);
+      {f.itens.map((it, i) => {
+        const p = perfumes.find((pf) => pf.id === it.perfumeId);
         const editando = searchingIdx === i;
         return (
           <View key={i} style={{ padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.sm }}>
@@ -971,7 +1024,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
                 </View>
                 <ScrollView style={{ maxHeight: 200, borderRadius: 8, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border }} nestedScrollEnabled>
                   {filtrados.length === 0 && <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, padding: 12 }}>Nenhum resultado.</Text>}
-                  {filtrados.map((p2: any) => (
+                  {filtrados.map((p2) => (
                     <Pressable
                       key={p2.id}
                       onPress={() => { setItem(i, 'perfumeId', p2.id); setItem(i, 'ml', p2.precos?.[0]?.ml || 30); setSearchingIdx(null); setQ(''); }}
@@ -990,7 +1043,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.orderChoiceLabel}>TAMANHO ESCOLHIDO</Text>
                   <Text style={styles.orderChoiceValue}>
-                    {it.ml}ml · {brl((p?.precos || []).find((pr: any) => pr.ml === Number(it.ml))?.preco || 0)}
+                    {it.ml}ml · {brl((p?.precos || []).find((pr) => pr.ml === Number(it.ml))?.preco || 0)}
                   </Text>
                 </View>
                 <View style={styles.orderQuantity}>
@@ -1000,7 +1053,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
               </View>
             ) : (
               <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginTop: SPACING.sm }}>
-                {(p?.precos || []).map((pr: any) => (
+                {(p?.precos || []).map((pr) => (
                   <Pressable key={pr.ml} onPress={() => setItem(i, 'ml', pr.ml)} style={[styles.miniChip, Number(it.ml) === pr.ml && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
                     <Text style={{ color: Number(it.ml) === pr.ml ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{pr.ml}ml · {brl(pr.preco)}</Text>
                   </Pressable>
@@ -1132,7 +1185,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
                       {recuperandoEndereco ? 'Buscando…' : 'Buscar no cadastro do cliente'}
                     </Text>
                   </Pressable>
-                  <Pressable onPress={() => { setF((current: any) => ({ ...current, endereco: enderecoVazio() })); setEditandoEndereco(true); }} testID="pedido-adicionar-endereco">
+                  <Pressable onPress={() => { setF((current) => ({ ...current, endereco: enderecoVazio() })); setEditandoEndereco(true); }} testID="pedido-adicionar-endereco">
                     <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label }}>Adicionar manualmente</Text>
                   </Pressable>
                 </View>
@@ -1266,7 +1319,7 @@ function PedidoForm({ perfumes, initial, onSave, onCancel, onDelete }: any) {
       )}
       {pedidoRecebido && (initial?.status === 'cancelado' || initial?.status === 'entregue') && (
         <Pressable
-          onPress={() => onDelete(initial)}
+          onPress={() => onDelete?.(initial)}
           style={styles.deleteAdminOrderButton}
           testID="pedido-arquivar"
         >
@@ -1372,7 +1425,7 @@ export function Atelie({
         optional('catálogo', listPerfumes()),
         optional('movimentos', listMovimentos()),
         optional('pedidos', listPedidos()),
-        optional('opiniões', listOpinioes()),
+        optional('opiniões', listOpinioesAdmin()),
         optional('sugestões', listSugestoes()),
         optional('compras', listCompras()),
         optional('estoque', estoque),
@@ -1669,9 +1722,12 @@ export function Atelie({
     return totais;
   }, { saldo: 0, reservado: 0, disponivel: 0 });
   const pendentes = pedidosUnificados.filter((p) => p.status === 'pendente').length;
-  const notaMedia = opinioes.length ? (opinioes.reduce((s, o) => s + o.nota, 0) / opinioes.length).toFixed(1) : '–';
+  const opinioesAprovadas = opinioes.filter((opiniao) => opiniao.aprovada === true);
+  const notaMedia = opinioesAprovadas.length
+    ? (opinioesAprovadas.reduce((s, o) => s + o.nota, 0) / opinioesAprovadas.length).toFixed(1)
+    : '–';
 
-  const doSavePerfume = async (data: any) => {
+  const doSavePerfume = async (data: PerfumeSaveData) => {
     if (data.id) await updatePerfume(data.id, data);
     else await createPerfume(data);
     setSheet(null); load();
@@ -1690,7 +1746,7 @@ export function Atelie({
     });
     load();
   };
-  const doMov = async (data: any) => { await createMovimento(data); setSheet(null); load(); };
+  const doMov = async (data: MovimentoDraft) => { await createMovimento(data); setSheet(null); load(); };
   const doStockCount = async (data: { perfumeId: string; quantidadeFisicaMl: number; saldoEsperadoMl: number; motivo: string }) => {
     try {
       const result = await conferirEstoque(data);
@@ -1764,7 +1820,7 @@ export function Atelie({
       confirmLabel: 'Salvar disponibilidade',
     });
   };
-  const pedidoPayload = (data: any) => ({
+  const pedidoPayload = (data: PedidoSaveData | Pedido): Omit<Pedido, 'id' | 'seq' | 'criadoEm'> => ({
     cliente: data.cliente,
     contato: data.contato || '',
     status: data.status,
@@ -1778,7 +1834,7 @@ export function Atelie({
       cidade: String(data.endereco.cidade || '').trim(),
       estado: String(data.endereco.estado || '').trim().toUpperCase(),
     } : undefined,
-    itens: (data.itens || []).map((item: any) => ({
+    itens: data.itens.map((item) => ({
       perfumeId: item.perfumeId,
       ml: Number(item.ml),
       quantidade: Number(item.quantidade) || 1,
@@ -1824,19 +1880,19 @@ export function Atelie({
     Linking.openURL(webUrl)
       .catch(() => setSheet({ type: 'info', label: 'Não foi possível abrir o WhatsApp.' }));
   };
-  const persistPedido = async (data: any, previous?: Pedido | null) => {
+  const persistPedido = async (data: PedidoSaveData, previous?: Pedido | null) => {
     const saved = data.id
       ? await updatePedido(data.id, pedidoPayload(data))
-      : await createPedido(pedidoPayload(data) as any);
+      : await createPedido(pedidoPayload(data));
     await load();
     if (!offerWhatsAppStatusUpdate(saved, previous?.status)) setSheet(null);
   };
-  const doSavePedido = async (data: any) => {
+  const doSavePedido = async (data: PedidoSaveData) => {
     const anterior = data.id ? pedidos.find((pedido) => pedido.id === data.id) : null;
     if (anterior && anterior.status !== 'cancelado' && data.status === 'cancelado') {
       setSheet({
         type: 'confirm',
-        label: `Cancelar o pedido Nº ${padSeq(data.seq)} de ${data.cliente}? A reserva ou a baixa automática do estoque será liberada.`,
+        label: `Cancelar o pedido Nº ${padSeq(data.seq || 0)} de ${data.cliente}? A reserva ou a baixa automática do estoque será liberada.`,
         onConfirm: () => persistPedido(data, anterior),
         confirmLabel: 'Cancelar pedido',
         danger: true,
@@ -1857,6 +1913,10 @@ export function Atelie({
     });
   };
   const doDelOpiniao = async (id: string) => { await deleteOpiniao(id); setSheet(null); load(); };
+  const doModerateOpiniao = async (id: string, aprovada: boolean) => {
+    await moderateOpiniao(id, aprovada);
+    await load();
+  };
   const doDelSugestao = async (id: string) => { await deleteSugestao(id); load(); };
   const doDelCompra = async (id: string) => { await deleteCompra(id); setSheet(null); load(); };
   const abrirPedido = (pedido: PedidoPainel) => {
@@ -2112,7 +2172,7 @@ export function Atelie({
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                    {p.precos.map((pr: any, i: number) => (
+                    {p.precos.map((pr, i) => (
                       <Text key={i} style={{ color: COLORS.bone, fontSize: FONT_SIZES.caption }}>{pr.ml}ml · {brl(pr.preco)}</Text>
                     ))}
                   </View>
@@ -2381,7 +2441,12 @@ export function Atelie({
             return (
               <View key={o.id} style={styles.rowCard}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p?.nome || 'Perfume removido'}</Text>
+                  <View style={{ flex: 1, paddingRight: SPACING.sm }}>
+                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p?.nome || 'Perfume removido'}</Text>
+                    <Text style={{ color: o.aprovada ? COLORS.sage : COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 2 }}>
+                      {o.aprovada ? 'PUBLICADA NA VITRINE' : 'AGUARDANDO ANÁLISE'}
+                    </Text>
+                  </View>
                   <Pressable onPress={() => setSheet({ type: 'confirm', label: 'Arquivar esta avaliação? Ela deixará de aparecer, mas o registro será preservado.', onConfirm: () => doDelOpiniao(o.id), confirmLabel: 'Arquivar avaliação' })} hitSlop={8} accessibilityLabel={`Arquivar avaliação de ${o.cliente || 'cliente anônimo'}`}>
                     <Feather name="archive" size={14} color={COLORS.muted} />
                   </Pressable>
@@ -2389,6 +2454,27 @@ export function Atelie({
                 <View style={{ marginTop: 4 }}><Stars value={o.nota} size={14} /></View>
                 {!!o.cliente && <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginTop: 4 }}>{o.cliente}</Text>}
                 {!!o.comentario && <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, marginTop: 4 }}>{o.comentario}</Text>}
+                <View style={{ flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.md }}>
+                  {!o.aprovada ? (
+                    <Pressable
+                      onPress={() => doModerateOpiniao(o.id, true)}
+                      style={[styles.systemInlineButton, { flex: 1, justifyContent: 'center' }]}
+                      accessibilityLabel={`Aprovar avaliação de ${o.cliente || 'cliente anônimo'}`}
+                    >
+                      <Feather name="check" size={14} color={COLORS.sage} />
+                      <Text style={[styles.systemInlineButtonText, { color: COLORS.sage }]}>Aprovar</Text>
+                    </Pressable>
+                  ) : (
+                    <Pressable
+                      onPress={() => doModerateOpiniao(o.id, false)}
+                      style={[styles.systemInlineButton, { flex: 1, justifyContent: 'center' }]}
+                      accessibilityLabel={`Ocultar avaliação de ${o.cliente || 'cliente anônimo'}`}
+                    >
+                      <Feather name="eye-off" size={14} color={COLORS.gold} />
+                      <Text style={styles.systemInlineButtonText}>Ocultar da vitrine</Text>
+                    </Pressable>
+                  )}
+                </View>
               </View>
             );
           })}

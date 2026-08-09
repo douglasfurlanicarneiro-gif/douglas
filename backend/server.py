@@ -102,6 +102,7 @@ async def _criar_indices():
     await db.movimentos.create_index("origem")
     await db.operacoes_sistema.create_index("data")
     await db.opinioes.create_index([("arquivadoEm", 1), ("data", -1)])
+    await db.opinioes.create_index([("aprovada", 1), ("arquivadoEm", 1), ("data", -1)])
     await db.sugestoes.create_index([("arquivadoEm", 1), ("data", -1)])
     await db.clientes.create_index("contato")
     await db.fornecedores.create_index("nome")

@@ -458,18 +458,9 @@ async def salvar_configuracoes(
     _: str = Depends(require_atelie_auth),
 ):
     db = get_db()
-    atuais = _configuracoes_completas(
-        await db.configuracoes.find_one({"_id": "loja"}) or {}
-    )
     enviados = payload.model_dump()
     dados = {
-        chave: (
-            valor.strip()
-            if isinstance(valor, str) and valor.strip()
-            else atuais[chave]
-            if isinstance(valor, str)
-            else valor
-        )
+        chave: valor.strip() if isinstance(valor, str) else valor
         for chave, valor in enviados.items()
     }
     dados["nomeLoja"] = dados["nomeLoja"] or "L’Essence Furlani"

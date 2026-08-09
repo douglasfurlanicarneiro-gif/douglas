@@ -756,7 +756,7 @@ export function Vitrine({
         comentario: reviewForm.comentario,
       });
       setReviewItem(null); setReviewForm({ cliente: '', nota: 5, comentario: '' });
-      setInfo('Avaliação enviada! Obrigado.');
+      setInfo('Avaliação recebida! Ela aparecerá na vitrine após a análise da nossa equipe.');
     } catch { setInfo('Não foi possível enviar. Tente novamente.'); }
     finally { setEnviando(false); }
   };

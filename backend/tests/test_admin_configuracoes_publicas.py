@@ -1,4 +1,7 @@
-from routers.admin import ConfiguracoesLojaPublica
+import asyncio
+
+from routers import admin
+from routers.admin import ConfiguracoesLojaIn, ConfiguracoesLojaPublica
 
 
 def test_configuracao_publica_nao_expoe_chave_pix():
@@ -14,3 +17,34 @@ def test_configuracao_publica_nao_expoe_chave_pix():
 
     assert "pix" not in configuracao
     assert configuracao["pixManualAtivo"] is True
+
+
+def test_canais_podem_ser_limpos_intencionalmente(monkeypatch):
+    class Collection:
+        saved = None
+
+        async def update_one(self, _query, update, **_kwargs):
+            self.saved = update["$set"]
+
+    class Db:
+        configuracoes = Collection()
+
+    db = Db()
+    monkeypatch.setattr(admin, "get_db", lambda: db)
+    payload = ConfiguracoesLojaIn(
+        nomeLoja="Loja",
+        whatsapp="",
+        instagram="",
+        email="",
+        logoUrl="",
+        pix="",
+        infinitePayHandle="",
+        cnpj="",
+    )
+
+    resultado = asyncio.run(admin.salvar_configuracoes(payload, "admin"))
+
+    assert resultado["whatsapp"] == ""
+    assert resultado["instagram"] == ""
+    assert resultado["email"] == ""
+    assert db.configuracoes.saved["logoUrl"] == ""

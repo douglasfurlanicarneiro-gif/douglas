@@ -21,8 +21,21 @@ class OpiniaoIn(BaseModel):
     comentario: str = Field(default="", max_length=1000)
 
 
+class ModeracaoOpiniaoIn(BaseModel):
+    aprovada: bool
+
+
 @router.get("")
 async def listar_opinioes():
+    db = get_db()
+    opinioes = await db.opinioes.find(
+        {"arquivadoEm": None, "aprovada": True}
+    ).sort("data", -1).to_list(2000)
+    return [serialize(o) for o in opinioes]
+
+
+@router.get("/admin")
+async def listar_opinioes_admin(_: str = Depends(require_atelie_auth)):
     db = get_db()
     opinioes = await db.opinioes.find(
         {"arquivadoEm": None}
@@ -37,9 +50,45 @@ async def criar_opiniao(payload: OpiniaoIn):
     doc["cliente"] = doc["cliente"].strip()
     doc["comentario"] = doc["comentario"].strip()
     doc["data"] = datetime.now(timezone.utc).isoformat()
+    doc["aprovada"] = False
+    doc["moderadaEm"] = None
     resultado = await db.opinioes.insert_one(doc)
     nova = await db.opinioes.find_one({"_id": resultado.inserted_id})
     return serialize(nova)
+
+
+@router.patch("/{opiniao_id}/moderacao")
+async def moderar_opiniao(
+    opiniao_id: str,
+    payload: ModeracaoOpiniaoIn,
+    _: str = Depends(require_atelie_auth),
+):
+    db = get_db()
+    try:
+        oid = ObjectId(opiniao_id)
+    except InvalidId:
+        raise HTTPException(status_code=400, detail="Id de opinião inválido.")
+    agora = datetime.now(timezone.utc).isoformat()
+    resultado = await db.opinioes.update_one(
+        {"_id": oid, "arquivadoEm": None},
+        {"$set": {"aprovada": payload.aprovada, "moderadaEm": agora}},
+    )
+    if resultado.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Opinião não encontrada.")
+    await registrar_auditoria(
+        db,
+        acao="aprovar" if payload.aprovada else "ocultar",
+        recurso="opiniao",
+        recurso_id=opiniao_id,
+        titulo="Avaliação aprovada" if payload.aprovada else "Avaliação ocultada",
+        detalhes=(
+            "Avaliação liberada para exibição na vitrine."
+            if payload.aprovada
+            else "Avaliação retirada da exibição pública sem apagar o registro."
+        ),
+    )
+    atualizada = await db.opinioes.find_one({"_id": oid})
+    return serialize(atualizada)
 
 
 @router.delete("/{opiniao_id}")

@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { ScrollViewStyleReset } from "expo-router/html";
 import type { PropsWithChildren } from "react";
 
@@ -10,14 +9,43 @@ export default function Root({ children }: PropsWithChildren) {
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
         <title>L’Essence Furlani</title>
         <meta
+          name="description"
+          content="Conheça a vitrine da L’Essence Furlani e encontre perfumes inspirados para diferentes estilos, notas e ocasiões."
+        />
+        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <meta name="referrer" content="strict-origin-when-cross-origin" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no"
         />
         <meta name="theme-color" content="#D5CCBB" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="L’Essence Furlani" />
         <link rel="manifest" href="/manifest.json" />
+        <link rel="canonical" href="https://lessence-furlani-vitrine.onrender.com/" />
+        <meta property="og:locale" content="pt_BR" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="L’Essence Furlani" />
+        <meta property="og:title" content="L’Essence Furlani · Perfumaria autoral" />
+        <meta
+          property="og:description"
+          content="Encontre perfumes inspirados para diferentes estilos, notas e ocasiões."
+        />
+        <meta property="og:url" content="https://lessence-furlani-vitrine.onrender.com/" />
+        <meta property="og:image" content="https://lessence-furlani-vitrine.onrender.com/app-icon-512-light.png" />
+        <meta property="og:image:width" content="512" />
+        <meta property="og:image:height" content="512" />
+        <meta property="og:image:alt" content="Logo da L’Essence Furlani" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="L’Essence Furlani · Perfumaria autoral" />
+        <meta
+          name="twitter:description"
+          content="Encontre perfumes inspirados para diferentes estilos, notas e ocasiões."
+        />
+        <meta name="twitter:image" content="https://lessence-furlani-vitrine.onrender.com/app-icon-512-light.png" />
         <link rel="dns-prefetch" href="//lessence-furlani-api.onrender.com" />
         <link rel="preconnect" href="https://lessence-furlani-api.onrender.com" crossOrigin="anonymous" />
         <link rel="icon" type="image/png" sizes="192x192" href="/favicon-light.png?v=2" />

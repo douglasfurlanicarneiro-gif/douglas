@@ -161,6 +161,8 @@ export type Opiniao = {
   nota: number;
   comentario: string;
   data: string;
+  aprovada?: boolean;
+  moderadaEm?: string | null;
 };
 
 export type Sugestao = {

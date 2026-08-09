@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://lessence-furlani-vitrine.onrender.com/sitemap.xml
