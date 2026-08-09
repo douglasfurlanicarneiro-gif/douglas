@@ -1,5 +1,5 @@
 """Helpers pequenos e reaproveitados por várias rotas."""
-from motor.motor_asyncio import AsyncIOMotorDatabase
+from pymongo.asynchronous.database import AsyncDatabase
 from pymongo import ReturnDocument
 
 
@@ -53,7 +53,7 @@ def pagamento_publico(pagamento: dict | None) -> dict | None:
     }
 
 
-async def next_seq(db: AsyncIOMotorDatabase, nome: str) -> int:
+async def next_seq(db: AsyncDatabase, nome: str) -> int:
     """Contador atômico por coleção (usado para os números sequenciais
     "Nº 007" exibidos no catálogo e nos pedidos)."""
     # Bancos importados ou restaurados podem ter o contador atras do maior
@@ -105,7 +105,7 @@ def planejar_reparo_sequencias(documentos: list[dict]) -> tuple[list[tuple[objec
     return reparos, proximo
 
 
-async def reparar_sequencias(db: AsyncIOMotorDatabase, nome: str) -> int:
+async def reparar_sequencias(db: AsyncDatabase, nome: str) -> int:
     """Corrige sequencias duplicadas sem renumerar o catalogo inteiro."""
     colecao = getattr(db, nome)
     documentos = await colecao.find({}, {"_id": 1, "seq": 1}).to_list(100_000)

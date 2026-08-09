@@ -141,7 +141,7 @@ async def _saldos(db, ids: list[str] | None = None) -> dict[str, float]:
         }
     })
     resultado: dict[str, float] = {}
-    async for linha in db.movimentos_insumos.aggregate(pipeline):
+    async for linha in await db.movimentos_insumos.aggregate(pipeline):
         resultado[str(linha["_id"])] = float(linha.get("total", 0) or 0)
     return resultado
 

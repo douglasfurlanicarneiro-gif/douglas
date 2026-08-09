@@ -125,7 +125,7 @@ async def conferir_estoque(payload: ConferenciaEstoqueIn, _: str = Depends(requi
             {"$match": {"perfumeId": payload.perfumeId}},
             *_PIPELINE_ESTOQUE,
         ]
-        async for linha in db.movimentos.aggregate(pipeline):
+        async for linha in await db.movimentos.aggregate(pipeline):
             saldo_atual = int(linha["total"])
 
         if payload.saldoEsperadoMl is not None and payload.saldoEsperadoMl != saldo_atual:
@@ -239,7 +239,7 @@ async def apagar_movimento(movimento_id: str, _: str = Depends(require_atelie_au
 async def mapa_estoque(_: str = Depends(require_atelie_auth)):
     db = get_db()
     mapa: dict[str, int] = {}
-    async for linha in db.movimentos.aggregate(_PIPELINE_ESTOQUE):
+    async for linha in await db.movimentos.aggregate(_PIPELINE_ESTOQUE):
         mapa[linha["_id"]] = linha["total"]
     return mapa
 

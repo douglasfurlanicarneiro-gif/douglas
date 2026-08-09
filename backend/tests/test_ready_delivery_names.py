@@ -75,7 +75,7 @@ class _MovimentosCollection:
     def __init__(self):
         self.inserted = []
 
-    def aggregate(self, _pipeline):
+    async def aggregate(self, _pipeline):
         return _AsyncRows([
             {"_id": "sob-1", "total": 1000},
             {"_id": "sob-2", "total": 0},

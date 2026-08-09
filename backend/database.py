@@ -3,14 +3,15 @@
 Toda rota deve pegar o banco por `get_db()` em vez de criar seu próprio
 client — evita abrir uma conexão nova a cada request.
 """
-from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
+from pymongo import AsyncMongoClient
+from pymongo.asynchronous.database import AsyncDatabase
 
 from config import DB_NAME, MONGO_URL
 
-_client: AsyncIOMotorClient | None = None
+_client: AsyncMongoClient | None = None
 
 
-def get_client() -> AsyncIOMotorClient:
+def get_client() -> AsyncMongoClient:
     global _client
     if _client is None:
         if not MONGO_URL:
@@ -18,7 +19,7 @@ def get_client() -> AsyncIOMotorClient:
                 "MONGO_URL não configurado. Defina essa variável de ambiente "
                 "(no Render: Environment) apontando para o cluster MongoDB."
             )
-        _client = AsyncIOMotorClient(
+        _client = AsyncMongoClient(
             MONGO_URL,
             serverSelectionTimeoutMS=10_000,
             connectTimeoutMS=10_000,
@@ -27,13 +28,13 @@ def get_client() -> AsyncIOMotorClient:
     return _client
 
 
-def get_db() -> AsyncIOMotorDatabase:
+def get_db() -> AsyncDatabase:
     return get_client()[DB_NAME]
 
 
-def close_client() -> None:
+async def close_client() -> None:
     """Fecha o pool compartilhado durante o encerramento do servidor."""
     global _client
     if _client is not None:
-        _client.close()
+        await _client.close()
         _client = None

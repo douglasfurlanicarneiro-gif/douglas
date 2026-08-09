@@ -57,7 +57,7 @@ async def listar_fornecedores(_: str = Depends(require_atelie_auth)):
     ids = [str(item["_id"]) for item in fornecedores]
     contagens: dict[str, int] = {item: 0 for item in ids}
     if ids:
-        async for linha in db.cotacoes_fornecedores.aggregate([
+        async for linha in await db.cotacoes_fornecedores.aggregate([
             {"$match": {"fornecedorId": {"$in": ids}, "arquivadoEm": None}},
             {"$group": {"_id": "$fornecedorId", "total": {"$sum": 1}}},
         ]):

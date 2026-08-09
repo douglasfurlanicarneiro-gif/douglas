@@ -45,7 +45,7 @@ class DisponibilidadeIn(BaseModel):
 
 async def _estoque_atual(db) -> dict[str, int]:
     estoque: dict[str, int] = {}
-    async for linha in db.movimentos.aggregate(_STOCK_PIPELINE):
+    async for linha in await db.movimentos.aggregate(_STOCK_PIPELINE):
         estoque[str(linha["_id"])] = int(linha.get("total", 0))
     return estoque
 

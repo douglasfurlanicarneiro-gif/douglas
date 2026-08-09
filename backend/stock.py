@@ -103,7 +103,7 @@ def quantidades_por_perfume(
 
 async def mapa_saldo_fisico(db) -> dict[str, int]:
     saldo: dict[str, int] = {}
-    async for linha in db.movimentos.aggregate(STOCK_PIPELINE):
+    async for linha in await db.movimentos.aggregate(STOCK_PIPELINE):
         saldo[str(linha["_id"])] = int(linha.get("total", 0))
     return saldo
 

@@ -170,7 +170,7 @@ async def lifespan(_: FastAPI):
         bootstrap_task.cancel()
         with suppress(asyncio.CancelledError):
             await bootstrap_task
-    close_client()
+    await close_client()
 
 
 app = FastAPI(title="L’Essence Furlani API", lifespan=lifespan)
