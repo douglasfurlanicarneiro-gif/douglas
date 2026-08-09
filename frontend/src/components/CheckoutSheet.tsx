@@ -659,10 +659,7 @@ export function CheckoutSheet({
             </Field>
 
             <View style={[styles.paymentSummary, isWide && styles.paymentSummaryWide]}>
-              <View style={styles.paymentSummaryRow}>
-                <Text style={styles.paymentSummaryLabel}>Produtos</Text>
-                <Text style={styles.paymentSummaryValue}>{brl(subtotal)}</Text>
-              </View>
+              <Text style={styles.paymentSummaryLabel}>Produtos</Text>
               <View style={styles.paymentProductList}>
                 {items.map((item) => (
                   <View key={`${item.perfume.id}-${item.option.ml}`} style={styles.paymentProductRow}>
