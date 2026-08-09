@@ -1488,8 +1488,7 @@ export function Vitrine({
         {reviewItem && (
           <View>
             <View style={{ padding: SPACING.md, borderRadius: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
-              <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(reviewItem.seq)}</Text>
-              <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '500' }}>{reviewItem.nome}</Text>
+              <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '600', textAlign: 'center' }}>{reviewItem.nome}</Text>
             </View>
             <Field label="Seu nome (opcional)"><TInput value={reviewForm.cliente} onChangeText={(v) => setReviewForm({ ...reviewForm, cliente: v })} testID="review-cliente" /></Field>
             <Field label="Nota"><Stars value={reviewForm.nota} onChange={(n) => setReviewForm({ ...reviewForm, nota: n })} size={26} /></Field>

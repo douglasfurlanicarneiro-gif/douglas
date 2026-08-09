@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, TextInputProps, TextStyle } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
@@ -83,10 +83,24 @@ export function EmptyState({ text }: { text: string }) {
 
 export function Stars({ value, onChange, size = 16 }: { value: number; onChange?: (n: number) => void; size?: number }) {
   return (
-    <View style={{ flexDirection: 'row', gap: 4 }}>
+    <View style={{ flexDirection: 'row', gap: 6 }}>
       {[1, 2, 3, 4, 5].map((n) => (
-        <Pressable key={n} onPress={() => onChange?.(n)} disabled={!onChange} hitSlop={4} testID={`star-${n}`}>
-          <Feather name="star" size={size} color={n <= value ? COLORS.gold : COLORS.muted} style={{ opacity: n <= value ? 1 : 0.6 }} />
+        <Pressable
+          key={n}
+          onPress={() => onChange?.(n)}
+          disabled={!onChange}
+          hitSlop={4}
+          testID={`star-${n}`}
+          accessibilityRole={onChange ? 'button' : undefined}
+          accessibilityLabel={`${n} estrela${n > 1 ? 's' : ''}`}
+          accessibilityState={{ selected: n === value }}
+        >
+          <FontAwesome
+            name={n <= value ? 'star' : 'star-o'}
+            size={size}
+            color={n <= value ? COLORS.gold : COLORS.muted}
+            style={{ opacity: n <= value ? 1 : 0.55 }}
+          />
         </Pressable>
       ))}
     </View>
