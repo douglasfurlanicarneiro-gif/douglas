@@ -11,6 +11,7 @@ import { Chip, PrimaryButton, SecondaryButton, TInput } from './atoms';
 import { DEFAULT_STORE_CONFIG, whatsappNumber } from '../storeConfig';
 import { AppText as Text } from './Typography';
 import { tamanhoDisponivel } from '../utils/availability';
+import { openInfinitePayCheckout } from '../utils/paymentCheckout';
 
 const CUSTOMER_ORDER_ACTION_WIDTH = 104;
 
@@ -390,6 +391,8 @@ export function OrdersSheet({
   const [cancellingCode, setCancellingCode] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState('');
   const [removeConfirmCode, setRemoveConfirmCode] = useState<string | null>(null);
+  const [paymentOpeningCode, setPaymentOpeningCode] = useState<string | null>(null);
+  const [paymentErrorCode, setPaymentErrorCode] = useState<string | null>(null);
   const supportNumber = whatsappNumber(supportWhatsapp);
   const currentStoreName = storeName.trim() || DEFAULT_STORE_CONFIG.nomeLoja;
 
@@ -487,6 +490,21 @@ export function OrdersSheet({
     Linking.openURL(`https://wa.me/${supportNumber}?text=${encodeURIComponent(message)}`).catch(() => undefined);
   };
 
+  const continuePayment = async (order: Acompanhamento) => {
+    const checkoutUrl = order.pagamento?.checkoutUrl?.trim();
+    if (!checkoutUrl) return;
+
+    setPaymentOpeningCode(order.codigoAcompanhamento);
+    setPaymentErrorCode(null);
+    try {
+      await openInfinitePayCheckout(checkoutUrl);
+    } catch {
+      setPaymentErrorCode(order.codigoAcompanhamento);
+    } finally {
+      setPaymentOpeningCode(null);
+    }
+  };
+
   const cancelOrder = async (order: Acompanhamento) => {
     setCancellingCode(order.codigoAcompanhamento);
     setCancelError('');
@@ -543,6 +561,12 @@ export function OrdersSheet({
       {!loading && orders.length > 0 && recovery}
       {!loading && orders.map((order) => {
         const status = STATUS.find((item) => item.id === order.status) || STATUS[0];
+        const canContinuePayment = Boolean(
+          order.status === 'pendente'
+          && order.pagamento?.provedor === 'infinitepay'
+          && order.pagamento?.status !== 'pago'
+          && order.pagamento?.checkoutUrl?.trim(),
+        );
         return (
           <CustomerOrderSwipe
             key={order.codigoAcompanhamento}
@@ -602,6 +626,38 @@ export function OrdersSheet({
                 </View>
               );
             })}
+            {canContinuePayment && (
+              <Pressable
+                onPress={() => continuePayment(order)}
+                disabled={paymentOpeningCode === order.codigoAcompanhamento}
+                style={({ pressed }) => [
+                  styles.continuePaymentButton,
+                  pressed && styles.continuePaymentButtonPressed,
+                  paymentOpeningCode === order.codigoAcompanhamento && styles.continuePaymentButtonDisabled,
+                ]}
+                testID={`order-continue-payment-${order.codigoAcompanhamento}`}
+                accessibilityRole="link"
+                accessibilityLabel={`Continuar pagamento do pedido ${String(order.seq || 0).padStart(3, '0')} na InfinitePay`}
+                accessibilityState={{ disabled: paymentOpeningCode === order.codigoAcompanhamento }}
+              >
+                <Feather name="credit-card" size={18} color={COLORS.ink} />
+                <View style={styles.continuePaymentCopy}>
+                  <Text style={styles.continuePaymentTitle}>
+                    {paymentOpeningCode === order.codigoAcompanhamento ? 'Abrindo pagamento…' : 'Continuar pagamento'}
+                  </Text>
+                  <Text style={styles.continuePaymentSubtitle}>Concluir com Pix ou cartão na InfinitePay</Text>
+                </View>
+                <Feather name="arrow-up-right" size={18} color={COLORS.ink} />
+              </Pressable>
+            )}
+            {paymentErrorCode === order.codigoAcompanhamento && (
+              <View style={styles.paymentError} accessibilityRole="alert">
+                <Feather name="alert-circle" size={15} color={COLORS.rust} />
+                <Text style={styles.paymentErrorText}>
+                  Não foi possível abrir o pagamento. Tente novamente ou fale conosco.
+                </Text>
+              </View>
+            )}
             {!!supportNumber && (
               <Pressable
                 onPress={() => talkAboutOrder(order)}
@@ -765,8 +821,16 @@ const styles = StyleSheet.create({
   timelineDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   timelineText: { color: COLORS.bone, fontSize: FONT_SIZES.label, flex: 1 },
   timelineDate: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
-  whatsappButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: SPACING.md, marginTop: SPACING.md, marginBottom: 8, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
-  whatsappButtonText: { color: COLORS.ink, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  continuePaymentButton: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SPACING.md, paddingVertical: 10, marginTop: SPACING.md, marginBottom: 8, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
+  continuePaymentButtonPressed: { opacity: 0.86 },
+  continuePaymentButtonDisabled: { opacity: 0.62 },
+  continuePaymentCopy: { flex: 1 },
+  continuePaymentTitle: { color: COLORS.ink, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  continuePaymentSubtitle: { color: COLORS.ink, fontSize: FONT_SIZES.caption, marginTop: 2, opacity: 0.78 },
+  paymentError: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingHorizontal: SPACING.sm, marginBottom: 8 },
+  paymentErrorText: { flex: 1, color: COLORS.rust, fontSize: FONT_SIZES.caption, lineHeight: 17 },
+  whatsappButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: SPACING.md, marginTop: SPACING.md, marginBottom: 8, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
+  whatsappButtonText: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
   cancelOrderLink: { minHeight: 42, alignItems: 'center', justifyContent: 'center', marginTop: 5 },
   cancelOrderLinkText: { color: COLORS.rust, fontSize: FONT_SIZES.label, fontWeight: '600' },
   cancelConfirm: { marginTop: SPACING.sm, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '70', backgroundColor: COLORS.surface },

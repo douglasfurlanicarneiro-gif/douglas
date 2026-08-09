@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
 import { storage } from '../utils/storage';
+import { openInfinitePayCheckout } from '../utils/paymentCheckout';
 import type { CheckoutPayload, Compra, OpcaoFrete, Perfume, PriceOption } from '../types';
 import { brl, COLORS, SPACING, FONT_SIZES, RADIUS, TYPOGRAPHY } from '../theme';
 import { BottomSheet } from './BottomSheet';
@@ -376,21 +377,7 @@ export function CheckoutSheet({
       checkoutAttemptRef.current = null;
       await storage.removeItem(CHECKOUT_ATTEMPT_KEY);
       if (order.pagamento?.checkoutUrl) {
-        const checkoutUrl = order.pagamento.checkoutUrl;
-        const parsed = new URL(checkoutUrl);
-        const host = parsed.hostname.toLowerCase();
-        const seguro = parsed.protocol === 'https:' && (
-          host === 'infinitepay.com.br'
-          || host.endsWith('.infinitepay.com.br')
-          || host === 'infinitepay.io'
-          || host.endsWith('.infinitepay.io')
-        );
-        if (!seguro) throw new Error('Endereço de pagamento inválido.');
-        if (Platform.OS === 'web' && typeof window !== 'undefined') {
-          window.location.assign(checkoutUrl);
-        } else {
-          await Linking.openURL(checkoutUrl);
-        }
+        await openInfinitePayCheckout(order.pagamento.checkoutUrl);
       }
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) {
