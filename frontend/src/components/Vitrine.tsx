@@ -174,6 +174,7 @@ function VitrineCard({
   const { width } = useWindowDimensions();
   const wideCard = width >= 760;
   const narrowCard = width < 380;
+  const compactTypography = width < 430;
   const ocasioes = item.ocasioes || [];
   const familias = familiasDoPerfume(item);
   const familiasResumo = resumirCategorias(familias, 2, 'família', 'famílias');
@@ -224,7 +225,7 @@ function VitrineCard({
             accessible={false}
             focusable={false}
           >
-            <Text style={[styles.cardTitle, wideCard && styles.cardTitleWide]} numberOfLines={wideCard ? 3 : 2}>
+            <Text style={[styles.cardTitle, compactTypography && styles.cardTitleMobile, wideCard && styles.cardTitleWide]} numberOfLines={wideCard ? 3 : 2}>
               {nomeExibicao}
             </Text>
           </Pressable>
@@ -998,25 +999,26 @@ export function Vitrine({
                       accessibilityLabel="Mostrar perfumes a pronta entrega"
                       accessibilityState={{ selected: disponibilidadeAtiva === 'pronta' }}
                     >
-                      <Feather
-                        name="package"
-                        size={13}
-                        color={
-                          disponibilidadeAtiva === 'pronta'
-                            && familiaAtiva === 'Todas'
-                            && ocasiaoAtiva === 'Todas'
-                            ? COLORS.ink
-                            : COLORS.gold
-                        }
-                      />
+                      {!narrowViewport && (
+                        <Feather
+                          name="package"
+                          size={13}
+                          color={
+                            disponibilidadeAtiva === 'pronta'
+                              && familiaAtiva === 'Todas'
+                              && ocasiaoAtiva === 'Todas'
+                              ? COLORS.ink
+                              : COLORS.gold
+                          }
+                        />
+                      )}
                       <Text style={[
                         styles.quickFilterText,
-                        narrowViewport && styles.quickFilterTextNarrow,
                         disponibilidadeAtiva === 'pronta'
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && styles.quickFilterTextActive,
-                      ]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>Pronta entrega</Text>
+                      ]} numberOfLines={1}>Pronta entrega</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1038,25 +1040,26 @@ export function Vitrine({
                       accessibilityLabel="Mostrar perfumes sob encomenda"
                       accessibilityState={{ selected: disponibilidadeAtiva === 'encomenda' }}
                     >
-                      <Feather
-                        name="clock"
-                        size={13}
-                        color={
-                          disponibilidadeAtiva === 'encomenda'
-                            && familiaAtiva === 'Todas'
-                            && ocasiaoAtiva === 'Todas'
-                            ? COLORS.ink
-                            : COLORS.gold
-                        }
-                      />
+                      {!narrowViewport && (
+                        <Feather
+                          name="clock"
+                          size={13}
+                          color={
+                            disponibilidadeAtiva === 'encomenda'
+                              && familiaAtiva === 'Todas'
+                              && ocasiaoAtiva === 'Todas'
+                              ? COLORS.ink
+                              : COLORS.gold
+                          }
+                        />
+                      )}
                       <Text style={[
                         styles.quickFilterText,
-                        narrowViewport && styles.quickFilterTextNarrow,
                         disponibilidadeAtiva === 'encomenda'
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && styles.quickFilterTextActive,
-                      ]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>Sob encomenda</Text>
+                      ]} numberOfLines={1}>Sob encomenda</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1070,12 +1073,12 @@ export function Vitrine({
                       accessibilityLabel="Mostrar perfumes favoritos"
                       accessibilityState={{ selected: familiaAtiva === 'Favoritos' }}
                     >
-                      {familiaAtiva === 'Favoritos' ? (
+                      {!narrowViewport && (familiaAtiva === 'Favoritos' ? (
                         <FontAwesome name="heart" size={14} color={COLORS.favorite} />
                       ) : (
                         <Feather name="heart" size={14} color={COLORS.gold} />
-                      )}
-                      <Text style={[styles.quickFilterText, narrowViewport && styles.quickFilterTextNarrow, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>Favoritos</Text>
+                      ))}
+                      <Text style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1}>Favoritos</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1087,8 +1090,8 @@ export function Vitrine({
                       accessibilityRole="button"
                       accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
                     >
-                      <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />
-                      <Text style={[styles.quickFilterText, narrowViewport && styles.quickFilterTextNarrow, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.76}>Filtros</Text>
+                      {!narrowViewport && <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />}
+                      <Text style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1}>Filtros</Text>
                       {filtrosAtivos > 0 && (
                         <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{filtrosAtivos}</Text></View>
                       )}
@@ -1752,7 +1755,6 @@ const styles = StyleSheet.create({
   quickFilterCompact: { flex: 0.82 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '600' },
-  quickFilterTextNarrow: { fontSize: FONT_SIZES.micro },
   quickFilterTextActive: { color: COLORS.ink },
   storefrontEmpty: { alignItems: 'center', padding: SPACING.xl, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   storefrontEmptyTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
@@ -1806,6 +1808,7 @@ const styles = StyleSheet.create({
   productInfo: { flex: 1, minWidth: 0, paddingTop: 3, paddingRight: 25 },
   productInfoWide: { paddingRight: 40 },
   cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.heading, lineHeight: 22, fontWeight: '700' },
+  cardTitleMobile: { fontSize: FONT_SIZES.subtitle, lineHeight: 20 },
   cardTitleWide: { fontSize: FONT_SIZES.titleLarge, lineHeight: 28 },
   inspirationText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 5 },
   genderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 2 },
