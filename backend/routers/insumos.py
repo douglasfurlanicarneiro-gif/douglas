@@ -9,6 +9,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, model_validator
 
+from catalog_cache import invalidate_catalog_cache
 from database import get_db
 from locks import stock_lock
 from security import require_atelie_auth
@@ -357,5 +358,6 @@ async def registrar_producao(payload: ProducaoIn, _: str = Depends(require_ateli
             "origem": f"producao:{producao_id}",
             "data": agora,
         })
+        invalidate_catalog_cache()
 
     return {**plano, "producaoId": producao_id, "registrada": True}

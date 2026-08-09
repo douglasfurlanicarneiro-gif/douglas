@@ -7,6 +7,7 @@ from bson.errors import InvalidId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from catalog_cache import invalidate_catalog_cache
 from config import INFINITEPAY_HANDLE
 from database import get_db
 from locks import stock_lock
@@ -192,6 +193,7 @@ async def _confirmar_pagamento(
             )
 
         atualizado = await db.pedidos.find_one({"_id": oid})
+        invalidate_catalog_cache()
     return atualizado or pedido
 
 

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from audit import registrar_auditoria
+from catalog_cache import invalidate_catalog_cache
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
@@ -290,6 +291,7 @@ async def criar_pedido(payload: PedidoIn, _: str = Depends(require_atelie_auth))
             await _reverter_movimentos_do_pedido(db, pedido_id)
             raise
         novo = await db.pedidos.find_one({"_id": resultado.inserted_id})
+        invalidate_catalog_cache()
         return serialize(novo)
 
 
@@ -321,6 +323,7 @@ async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(r
             novo_status=payload.status,
         )
         atualizado = await db.pedidos.find_one({"_id": _oid(pedido_id)})
+        invalidate_catalog_cache()
         return serialize(atualizado)
 
 
@@ -354,6 +357,7 @@ async def apagar_pedido(pedido_id: str, _: str = Depends(require_atelie_auth)):
             detalhes=f"Pedido Nº {pedido.get('seq', 0)} preservado fora do fluxo ativo.",
             metadados={"seq": pedido.get("seq"), "status": pedido.get("status")},
         )
+        invalidate_catalog_cache()
         return {"status": "Pedido arquivado com histórico preservado."}
 
 
@@ -380,4 +384,5 @@ async def restaurar_pedido(pedido_id: str, _: str = Depends(require_atelie_auth)
         titulo="Pedido restaurado",
         detalhes="Pedido devolvido ao painel administrativo.",
     )
+    invalidate_catalog_cache()
     return {"status": "Pedido restaurado."}

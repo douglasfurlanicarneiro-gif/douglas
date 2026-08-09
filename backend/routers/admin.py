@@ -11,6 +11,7 @@ from pymongo import ReturnDocument
 
 from audit import registrar_auditoria
 from backup_service import gerar_backup_criptografado, transmitir_e_remover
+from catalog_cache import invalidate_catalog_cache
 from config import BACKUP_ENCRYPTION_KEY, INFINITEPAY_HANDLE
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
@@ -529,6 +530,7 @@ async def limpar_dados(recurso: str, _: str = Depends(require_atelie_auth)):
                 titulo="Estoque zerado por ajustes compensatórios",
                 detalhes=f"{len(ajustes)} saldo(s) zerados sem apagar lançamentos.",
             )
+            invalidate_catalog_cache()
         return {
             "status": "Estoque zerado com histórico preservado.",
             "removidos": len(ajustes),
@@ -643,6 +645,7 @@ async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
         }
         await db.pedidos.update_many({"arquivadoEm": None}, {"$set": marcador})
         await db.compras.update_many({"arquivadoEm": None}, {"$set": marcador})
+        invalidate_catalog_cache()
         await registrar_auditoria(
             db,
             acao="arquivar_em_massa",

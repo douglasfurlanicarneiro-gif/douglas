@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from audit import registrar_auditoria
+from catalog_cache import invalidate_catalog_cache
 from database import get_db
 from locks import stock_lock
 from security import require_atelie_auth
@@ -67,6 +68,7 @@ async def criar_movimento(payload: MovimentoIn, _: str = Depends(require_atelie_
         doc["origem"] = "manual"
         resultado = await db.movimentos.insert_one(doc)
         novo = await db.movimentos.find_one({"_id": resultado.inserted_id})
+        invalidate_catalog_cache()
     return serialize(novo)
 
 
@@ -99,6 +101,7 @@ async def completar_estoque(payload: CompletarEstoqueIn, _: str = Depends(requir
 
         if movimentos:
             await db.movimentos.insert_many(movimentos)
+            invalidate_catalog_cache()
 
     return {
         "perfumesConsiderados": len(perfumes),
@@ -160,6 +163,7 @@ async def conferir_estoque(payload: ConferenciaEstoqueIn, _: str = Depends(requi
         }
         resultado = await db.movimentos.insert_one(doc)
         novo = await db.movimentos.find_one({"_id": resultado.inserted_id})
+        invalidate_catalog_cache()
     return {
         "alterado": True,
         "saldoAnteriorMl": saldo_atual,
@@ -232,6 +236,7 @@ async def apagar_movimento(movimento_id: str, _: str = Depends(require_atelie_au
                 "estornoId": str(resultado_estorno.inserted_id),
             },
         )
+        invalidate_catalog_cache()
     return {"status": "Movimento estornado com histórico preservado."}
 
 

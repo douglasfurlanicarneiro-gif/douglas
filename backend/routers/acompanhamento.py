@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from catalog_cache import invalidate_catalog_cache
 from database import get_db
 from locks import stock_lock
 from rate_limit import tracking_rate_limit
@@ -93,4 +94,5 @@ async def cancelar_pedido_cliente(codigo: str):
             {"$set": {"status": "cancelado", "historicoStatus": historico}},
         )
         atualizado = await db.pedidos.find_one({"_id": pedido["_id"]})
+        invalidate_catalog_cache()
         return _resposta_publica(atualizado)

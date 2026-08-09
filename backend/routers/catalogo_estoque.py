@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from availability import apply_ready_delivery_by_ids
+from catalog_cache import invalidate_catalog_cache
 from database import get_db
 from locks import stock_lock
 from routers.vitrine import marcar_vitrine_pendente
@@ -178,6 +179,7 @@ async def zerar_sob_encomenda(_: str = Depends(require_atelie_auth)):
         movimentos = _movimentos_para_zerar(ids, estoque, agora)
         if movimentos:
             await db.movimentos.insert_many(movimentos)
+            invalidate_catalog_cache()
         quantidade_ml = sum(item["quantidadeMl"] for item in movimentos)
         await _registrar_operacao(
             db,
@@ -216,6 +218,7 @@ async def completar_pronta_entrega(
         )
         if movimentos:
             await db.movimentos.insert_many(movimentos)
+            invalidate_catalog_cache()
         quantidade_ml = sum(item["quantidadeMl"] for item in movimentos)
         await _registrar_operacao(
             db,

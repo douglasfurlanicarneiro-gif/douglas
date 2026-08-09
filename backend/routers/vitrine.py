@@ -6,6 +6,13 @@ import unicodedata
 
 from fastapi import APIRouter, Depends, Response
 
+from catalog_cache import (
+    build_lock,
+    generation as cache_generation,
+    get_cached_catalog,
+    invalidate_catalog_cache,
+    set_cached_catalog,
+)
 from database import get_db
 from locks import distributed_lock
 from security import require_atelie_auth
@@ -110,6 +117,7 @@ def _agendar_publicacao(db) -> None:
 
 async def marcar_vitrine_pendente(db) -> dict:
     """Registra uma alteração pública e agrupa edições feitas em sequência."""
+    invalidate_catalog_cache()
     agora = datetime.now(timezone.utc)
     await db.configuracoes.update_one(
         {"_id": _PUBLICATION_STATE_ID},
@@ -172,6 +180,7 @@ async def _publicar_snapshot_sem_trava(db, *, registrar_operacao: bool = True) -
             "quantidadeMl": 0,
             "data": atualizado_em,
         })
+    invalidate_catalog_cache()
     return {"atualizadoEm": atualizado_em, "itensPublicados": len(itens)}
 
 
@@ -221,7 +230,48 @@ async def garantir_vitrine_atualizada(db, *, forcar: bool = False) -> dict | Non
 @router.get("")
 async def obter_vitrine(response: Response, atualizar: bool = False):
     inicio = time.perf_counter()
-    db = get_db()
+    if not atualizar:
+        cached = get_cached_catalog()
+        if cached is not None:
+            duracao_ms = (time.perf_counter() - inicio) * 1_000
+            response.headers["Server-Timing"] = f'catalog-cache;dur={duracao_ms:.1f}'
+            response.headers["Cache-Control"] = "public, max-age=2, s-maxage=2, must-revalidate"
+            response.headers["X-Catalog-Cache"] = "HIT"
+            if cached.get("atualizadoEm"):
+                response.headers["X-Catalog-Updated-At"] = str(cached["atualizadoEm"])
+            return cached
+
+    async with build_lock:
+        if not atualizar:
+            cached = get_cached_catalog()
+            if cached is not None:
+                duracao_ms = (time.perf_counter() - inicio) * 1_000
+                response.headers["Server-Timing"] = f'catalog-cache;dur={duracao_ms:.1f}'
+                response.headers["Cache-Control"] = "public, max-age=2, s-maxage=2, must-revalidate"
+                response.headers["X-Catalog-Cache"] = "HIT"
+                if cached.get("atualizadoEm"):
+                    response.headers["X-Catalog-Updated-At"] = str(cached["atualizadoEm"])
+                return cached
+
+        geracao_inicial = cache_generation()
+        payload = await _montar_vitrine(get_db(), atualizar=atualizar)
+        if not atualizar:
+            set_cached_catalog(payload, geracao_inicial)
+
+    duracao_ms = (time.perf_counter() - inicio) * 1_000
+    response.headers["Server-Timing"] = f'catalog;dur={duracao_ms:.1f}'
+    response.headers["Cache-Control"] = (
+        "no-store"
+        if atualizar
+        else "public, max-age=2, s-maxage=2, must-revalidate"
+    )
+    response.headers["X-Catalog-Cache"] = "MISS"
+    if payload.get("atualizadoEm"):
+        response.headers["X-Catalog-Updated-At"] = str(payload["atualizadoEm"])
+    return payload
+
+
+async def _montar_vitrine(db, *, atualizar: bool) -> dict:
     # Estado da publicação, snapshot e saldos são independentes na leitura
     # comum. Executá-los em paralelo elimina viagens sequenciais ao MongoDB,
     # que eram o maior custo na primeira abertura da vitrine.
@@ -250,15 +300,6 @@ async def obter_vitrine(response: Response, atualizar: bool = False):
         )
 
     itens.sort(key=_alphabetical_name)
-    duracao_ms = (time.perf_counter() - inicio) * 1_000
-    response.headers["Server-Timing"] = f'catalog;dur={duracao_ms:.1f}'
-    response.headers["Cache-Control"] = (
-        "no-store"
-        if atualizar
-        else "public, max-age=2, s-maxage=2, must-revalidate"
-    )
-    if snapshot.get("atualizadoEm"):
-        response.headers["X-Catalog-Updated-At"] = str(snapshot["atualizadoEm"])
     return {"atualizadoEm": snapshot.get("atualizadoEm"), "itens": itens}
 
 

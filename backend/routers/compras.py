@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from audit import registrar_auditoria
+from catalog_cache import invalidate_catalog_cache
 from config import INFINITEPAY_HANDLE
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
@@ -403,6 +404,7 @@ async def _criar_compra(
         )
         doc["seq"] = await next_seq(db, "pedidos")
         resultado = await db.pedidos.insert_one(doc)
+        invalidate_catalog_cache()
     pedido_id = str(resultado.inserted_id)
 
     # O pedido pendente reserva a quantidade no resumo, sem alterar o saldo
@@ -433,6 +435,7 @@ async def _criar_compra(
             # falha antes de apresentar o checkout ao cliente.
             async with stock_lock(db):
                 await db.pedidos.delete_one({"_id": resultado.inserted_id})
+                invalidate_catalog_cache()
             raise HTTPException(status_code=502, detail=str(exc)) from exc
         await db.pedidos.update_one(
             {"_id": resultado.inserted_id},
@@ -440,6 +443,7 @@ async def _criar_compra(
         )
 
     nova = await db.pedidos.find_one({"_id": resultado.inserted_id})
+    invalidate_catalog_cache()
     return serialize(nova)
 
 
@@ -495,6 +499,7 @@ async def atualizar_status_compra(compra_id: str, payload: CompraStatusIn, _: st
             itens=itens,
             novo_status=payload.status,
         )
+        invalidate_catalog_cache()
         return serialize(await db.pedidos.find_one({"_id": oid}))
 
 
@@ -532,4 +537,5 @@ async def apagar_compra(compra_id: str, _: str = Depends(require_atelie_auth)):
             titulo="Compra arquivada",
             detalhes="Registro retirado do fluxo ativo com histórico preservado.",
         )
+        invalidate_catalog_cache()
     return {"status": "Pedido de compra arquivado."}
