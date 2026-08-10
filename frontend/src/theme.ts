@@ -1,4 +1,5 @@
 import type { OrderStatus } from './types';
+import { Platform } from 'react-native';
 
 export const COLORS = {
   ink: '#15130F',
@@ -30,6 +31,7 @@ export const FONTS = {
   medium: 'DMSans_500Medium',
   semiBold: 'DMSans_600SemiBold',
   bold: 'DMSans_700Bold',
+  editorial: Platform.select({ ios: 'Georgia', android: 'serif', web: 'Georgia, serif', default: 'serif' }),
 } as const;
 
 export const FONT_SIZES = {
@@ -44,6 +46,7 @@ export const FONT_SIZES = {
   title: 20,
   titleLarge: 22,
   display: 26,
+  hero: 36,
 } as const;
 
 export const TYPOGRAPHY = {

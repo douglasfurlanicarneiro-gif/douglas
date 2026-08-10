@@ -30,7 +30,9 @@ export function fontFamilyForStyle(style?: StyleProp<TextStyle>) {
   return FONTS.regular;
 }
 
-const normalizedFontStyle = (style?: StyleProp<TextStyle>): TextStyle => {
+type AppTextFamily = 'sans' | 'editorial';
+
+const normalizedFontStyle = (style?: StyleProp<TextStyle>, family: AppTextFamily = 'sans'): TextStyle => {
   const flattened = StyleSheet.flatten(style) || {};
   const requestedSize = typeof flattened.fontSize === 'number' ? flattened.fontSize : null;
   const fontSize = requestedSize == null
@@ -41,7 +43,7 @@ const normalizedFontStyle = (style?: StyleProp<TextStyle>): TextStyle => {
     : undefined;
 
   return {
-    fontFamily: fontFamilyForStyle(style),
+    fontFamily: family === 'editorial' ? FONTS.editorial : (flattened.fontFamily || fontFamilyForStyle(style)),
     fontWeight: '400',
     fontStyle: 'normal',
     ...(fontSize == null ? {} : { fontSize }),
@@ -49,8 +51,8 @@ const normalizedFontStyle = (style?: StyleProp<TextStyle>): TextStyle => {
   };
 };
 
-export function AppText({ style, ...props }: TextProps) {
-  return <NativeText {...props} style={[style, normalizedFontStyle(style)]} />;
+export function AppText({ family = 'sans', style, ...props }: TextProps & { family?: AppTextFamily }) {
+  return <NativeText {...props} style={[style, normalizedFontStyle(style, family)]} />;
 }
 
 export const AppTextInput = React.forwardRef<
