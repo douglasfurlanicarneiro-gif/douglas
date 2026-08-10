@@ -94,6 +94,10 @@ async def _criar_indices():
         sparse=True,
     )
     await db.pedidos.create_index("pagamento.transactionNsu", sparse=True)
+    await db.eventos_pagamento.create_index(
+        [("status", 1), ("proximaTentativaEm", 1)]
+    )
+    await db.eventos_pagamento.create_index([("status", 1), ("leaseExpiraEm", 1)])
     await db.pedidos.create_index(
         "codigoAcompanhamento",
         unique=True,
@@ -173,12 +177,20 @@ async def lifespan(_: FastAPI):
         _bootstrap_database(),
         name="bootstrap-database",
     )
+    payment_reconciliation_task = asyncio.create_task(
+        pagamentos.reconciliacao_pagamentos_worker(),
+        name="payment-reconciliation",
+    )
     yield
 
     if not bootstrap_task.done():
         bootstrap_task.cancel()
         with suppress(asyncio.CancelledError):
             await bootstrap_task
+    if not payment_reconciliation_task.done():
+        payment_reconciliation_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await payment_reconciliation_task
     await close_client()
 
 

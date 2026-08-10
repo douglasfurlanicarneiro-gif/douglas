@@ -16,7 +16,7 @@ import requests
 from config import (
     INFINITEPAY_API_URL,
     INFINITEPAY_HANDLE,
-    JWT_SECRET,
+    INFINITEPAY_WEBHOOK_SECRET,
     PUBLIC_API_URL,
     STOREFRONT_URL,
 )
@@ -43,7 +43,11 @@ def normalizar_telefone(valor: str | None) -> str:
 
 
 def _token_webhook(referencia: str) -> str:
-    segredo = (JWT_SECRET or "infinitepay-development-only").encode("utf-8")
+    if not INFINITEPAY_WEBHOOK_SECRET:
+        raise InfinitePayError(
+            "A assinatura do webhook da InfinitePay ainda nao foi configurada."
+        )
+    segredo = INFINITEPAY_WEBHOOK_SECRET.encode("utf-8")
     return hmac.new(segredo, referencia.encode("utf-8"), hashlib.sha256).hexdigest()
 
 

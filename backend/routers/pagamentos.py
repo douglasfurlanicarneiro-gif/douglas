@@ -1,10 +1,13 @@
-"""Confirmacao automatica de pagamentos processados pela InfinitePay."""
+"""Confirmacao e conciliacao de pagamentos processados pela InfinitePay."""
 
-from datetime import datetime, timezone
+import asyncio
+import logging
+from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from pymongo import ReturnDocument
 from pydantic import BaseModel, Field
 
 from catalog_cache import invalidate_catalog_cache
@@ -18,6 +21,11 @@ from stock import pedido_tem_reserva_ativa, validar_estoque
 from utils import pagamento_publico, serialize
 
 router = APIRouter(prefix="/api/pagamentos", tags=["pagamentos"])
+logger = logging.getLogger("atelie.pagamentos")
+
+_RECONCILIATION_BATCH_SIZE = 20
+_RECONCILIATION_MAX_ATTEMPTS = 8
+_RECONCILIATION_INTERVAL_SECONDS = 20
 
 
 class InfinitePayWebhookIn(BaseModel):
@@ -36,6 +44,38 @@ class InfinitePayConfirmacaoIn(BaseModel):
     orderNsu: str = Field(min_length=1, max_length=80)
     transactionNsu: str = Field(min_length=1, max_length=300)
     slug: str = Field(min_length=1, max_length=300)
+
+
+def _webhook_event_id(order_nsu: str, transaction_nsu: str) -> str:
+    return f"infinitepay:{order_nsu}:{transaction_nsu}"
+
+
+def _retry_delay(attempt: int) -> int:
+    """Backoff curto no inicio e limitado a quinze minutos."""
+    return min(15 * (2 ** max(0, attempt - 1)), 900)
+
+
+async def _registrar_webhook(payload: InfinitePayWebhookIn) -> str:
+    """Persiste o aviso antes de responder ao provedor."""
+    db = get_db()
+    event_id = _webhook_event_id(payload.order_nsu, payload.transaction_nsu)
+    agora = datetime.now(timezone.utc)
+    await db.eventos_pagamento.update_one(
+        {"_id": event_id},
+        {
+            "$setOnInsert": {
+                "provedor": "infinitepay",
+                "status": "pendente",
+                "tentativas": 0,
+                "payload": payload.model_dump(),
+                "criadoEm": agora,
+                "proximaTentativaEm": agora,
+            },
+            "$set": {"ultimoRecebimentoEm": agora},
+        },
+        upsert=True,
+    )
+    return event_id
 
 
 def _pedido_publico(pedido: dict) -> dict:
@@ -197,28 +237,157 @@ async def _confirmar_pagamento(
     return atualizado or pedido
 
 
+async def processar_evento_pagamento(event_id: str) -> bool:
+    """Confirma um webhook duravel com claim atomico e repeticao controlada."""
+    db = get_db()
+    agora = datetime.now(timezone.utc)
+    evento = await db.eventos_pagamento.find_one_and_update(
+        {
+            "_id": event_id,
+            "$or": [
+                {
+                    "status": {"$in": ["pendente", "repetir"]},
+                    "proximaTentativaEm": {"$lte": agora},
+                },
+                {"status": "processando", "leaseExpiraEm": {"$lte": agora}},
+            ],
+        },
+        {
+            "$set": {
+                "status": "processando",
+                "iniciadoEm": agora,
+                "leaseExpiraEm": agora + timedelta(minutes=2),
+            },
+            "$inc": {"tentativas": 1},
+        },
+        return_document=ReturnDocument.AFTER,
+    )
+    if not evento:
+        return False
+
+    payload = evento.get("payload") or {}
+    try:
+        await _confirmar_pagamento(
+            order_nsu=str(payload.get("order_nsu", "")),
+            transaction_nsu=str(payload.get("transaction_nsu", "")),
+            slug=str(payload.get("invoice_slug", "")),
+            installments=payload.get("installments"),
+            capture_method=payload.get("capture_method"),
+        )
+    except HTTPException as exc:
+        tentativas = int(evento.get("tentativas", 1))
+        deve_repetir = (
+            exc.status_code in {409, 502}
+            and tentativas < _RECONCILIATION_MAX_ATTEMPTS
+        )
+        atualizacao = {
+            "status": "repetir" if deve_repetir else "falhou",
+            "ultimoErro": str(exc.detail)[:500],
+            "ultimaTentativaEm": datetime.now(timezone.utc),
+        }
+        if deve_repetir:
+            atualizacao["proximaTentativaEm"] = datetime.now(timezone.utc) + timedelta(
+                seconds=_retry_delay(tentativas)
+            )
+        await db.eventos_pagamento.update_one(
+            {"_id": event_id, "status": "processando"},
+            {"$set": atualizacao, "$unset": {"leaseExpiraEm": ""}},
+        )
+        logger.warning(
+            "payment_reconciliation_failed event_id=%s attempt=%s retry=%s status=%s",
+            event_id,
+            tentativas,
+            deve_repetir,
+            exc.status_code,
+        )
+        return False
+    except Exception as exc:
+        tentativas = int(evento.get("tentativas", 1))
+        deve_repetir = tentativas < _RECONCILIATION_MAX_ATTEMPTS
+        await db.eventos_pagamento.update_one(
+            {"_id": event_id, "status": "processando"},
+            {
+                "$set": {
+                    "status": "repetir" if deve_repetir else "falhou",
+                    "ultimoErro": type(exc).__name__,
+                    "ultimaTentativaEm": datetime.now(timezone.utc),
+                    "proximaTentativaEm": datetime.now(timezone.utc)
+                    + timedelta(seconds=_retry_delay(tentativas)),
+                },
+                "$unset": {"leaseExpiraEm": ""},
+            },
+        )
+        logger.exception("payment_reconciliation_error event_id=%s", event_id)
+        return False
+
+    await db.eventos_pagamento.update_one(
+        {"_id": event_id},
+        {
+            "$set": {
+                "status": "processado",
+                "processadoEm": datetime.now(timezone.utc),
+            },
+            "$unset": {
+                "ultimoErro": "",
+                "proximaTentativaEm": "",
+                "leaseExpiraEm": "",
+            },
+        },
+    )
+    return True
+
+
+async def processar_fila_pagamentos(limit: int = _RECONCILIATION_BATCH_SIZE) -> int:
+    """Retoma eventos pendentes apos reinicios e falhas temporarias."""
+    db = get_db()
+    agora = datetime.now(timezone.utc)
+    cursor = (
+        db.eventos_pagamento.find(
+            {
+                "$or": [
+                    {
+                        "status": {"$in": ["pendente", "repetir"]},
+                        "proximaTentativaEm": {"$lte": agora},
+                    },
+                    {"status": "processando", "leaseExpiraEm": {"$lte": agora}},
+                ]
+            },
+            {"_id": 1},
+        )
+        .sort("proximaTentativaEm", 1)
+        .limit(max(1, min(limit, 100)))
+    )
+    ids = [documento["_id"] async for documento in cursor]
+    resultados = await asyncio.gather(
+        *(processar_evento_pagamento(event_id) for event_id in ids),
+        return_exceptions=True,
+    )
+    return sum(resultado is True for resultado in resultados)
+
+
+async def reconciliacao_pagamentos_worker() -> None:
+    """Worker leve executado no mesmo processo da API."""
+    while True:
+        try:
+            await processar_fila_pagamentos()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("payment_reconciliation_worker_failed")
+        await asyncio.sleep(_RECONCILIATION_INTERVAL_SECONDS)
+
+
 @router.post("/infinitepay/webhook")
 async def webhook_infinitepay(
     payload: InfinitePayWebhookIn,
+    background_tasks: BackgroundTasks,
     token: str = Query(default="", max_length=128),
 ):
     if not token_webhook_valido(payload.order_nsu, token):
         raise HTTPException(status_code=401, detail="Webhook não autorizado.")
-    try:
-        pedido = await _confirmar_pagamento(
-            order_nsu=payload.order_nsu,
-            transaction_nsu=payload.transaction_nsu,
-            slug=payload.invoice_slug,
-            installments=payload.installments,
-            capture_method=payload.capture_method,
-        )
-    except HTTPException as exc:
-        # A InfinitePay repete webhooks que recebem HTTP 400. Isso cobre a
-        # pequena janela em que o aviso chega antes do payment_check atualizar.
-        if exc.status_code in {409, 502}:
-            raise HTTPException(status_code=400, detail=exc.detail) from exc
-        raise
-    return {"recebido": True, "pago": True, "pedidoId": str(pedido["_id"])}
+    event_id = await _registrar_webhook(payload)
+    background_tasks.add_task(processar_evento_pagamento, event_id)
+    return {"success": True, "recebido": True}
 
 
 @router.post("/infinitepay/confirmar", dependencies=[Depends(payment_rate_limit)])

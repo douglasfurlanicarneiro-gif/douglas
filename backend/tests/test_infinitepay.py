@@ -39,6 +39,7 @@ def test_telefone_brasileiro_e_enviado_no_formato_internacional():
 
 def test_checkout_usa_host_seguro_e_remove_cifrao_da_tag(monkeypatch):
     recebido = {}
+    monkeypatch.setattr(infinitepay, "INFINITEPAY_WEBHOOK_SECRET", "test-secret")
 
     async def fake_post(caminho, payload):
         recebido.update({"caminho": caminho, "payload": payload})
@@ -103,6 +104,50 @@ class FakeDb:
         self.configuracoes = FakeCollection(
             {"_id": "loja", "infinitePayHandle": "lessence"}
         )
+
+
+class FakeEventCollection:
+    def __init__(self):
+        self.documents = {}
+
+    async def update_one(self, query, update, upsert=False):
+        event_id = query["_id"]
+        document = self.documents.get(event_id)
+        if document is None and upsert:
+            document = {"_id": event_id, **update.get("$setOnInsert", {})}
+            self.documents[event_id] = document
+        if document is not None:
+            document.update(update.get("$set", {}))
+
+
+def test_webhook_e_persistido_de_forma_idempotente(monkeypatch):
+    event_collection = FakeEventCollection()
+    db = type("WebhookDb", (), {"eventos_pagamento": event_collection})()
+    monkeypatch.setattr(pagamentos, "get_db", lambda: db)
+    payload = pagamentos.InfinitePayWebhookIn(
+        invoice_slug="invoice-1",
+        amount=2500,
+        paid_amount=2500,
+        installments=1,
+        capture_method="pix",
+        transaction_nsu="transaction-1",
+        order_nsu="64d000000000000000000001",
+    )
+
+    first_id = asyncio.run(pagamentos._registrar_webhook(payload))
+    second_id = asyncio.run(pagamentos._registrar_webhook(payload))
+
+    assert first_id == second_id
+    assert len(event_collection.documents) == 1
+    event = event_collection.documents[first_id]
+    assert event["status"] == "pendente"
+    assert event["payload"]["transaction_nsu"] == "transaction-1"
+
+
+def test_backoff_de_reconciliacao_e_limitado():
+    assert pagamentos._retry_delay(1) == 15
+    assert pagamentos._retry_delay(2) == 30
+    assert pagamentos._retry_delay(20) == 900
 
 
 def test_confirmacao_valida_valor_e_e_idempotente(monkeypatch):

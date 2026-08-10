@@ -72,6 +72,9 @@ FRETE_TAXA_EMBALAGEM = float(os.getenv("FRETE_TAXA_EMBALAGEM", "0"))
 # A InfiniteTag pode ser cadastrada pelo painel. A variavel serve como fallback
 # para instalacoes que prefiram manter essa configuracao no Render.
 INFINITEPAY_HANDLE = os.getenv("INFINITEPAY_HANDLE", "").strip().lstrip("$")
+INFINITEPAY_WEBHOOK_SECRET = os.getenv("INFINITEPAY_WEBHOOK_SECRET", "") or (
+    JWT_SECRET or ""
+)
 INFINITEPAY_API_URL = os.getenv(
     "INFINITEPAY_API_URL",
     "https://api.checkout.infinitepay.io",
