@@ -234,7 +234,7 @@ function VitrineCard({
                 onPress={() => onBuy(pr.ml, pr.preco)}
                 testID={`buy-${item.id}-${pr.ml}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${pr.ml} ml, ${disponivel ? (item.prontaEntrega ? brl(pr.preco) : 'Solicitar') : 'Indisponível'}. ${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}`}
+                accessibilityLabel={`${pr.ml} ml ${disponivel ? (item.prontaEntrega ? brl(pr.preco) : 'Solicitar') : 'Indisponível'}. ${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}`}
                 accessibilityState={{ disabled: !disponivel }}
                 style={({ pressed }) => [
                   styles.sizeButton,
@@ -917,7 +917,6 @@ export function Vitrine({
           </View>
         )}
         <FlatList
-        accessibilityRole="list"
         key={`catalog-${desktopColumns}`}
         data={filtrados}
         numColumns={desktopColumns}
@@ -978,16 +977,16 @@ export function Vitrine({
                   style={[styles.quizBanner, phoneViewport && styles.quizBannerPhone]}
                   testID="quiz-open"
                   accessibilityRole="button"
-                  accessibilityLabel="Encontre seu perfume. Uma seleção personalizada em poucos passos."
+                  accessibilityLabel="Encontre seu perfume Uma seleção personalizada em poucos passos"
                 >
                   <View style={[styles.quizIcon, phoneViewport && styles.quizIconPhone]}>
-                    <Feather name="compass" size={phoneViewport ? 23 : 19} color={COLORS.gold} />
+                    <Feather name="compass" size={phoneViewport ? 23 : 19} color={COLORS.gold} accessible={false} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.quizTitle}>Encontre seu perfume</Text>
                     <Text style={styles.quizSubtitle}>Uma seleção personalizada em poucos passos</Text>
                   </View>
-                  <Feather name="chevron-right" size={18} color={COLORS.gold} />
+                  <Feather name="chevron-right" size={18} color={COLORS.gold} accessible={false} />
                 </Pressable>
                 <View style={styles.quickFilters}>
                   <View style={styles.quickFilterRow}>
