@@ -48,3 +48,19 @@ def test_canais_podem_ser_limpos_intencionalmente(monkeypatch):
     assert resultado["instagram"] == ""
     assert resultado["email"] == ""
     assert db.configuracoes.saved["logoUrl"] == ""
+
+
+def test_configuracao_publica_usa_whatsapp_do_ambiente(monkeypatch):
+    class Collection:
+        async def find_one(self, _query):
+            return {"_id": "loja", "nomeLoja": "Loja de teste", "whatsapp": ""}
+
+    class Db:
+        configuracoes = Collection()
+
+    monkeypatch.setattr(admin, "get_db", lambda: Db())
+    monkeypatch.setenv("WHATSAPP_NUMBER", "5511999999999")
+
+    resultado = asyncio.run(admin.obter_configuracoes_publicas())
+
+    assert resultado["whatsapp"] == "5511999999999"

@@ -1,5 +1,7 @@
 """Recursos operacionais do painel: métricas e backup."""
+
 import asyncio
+import os
 from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
@@ -108,12 +110,15 @@ def _resumo_arquivado(recurso: str, documento: dict) -> dict:
 @router.get("/arquivados")
 async def listar_arquivados(_: str = Depends(require_atelie_auth)):
     db = get_db()
-    resultados = await asyncio.gather(*[
-        db[colecao].find({"arquivadoEm": {"$ne": None}}).sort(
-            "arquivadoEm", -1
-        ).to_list(500)
-        for colecao in RECURSOS_ARQUIVAVEIS.values()
-    ])
+    resultados = await asyncio.gather(
+        *[
+            db[colecao]
+            .find({"arquivadoEm": {"$ne": None}})
+            .sort("arquivadoEm", -1)
+            .to_list(500)
+            for colecao in RECURSOS_ARQUIVAVEIS.values()
+        ]
+    )
     itens = [
         _resumo_arquivado(recurso, documento)
         for recurso, documentos in zip(RECURSOS_ARQUIVAVEIS, resultados)
@@ -135,15 +140,19 @@ async def restaurar_arquivado(
     try:
         oid = ObjectId(recurso_id)
     except InvalidId as exc:
-        raise HTTPException(status_code=400, detail="Registro arquivado inválido.") from exc
+        raise HTTPException(
+            status_code=400, detail="Registro arquivado inválido."
+        ) from exc
 
     db = get_db()
-    atualizacao: dict = {"$unset": {
-        "arquivadoEm": "",
-        "arquivadoPor": "",
-        "excluirMetricas": "",
-        "acompanhamentoAtivo": "",
-    }}
+    atualizacao: dict = {
+        "$unset": {
+            "arquivadoEm": "",
+            "arquivadoPor": "",
+            "excluirMetricas": "",
+            "acompanhamentoAtivo": "",
+        }
+    }
     if recurso == "perfume":
         atualizacao["$set"] = {"publicavel": False, "prontaEntrega": False}
     resultado = await db[colecao].update_one(
@@ -151,7 +160,9 @@ async def restaurar_arquivado(
         atualizacao,
     )
     if resultado.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Registro arquivado não encontrado.")
+        raise HTTPException(
+            status_code=404, detail="Registro arquivado não encontrado."
+        )
     await registrar_auditoria(
         db,
         acao="restaurar",
@@ -229,7 +240,6 @@ async def obter_metricas(
         periodo = "30d"
         filtro["criadoEm"] = {"$gte": (agora - timedelta(days=30)).isoformat()}
 
-    pedidos = await db.pedidos.find(filtro).to_list(20_000)
     status_pagos = {
         "pagamento_confirmado",
         "preparando",
@@ -237,58 +247,81 @@ async def obter_metricas(
         "enviado",
         "entregue",
     }
-    pagos = [p for p in pedidos if p.get("status") in status_pagos]
-    pendentes = [p for p in pedidos if p.get("status", "pendente") == "pendente"]
-    cancelados = [p for p in pedidos if p.get("status") == "cancelado"]
 
-    por_status: dict[str, int] = {}
-    for pedido in pedidos:
-        status = pedido.get("status", "pendente")
-        por_status[status] = por_status.get(status, 0) + 1
-
-    ids_perfumes: set[ObjectId] = set()
-    for pedido in pagos:
-        for item in pedido.get("itens", []):
-            try:
-                ids_perfumes.add(ObjectId(str(item.get("perfumeId"))))
-            except Exception:
-                continue
-    perfumes = await db.perfumes.find(
-        {"_id": {"$in": list(ids_perfumes)}},
+    # O catálogo é pequeno e serve apenas como fallback para pedidos antigos
+    # que ainda não possuem o snapshot do custo. Já os pedidos podem crescer
+    # indefinidamente e, por isso, são processados em streaming pelo cursor.
+    # A implementação anterior materializava até 20 mil documentos em memória
+    # e simplesmente ignorava vendas acima desse limite.
+    perfumes_por_id: dict[str, dict] = {}
+    async for perfume in db.perfumes.find(
+        {},
         {"nome": 1, "custoEssenciaPorMl": 1, "concentracaoPercentual": 1},
-    ).to_list(len(ids_perfumes)) if ids_perfumes else []
-    perfumes_por_id = {str(item["_id"]): item for item in perfumes}
+    ):
+        perfumes_por_id[str(perfume["_id"])] = perfume
     config_custos = await obter_config_custos(db)
 
+    por_status: dict[str, int] = {}
     produtos: dict[str, dict] = {}
     serie_diaria: dict[str, dict] = {}
     tamanhos: dict[int, dict] = {}
+    pedidos_total = 0
+    pedidos_validos = 0
+    pedidos_pagos = 0
+    pedidos_pendentes = 0
+    pedidos_cancelados = 0
     receita_confirmada = 0.0
     receita_entregue = 0.0
-    a_receber = sum(float(p.get("total", 0) or 0) for p in pendentes)
+    a_receber = 0.0
     custo_estimado = 0.0
     receita_produtos = 0.0
     lucro_produtos_estimado = 0.0
     ml_vendidos = 0
 
-    for pedido in pagos:
+    async for pedido in db.pedidos.find(filtro):
+        pedidos_total += 1
+        status = pedido.get("status", "pendente")
+        por_status[status] = por_status.get(status, 0) + 1
+
+        if status != "cancelado":
+            pedidos_validos += 1
+        if status == "cancelado":
+            pedidos_cancelados += 1
+        if status == "pendente":
+            pedidos_pendentes += 1
+            a_receber += float(pedido.get("total", 0) or 0)
+        if status not in status_pagos:
+            continue
+
+        pedidos_pagos += 1
         total_pedido = float(pedido.get("total", 0) or 0)
         receita_confirmada += total_pedido
-        if pedido.get("status") == "entregue":
+        if status == "entregue":
             receita_entregue += total_pedido
 
         data_pedido = str(pedido.get("criadoEm") or "")[:10]
         dia = None
         if len(data_pedido) == 10:
-            dia = serie_diaria.setdefault(data_pedido, {
-                "data": data_pedido, "receita": 0.0, "lucro": 0.0, "pedidos": 0, "ml": 0,
-            })
+            dia = serie_diaria.setdefault(
+                data_pedido,
+                {
+                    "data": data_pedido,
+                    "receita": 0.0,
+                    "lucro": 0.0,
+                    "pedidos": 0,
+                    "ml": 0,
+                },
+            )
             dia["receita"] += total_pedido
             dia["pedidos"] += 1
 
         for item in pedido.get("itens", []):
             perfume_id = str(item.get("perfumeId") or "")
-            nome = item.get("perfumeNome") or perfumes_por_id.get(perfume_id, {}).get("nome") or "Perfume"
+            nome = (
+                item.get("perfumeNome")
+                or perfumes_por_id.get(perfume_id, {}).get("nome")
+                or "Perfume"
+            )
             chave = perfume_id or nome
             if not chave:
                 continue
@@ -313,18 +346,23 @@ async def obter_metricas(
             if dia is not None:
                 dia["lucro"] += lucro_item
                 dia["ml"] += ml_item
-            tamanho = tamanhos.setdefault(ml, {"ml": ml, "quantidade": 0, "faturamento": 0.0})
+            tamanho = tamanhos.setdefault(
+                ml, {"ml": ml, "quantidade": 0, "faturamento": 0.0}
+            )
             tamanho["quantidade"] += quantidade
             tamanho["faturamento"] += subtotal
 
-            linha = produtos.setdefault(chave, {
-                "perfumeId": perfume_id or None,
-                "nome": nome,
-                "quantidade": 0,
-                "ml": 0,
-                "faturamento": 0.0,
-                "lucroEstimado": 0.0,
-            })
+            linha = produtos.setdefault(
+                chave,
+                {
+                    "perfumeId": perfume_id or None,
+                    "nome": nome,
+                    "quantidade": 0,
+                    "ml": 0,
+                    "faturamento": 0.0,
+                    "lucroEstimado": 0.0,
+                },
+            )
             linha["quantidade"] += quantidade
             linha["ml"] += ml_item
             linha["faturamento"] += subtotal
@@ -333,8 +371,10 @@ async def obter_metricas(
     # Lucro de produto não inclui frete cobrado do cliente. Isso evita
     # inflar a margem quando o total do pedido contém entrega.
     lucro_estimado = lucro_produtos_estimado
-    margem_estimada = (lucro_estimado / receita_produtos * 100) if receita_produtos else 0.0
-    ticket_medio = receita_confirmada / len(pagos) if pagos else 0.0
+    margem_estimada = (
+        (lucro_estimado / receita_produtos * 100) if receita_produtos else 0.0
+    )
+    ticket_medio = receita_confirmada / pedidos_pagos if pedidos_pagos else 0.0
     mais_vendidos = sorted(
         produtos.values(),
         key=lambda item: (item["ml"], item["faturamento"]),
@@ -346,7 +386,9 @@ async def obter_metricas(
         reverse=True,
     )[:10]
     tamanho_mais_vendido = max(
-        tamanhos.values(), key=lambda item: (item["quantidade"], item["faturamento"]), default=None
+        tamanhos.values(),
+        key=lambda item: (item["quantidade"], item["faturamento"]),
+        default=None,
     )
 
     # Para períodos curtos, preenche dias sem venda para o gráfico não
@@ -361,18 +403,25 @@ async def obter_metricas(
         cursor = inicio_serie
         while cursor <= agora.date():
             chave_dia = cursor.isoformat()
-            serie_diaria.setdefault(chave_dia, {
-                "data": chave_dia, "receita": 0.0, "lucro": 0.0, "pedidos": 0, "ml": 0,
-            })
+            serie_diaria.setdefault(
+                chave_dia,
+                {
+                    "data": chave_dia,
+                    "receita": 0.0,
+                    "lucro": 0.0,
+                    "pedidos": 0,
+                    "ml": 0,
+                },
+            )
             cursor += timedelta(days=1)
 
     return {
         "periodo": periodo,
-        "pedidosTotal": len(pedidos),
-        "pedidosValidos": len([p for p in pedidos if p.get("status") != "cancelado"]),
-        "pedidosPagos": len(pagos),
-        "pedidosPendentes": len(pendentes),
-        "pedidosCancelados": len(cancelados),
+        "pedidosTotal": pedidos_total,
+        "pedidosValidos": pedidos_validos,
+        "pedidosPagos": pedidos_pagos,
+        "pedidosPendentes": pedidos_pendentes,
+        "pedidosCancelados": pedidos_cancelados,
         "pedidosPorStatus": por_status,
         # Mantido por compatibilidade; agora significa receita confirmada.
         "faturamento": round(receita_confirmada, 2),
@@ -385,8 +434,12 @@ async def obter_metricas(
         "margemEstimada": round(margem_estimada, 2),
         "mlVendidos": int(ml_vendidos),
         "tamanhoMaisVendido": (
-            {**tamanho_mais_vendido, "faturamento": round(tamanho_mais_vendido["faturamento"], 2)}
-            if tamanho_mais_vendido else None
+            {
+                **tamanho_mais_vendido,
+                "faturamento": round(tamanho_mais_vendido["faturamento"], 2),
+            }
+            if tamanho_mais_vendido
+            else None
         ),
         "serieDiaria": [
             {
@@ -420,13 +473,11 @@ async def obter_configuracoes(_: str = Depends(require_atelie_auth)):
     doc = await get_db().configuracoes.find_one({"_id": "loja"}) or {}
     dados = _configuracoes_completas(doc)
     dados["whatsapp"] = (
-        str(dados["whatsapp"]).strip()
-        or os.getenv("WHATSAPP_NUMBER", "").strip()
+        str(dados["whatsapp"]).strip() or os.getenv("WHATSAPP_NUMBER", "").strip()
     )
     dados["pix"] = str(dados["pix"]).strip() or PIX_KEY
     dados["infinitePayHandle"] = (
-        str(dados["infinitePayHandle"]).strip().lstrip("$")
-        or INFINITEPAY_HANDLE
+        str(dados["infinitePayHandle"]).strip().lstrip("$") or INFINITEPAY_HANDLE
     )
     return ConfiguracoesLojaIn(**dados).model_dump()
 
@@ -440,14 +491,12 @@ async def obter_configuracoes_publicas():
         nomeLoja=str(dados["nomeLoja"]).strip() or "L’Essence Furlani",
         logoUrl=str(dados["logoUrl"]).strip(),
         whatsapp=(
-            str(dados["whatsapp"]).strip()
-            or os.getenv("WHATSAPP_NUMBER", "").strip()
+            str(dados["whatsapp"]).strip() or os.getenv("WHATSAPP_NUMBER", "").strip()
         ),
         instagram=str(dados["instagram"]).strip(),
         email=str(dados["email"]).strip(),
         cartaoOnlineAtivo=bool(
-            str(dados["infinitePayHandle"]).strip().lstrip("$")
-            or INFINITEPAY_HANDLE
+            str(dados["infinitePayHandle"]).strip().lstrip("$") or INFINITEPAY_HANDLE
         ),
         pixManualAtivo=bool(str(dados["pix"]).strip() or PIX_KEY),
     ).model_dump()
@@ -537,22 +586,29 @@ async def limpar_dados(recurso: str, _: str = Depends(require_atelie_auth)):
         }
     if recurso == "catalogo":
         async with stock_lock(db):
-            pedidos_ativos = await db.pedidos.count_documents({
-                "status": {"$nin": ["cancelado", "entregue"]},
-            })
+            pedidos_ativos = await db.pedidos.count_documents(
+                {
+                    "status": {"$nin": ["cancelado", "entregue"]},
+                }
+            )
             if pedidos_ativos:
                 raise HTTPException(
                     status_code=409,
-                    detail="Conclua ou cancele os pedidos ativos antes de resetar o catálogo.",
+                    detail=(
+                        "Conclua ou cancele os pedidos ativos antes de "
+                        "resetar o catálogo."
+                    ),
                 )
             perfumes = await db.perfumes.update_many(
                 {"arquivadoEm": None},
-                {"$set": {
-                    "arquivadoEm": agora,
-                    "arquivadoPor": "reset_catalogo",
-                    "publicavel": False,
-                    "prontaEntrega": False,
-                }},
+                {
+                    "$set": {
+                        "arquivadoEm": agora,
+                        "arquivadoPor": "reset_catalogo",
+                        "publicavel": False,
+                        "prontaEntrega": False,
+                    }
+                },
             )
             saldos = await mapa_saldo_fisico(db)
             ajustes = [
@@ -611,17 +667,25 @@ async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
         pedidos = await db.pedidos.count_documents({"arquivadoEm": None})
         compras_legadas = await db.compras.count_documents({"arquivadoEm": None})
 
-        saldos_pedidos = await db.movimentos.aggregate([
-            {"$match": {"origem": {"$regex": r"^pedido:"}}},
-            {"$group": {
-                "_id": {"origem": "$origem", "perfumeId": "$perfumeId"},
-                "consumo": {"$sum": {"$cond": [
-                    {"$eq": ["$tipo", "saida"]},
-                    "$quantidadeMl",
-                    {"$multiply": ["$quantidadeMl", -1]},
-                ]}},
-            }},
-        ]).to_list(100_000)
+        saldos_pedidos = await db.movimentos.aggregate(
+            [
+                {"$match": {"origem": {"$regex": r"^pedido:"}}},
+                {
+                    "$group": {
+                        "_id": {"origem": "$origem", "perfumeId": "$perfumeId"},
+                        "consumo": {
+                            "$sum": {
+                                "$cond": [
+                                    {"$eq": ["$tipo", "saida"]},
+                                    "$quantidadeMl",
+                                    {"$multiply": ["$quantidadeMl", -1]},
+                                ]
+                            }
+                        },
+                    }
+                },
+            ]
+        ).to_list(100_000)
         estornos = [
             {
                 "perfumeId": linha["_id"]["perfumeId"],
