@@ -1001,7 +1001,7 @@ export function Vitrine({
                       {!ultraNarrowViewport && (
                         <Feather
                           name="package"
-                          size={13}
+                          size={narrowViewport ? 9 : 13}
                           color={
                             disponibilidadeAtiva === 'pronta'
                               && familiaAtiva === 'Todas'
@@ -1043,7 +1043,7 @@ export function Vitrine({
                       {!ultraNarrowViewport && (
                         <Feather
                           name="clock"
-                          size={13}
+                          size={narrowViewport ? 9 : 13}
                           color={
                             disponibilidadeAtiva === 'encomenda'
                               && familiaAtiva === 'Todas'
