@@ -1013,6 +1013,7 @@ export function Vitrine({
                       )}
                       <Text style={[
                         styles.quickFilterText,
+                        narrowViewport && styles.quickFilterTextNarrow,
                         disponibilidadeAtiva === 'pronta'
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
@@ -1054,6 +1055,7 @@ export function Vitrine({
                       )}
                       <Text style={[
                         styles.quickFilterText,
+                        narrowViewport && styles.quickFilterTextNarrow,
                         disponibilidadeAtiva === 'encomenda'
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
@@ -1082,7 +1084,7 @@ export function Vitrine({
                       ) : (
                         <Feather name="heart" size={14} color={COLORS.gold} />
                       ))}
-                      <Text style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1}>Favoritos</Text>
+                      <Text style={[styles.quickFilterText, narrowViewport && styles.quickFilterTextNarrow, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1}>Favoritos</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1100,7 +1102,7 @@ export function Vitrine({
                       accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
                     >
                       {!ultraNarrowViewport && <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />}
-                      <Text style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1}>Filtros</Text>
+                      <Text style={[styles.quickFilterText, narrowViewport && styles.quickFilterTextNarrow, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1}>Filtros</Text>
                       {filtrosAtivos > 0 && (
                         <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{filtrosAtivos}</Text></View>
                       )}
@@ -1790,12 +1792,13 @@ const styles = StyleSheet.create({
   quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   quickFilterButton: { minHeight: 42, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   quickFilterButtonNarrow: { paddingHorizontal: 3, gap: 2 },
-  quickFilterReady: { flex: 1.15 },
-  quickFilterOrder: { flex: 1.48 },
+  quickFilterReady: { flex: 1.25 },
+  quickFilterOrder: { flex: 1.25 },
   quickFilterSecondary: { flex: 0.9 },
   quickFilterCompact: { flex: 0.7 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, fontWeight: '500' },
+  quickFilterTextNarrow: { fontSize: FONT_SIZES.compact, lineHeight: 14 },
   quickFilterTextActive: { color: COLORS.ink },
   storefrontEmpty: { alignItems: 'center', padding: SPACING.xl, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   storefrontEmptyTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },

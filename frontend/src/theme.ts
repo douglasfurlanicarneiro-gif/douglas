@@ -36,6 +36,7 @@ export const FONTS = {
 
 export const FONT_SIZES = {
   micro: 8,
+  compact: 10,
   caption: 11,
   label: 12,
   bodySmall: 13,
