@@ -234,7 +234,8 @@ function VitrineCard({
                 onPress={() => onBuy(pr.ml, pr.preco)}
                 testID={`buy-${item.id}-${pr.ml}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${pr.ml} ml ${disponivel ? (item.prontaEntrega ? brl(pr.preco) : 'Solicitar') : 'Indisponível'}. ${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}`}
+                accessibilityLabel={`${pr.ml} ml ${disponivel ? (item.prontaEntrega ? brl(pr.preco) : 'Solicitar') : 'Indisponível'}`}
+                accessibilityHint={`${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}`}
                 accessibilityState={{ disabled: !disponivel }}
                 style={({ pressed }) => [
                   styles.sizeButton,
@@ -978,15 +979,26 @@ export function Vitrine({
                   testID="quiz-open"
                   accessibilityRole="button"
                   accessibilityLabel="Encontre seu perfume Uma seleção personalizada em poucos passos"
+                  accessibilityHint="Abrir seleção personalizada de fragrâncias"
                 >
-                  <View style={[styles.quizIcon, phoneViewport && styles.quizIconPhone]}>
-                    <Feather name="compass" size={phoneViewport ? 23 : 19} color={COLORS.gold} accessible={false} />
+                  <View
+                    style={[styles.quizIcon, phoneViewport && styles.quizIconPhone]}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                  >
+                    <Feather name="compass" size={phoneViewport ? 23 : 19} color={COLORS.gold} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.quizTitle}>Encontre seu perfume</Text>
                     <Text style={styles.quizSubtitle}>Uma seleção personalizada em poucos passos</Text>
                   </View>
-                  <Feather name="chevron-right" size={18} color={COLORS.gold} accessible={false} />
+                  <Feather
+                    name="chevron-right"
+                    size={18}
+                    color={COLORS.gold}
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                  />
                 </Pressable>
                 <View style={styles.quickFilters}>
                   <View style={styles.quickFilterRow}>
