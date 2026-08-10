@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from audit import registrar_auditoria
 from client_identity import anonymous_client_key
 from database import get_db
+from rate_limit import login_rate_limit
 from security import (
     create_token,
     decode_token_claims,
@@ -19,6 +20,11 @@ MAX_LOGIN_ATTEMPTS = 5
 LOGIN_WINDOW_MINUTES = 15
 LOGIN_BLOCK_MINUTES = 15
 
+# Hash valido usado quando o usuario nao existe. Executar bcrypt mesmo nesse
+# caso reduz a diferenca de tempo que poderia revelar o nome administrativo.
+# O valor nao e uma credencial e nunca pode autenticar uma conta.
+_DUMMY_PASSWORD_HASH = "$2b$12$3Y5/o15n9qBg4OLhlXB7VevIdB53DByS3aenCb7NUPIl8jm6WnD5G"
+
 
 class LoginPayload(BaseModel):
     usuario: str = Field(min_length=1, max_length=120)
@@ -30,14 +36,24 @@ def _login_key(request: Request, usuario: str) -> str:
     return anonymous_client_key(request, f"login:{usuario_normalizado}")
 
 
-@router.post("/login")
+def _utc_datetime(value: object) -> datetime | None:
+    """Normaliza datas do MongoDB, que podem retornar sem fuso horario."""
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+@router.post("/login", dependencies=[Depends(login_rate_limit)])
 async def login(payload: LoginPayload, request: Request):
     db = get_db()
     agora = datetime.now(timezone.utc)
-    chave = _login_key(request, payload.usuario)
+    usuario = payload.usuario.strip()
+    chave = _login_key(request, usuario)
     tentativa = await db.auth_login_attempts.find_one({"_id": chave}) or {}
-    bloqueado_ate = tentativa.get("bloqueadoAte")
-    if isinstance(bloqueado_ate, datetime) and bloqueado_ate > agora:
+    bloqueado_ate = _utc_datetime(tentativa.get("bloqueadoAte"))
+    if bloqueado_ate and bloqueado_ate > agora:
         segundos = max(1, int((bloqueado_ate - agora).total_seconds()))
         raise HTTPException(
             status_code=429,
@@ -45,10 +61,14 @@ async def login(payload: LoginPayload, request: Request):
             headers={"Retry-After": str(segundos)},
         )
 
-    admin = await db.admins.find_one({"usuario": payload.usuario})
-    if not admin or not verify_password(payload.senha, admin["senhaHash"]):
-        inicio = tentativa.get("janelaInicio")
-        dentro_janela = isinstance(inicio, datetime) and inicio >= agora - timedelta(minutes=LOGIN_WINDOW_MINUTES)
+    admin = await db.admins.find_one({"usuario": usuario})
+    senha_hash = str((admin or {}).get("senhaHash") or _DUMMY_PASSWORD_HASH)
+    senha_valida = verify_password(payload.senha, senha_hash)
+    if not admin or not senha_valida:
+        inicio = _utc_datetime(tentativa.get("janelaInicio"))
+        dentro_janela = bool(
+            inicio and inicio >= agora - timedelta(minutes=LOGIN_WINDOW_MINUTES)
+        )
         quantidade = int(tentativa.get("tentativas", 0) or 0) + 1 if dentro_janela else 1
         atualizacao = {
             "janelaInicio": inicio if dentro_janela else agora,

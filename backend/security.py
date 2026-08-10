@@ -69,7 +69,7 @@ async def require_atelie_auth(
     x_atelie_token: Optional[str] = Header(default=None),
 ) -> str:
     """Dependência usada em toda rota privada do Ateliê (dono/admin)."""
-    if not x_atelie_token:
+    if not x_atelie_token or len(x_atelie_token) > 4_096:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token ausente.")
     claims = decode_token_claims(x_atelie_token)
     if not claims:

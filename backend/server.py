@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 from availability import ensure_initial_ready_delivery
-from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS
+from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS, IS_RENDER
 from database import close_client, get_db
 from locks import stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
@@ -202,7 +202,13 @@ async def lifespan(_: FastAPI):
     await close_client()
 
 
-app = FastAPI(title="L’Essence Furlani API", lifespan=lifespan)
+app = FastAPI(
+    title="L’Essence Furlani API",
+    lifespan=lifespan,
+    docs_url=None if IS_RENDER else "/docs",
+    redoc_url=None if IS_RENDER else "/redoc",
+    openapi_url=None if IS_RENDER else "/openapi.json",
+)
 
 app.add_middleware(GZipMiddleware, minimum_size=1_000, compresslevel=6)
 app.add_middleware(
@@ -254,8 +260,17 @@ async def security_headers(request, call_next):
     response.headers.setdefault("Referrer-Policy", "no-referrer")
     response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
-    if request.headers.get("x-atelie-token") or request.url.path.startswith("/api/auth"):
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    )
+    if (
+        request.headers.get("x-atelie-token")
+        or request.url.path.startswith(("/api/auth", "/api/admin"))
+        or response.status_code in {401, 403}
+    ):
         response.headers.setdefault("Cache-Control", "no-store")
+        response.headers.setdefault("Pragma", "no-cache")
     return response
 
 app.include_router(auth.router)

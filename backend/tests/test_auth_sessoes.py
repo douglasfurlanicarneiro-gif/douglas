@@ -77,3 +77,14 @@ def test_limitador_de_login_anonimiza_ip_e_normaliza_usuario():
     assert len(primeira) == 32
     assert "198.51.100.1" not in primeira
     assert "203.0.113.8" not in primeira
+
+
+def test_token_excessivamente_longo_e_rejeitado_antes_da_decodificacao(monkeypatch):
+    def nao_deveria_decodificar(_token):
+        raise AssertionError("token excessivo nao deve chegar ao decodificador")
+
+    monkeypatch.setattr(security, "decode_token_claims", nao_deveria_decodificar)
+    with pytest.raises(HTTPException) as erro:
+        asyncio.run(security.require_atelie_auth("x" * 4_097))
+
+    assert erro.value.status_code == 401

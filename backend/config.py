@@ -10,6 +10,10 @@ from pathlib import Path
 
 load_dotenv(Path(__file__).parent / ".env")
 
+# O Render define esta variavel automaticamente. Recursos de desenvolvimento
+# como a documentacao interativa da API ficam disponiveis apenas localmente.
+IS_RENDER = os.getenv("RENDER", "").strip().casefold() == "true"
+
 # --- Banco de dados ---
 MONGO_URL = os.getenv("MONGO_URL")
 DB_NAME = os.getenv("DB_NAME", "atelier_perfumes")
