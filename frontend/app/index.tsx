@@ -5,7 +5,6 @@ import { COLORS, SPACING, FONT_SIZES } from '../src/theme';
 import { Vitrine } from '../src/components/Vitrine';
 import { BottomSheet } from '../src/components/BottomSheet';
 import { Field, TInput, PrimaryButton, SecondaryButton } from '../src/components/atoms';
-import { LaunchIntro } from '../src/components/LaunchIntro';
 import { ApiError, login, logout, saveToken, getToken, getConfiguracoesPublicas, setSessionExpiredHandler } from '../src/api';
 import { DEFAULT_STORE_CONFIG, publicStoreConfig } from '../src/storeConfig';
 import type { ConfiguracoesLojaPublicas } from '../src/types';
@@ -13,6 +12,9 @@ import { AppText as Text } from '../src/components/Typography';
 
 const LazyAtelie = lazy(() => import('../src/components/Atelie').then((module) => ({
   default: module.Atelie,
+})));
+const LazyLaunchIntro = lazy(() => import('../src/components/LaunchIntro').then((module) => ({
+  default: module.LaunchIntro,
 })));
 
 function AdminLoading() {
@@ -177,10 +179,12 @@ export default function Index() {
         />
       </BottomSheet>
       {showIntro && (
-        <LaunchIntro
-          onFinish={finishIntro}
-          storeName={storeConfig.nomeLoja}
-        />
+        <Suspense fallback={null}>
+          <LazyLaunchIntro
+            onFinish={finishIntro}
+            storeName={storeConfig.nomeLoja}
+          />
+        </Suspense>
       )}
     </SafeAreaProvider>
   );
