@@ -234,7 +234,6 @@ function VitrineCard({
                 onPress={() => onBuy(pr.ml, pr.preco)}
                 testID={`buy-${item.id}-${pr.ml}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${pr.ml} ml ${disponivel ? (item.prontaEntrega ? brl(pr.preco) : 'Solicitar') : 'Indisponível'}`}
                 accessibilityHint={`${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}`}
                 accessibilityState={{ disabled: !disponivel }}
                 style={({ pressed }) => [
@@ -978,11 +977,11 @@ export function Vitrine({
                   style={[styles.quizBanner, phoneViewport && styles.quizBannerPhone]}
                   testID="quiz-open"
                   accessibilityRole="button"
-                  accessibilityLabel="Encontre seu perfume Uma seleção personalizada em poucos passos"
                   accessibilityHint="Abrir seleção personalizada de fragrâncias"
                 >
                   <View
                     style={[styles.quizIcon, phoneViewport && styles.quizIconPhone]}
+                    aria-hidden
                     accessibilityElementsHidden
                     importantForAccessibility="no-hide-descendants"
                   >
@@ -996,6 +995,7 @@ export function Vitrine({
                     name="chevron-right"
                     size={18}
                     color={COLORS.gold}
+                    aria-hidden
                     accessibilityElementsHidden
                     importantForAccessibility="no-hide-descendants"
                   />
