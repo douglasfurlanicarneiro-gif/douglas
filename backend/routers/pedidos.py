@@ -3,7 +3,7 @@ from typing import Any, List, Literal, Optional
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
 from audit import registrar_auditoria
@@ -11,6 +11,7 @@ from catalog_cache import invalidate_catalog_cache
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
+from label_service import gerar_etiquetas_producao
 from order_status import validar_transicao_status
 from security import require_atelie_auth
 from stock import quantidades_por_perfume, validar_estoque
@@ -266,6 +267,37 @@ async def listar_pedidos(_: str = Depends(require_atelie_auth)):
         {"arquivadoEm": None}
     ).sort("seq", -1).to_list(5000)
     return [serialize(p) for p in pedidos]
+
+
+@router.get("/{pedido_id}/etiquetas")
+async def gerar_etiquetas_pedido(pedido_id: str, _: str = Depends(require_atelie_auth)):
+    db = get_db()
+    pedido = await db.pedidos.find_one({"_id": _oid(pedido_id)})
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+    ids = []
+    for item in pedido.get("itens") or []:
+        try:
+            ids.append(ObjectId(str(item.get("perfumeId") or "")))
+        except InvalidId:
+            continue
+    nomes = {}
+    if ids:
+        perfumes = await db.perfumes.find({"_id": {"$in": ids}}, {"nome": 1}).to_list(5000)
+        nomes = {str(perfume["_id"]): str(perfume.get("nome") or "Perfume") for perfume in perfumes}
+    try:
+        conteudo = gerar_etiquetas_producao(pedido, nomes)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    seq = int(pedido.get("seq", 0) or 0)
+    return Response(
+        content=conteudo,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="etiquetas-pedido-{seq:03d}.pdf"',
+            "Cache-Control": "no-store",
+        },
+    )
 
 
 @router.post("")

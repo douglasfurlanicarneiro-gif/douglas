@@ -85,7 +85,9 @@ async def _criar_indices():
     await db.oauth_states.create_index("expiraEm", expireAfterSeconds=0)
     await db.perfumes.create_index([("publicavel", 1), ("arquivadoEm", 1)])
     await db.perfumes.create_index([("arquivadoEm", 1), ("nome", 1)])
+    await db.perfumes.create_index("seq", unique=True, name="perfumes_seq_unico")
     await db.pedidos.create_index([("arquivadoEm", 1), ("seq", -1)])
+    await db.pedidos.create_index("seq", unique=True, name="pedidos_seq_unico")
     await db.pedidos.create_index("status")
     await db.pedidos.create_index([("status", 1), ("arquivadoEm", 1)])
     await db.pedidos.create_index(
@@ -131,11 +133,12 @@ async def _bootstrap_database() -> None:
     try:
         async with asyncio.timeout(_BOOTSTRAP_TIMEOUT_SECONDS):
             await _seed_admin()
-            await _criar_indices()
             db = get_db()
             async with stock_lock(db):
                 sequencias_reparadas = await reparar_sequencias(db, "perfumes")
+                pedidos_reparados = await reparar_sequencias(db, "pedidos")
                 disponibilidade = await ensure_initial_ready_delivery(db)
+            await _criar_indices()
             if sequencias_reparadas:
                 await vitrine.marcar_vitrine_pendente(db)
     except TimeoutError:
@@ -166,6 +169,11 @@ async def _bootstrap_database() -> None:
         logger.info(
             "%s sequencia(s) duplicada(s) do catalogo foram corrigidas.",
             sequencias_reparadas,
+        )
+    if pedidos_reparados:
+        logger.info(
+            "%s sequencia(s) duplicada(s) de pedidos foram corrigidas.",
+            pedidos_reparados,
         )
 
 

@@ -20,7 +20,7 @@ import {
   listPedidos, createPedido, updatePedido, deletePedido, getClientePorContato,
   listOpinioesAdmin, moderateOpiniao, deleteOpiniao,
   listSugestoes, deleteSugestao, listCompras, deleteCompra,
-  downloadBackup, validateBackup, restoreBackup, getOperationalSummary, retryFailedPayments, getMetricas, resetAllOrders,
+  downloadBackup, downloadOrderLabels, auditCatalog, validateBackup, restoreBackup, getOperationalSummary, retryFailedPayments, getMetricas, resetAllOrders,
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
   aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
   listArquivados, restoreArquivado,
@@ -889,12 +889,14 @@ function PedidoForm({
   onSave,
   onCancel,
   onDelete,
+  onGenerateLabels,
 }: {
   perfumes: Perfume[];
   initial?: Pedido;
   onSave: (data: PedidoSaveData) => void | Promise<void>;
   onCancel: () => void;
   onDelete?: (pedido: Pedido) => void | Promise<void>;
+  onGenerateLabels?: (pedido: Pedido) => void | Promise<void>;
 }) {
   const [f, setF] = useState<PedidoFormState>(initial || {
     cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [],
@@ -1307,6 +1309,16 @@ function PedidoForm({
           testID="pedido-save"
         />
       </View>
+      {pedidoRecebido && (
+        <Pressable
+          onPress={() => initial && onGenerateLabels?.(initial)}
+          style={styles.cancelAdminOrderButton}
+          testID="pedido-gerar-etiquetas"
+        >
+          <Feather name="tag" size={16} color={COLORS.gold} />
+          <Text style={[styles.cancelAdminOrderText, { color: COLORS.gold }]}>Gerar etiquetas de produção (PDF)</Text>
+        </Pressable>
+      )}
       {pedidoRecebido && initial?.status !== 'cancelado' && (
         <Pressable
           onPress={() => onSave(pedidoParaSalvar('cancelado'))}
@@ -1953,6 +1965,29 @@ export function Atelie({
       setSheet({ type: 'info', label: 'Backup criptografado gerado com sucesso. Guarde o arquivo .lfe em um local seguro; ele não pode ser lido como um JSON comum.' });
     } catch {
       setSheet({ type: 'info', label: 'Não foi possível baixar o backup. Abra o painel no navegador e tente novamente.' });
+    }
+  };
+  const doGenerateLabels = async (pedido: Pedido) => {
+    try {
+      await downloadOrderLabels(pedido.id, pedido.seq);
+    } catch (error) {
+      setSheet({ type: 'info', label: error instanceof ApiError ? error.message : 'Não foi possível gerar as etiquetas.' });
+    }
+  };
+  const doAuditCatalog = async () => {
+    try {
+      const audit = await auditCatalog();
+      if (!audit.comProblemas) {
+        setSheet({ type: 'info', label: `Catálogo conferido: ${audit.total} perfumes, sem imagens ou preços pendentes.` });
+        return;
+      }
+      const lista = audit.itens.slice(0, 12)
+        .map((item) => `Nº ${padSeq(item.seq || 0)} ${item.nome}: ${item.problemas.join(', ')}`)
+        .join('\n');
+      const restante = audit.comProblemas > 12 ? `\nE mais ${audit.comProblemas - 12} item(ns).` : '';
+      setSheet({ type: 'info', label: `${audit.comProblemas} de ${audit.total} item(ns) precisam de revisão:\n\n${lista}${restante}` });
+    } catch (error) {
+      setSheet({ type: 'info', label: error instanceof ApiError ? error.message : 'Não foi possível auditar o catálogo.' });
     }
   };
   const refreshOperationalSummary = async (showResult = false) => {
@@ -3208,17 +3243,17 @@ export function Atelie({
             />
             <SystemAction
               icon="image"
-              title="Como funcionará Corrigir imagens"
-              subtitle="Confira a auditoria planejada para o catálogo."
-              badge="ENTENDA"
-              onPress={() => setSheet({ type: 'info', label: 'Corrigir imagens mostrará perfumes sem foto ou com endereço inválido. Você poderá abrir cada item, trocar a imagem e visualizar o resultado antes de publicar na vitrine.' })}
+              title="Auditar imagens e preços"
+              subtitle="Localiza itens sem foto, com endereço inválido ou sem preço."
+              badge="ATIVO"
+              onPress={doAuditCatalog}
             />
             <SystemAction
               icon="tag"
-              title="Como funcionará Gerar etiquetas"
-              subtitle="Confira o modelo planejado para produção e envio."
-              badge="ENTENDA"
-              onPress={() => setSheet({ type: 'info', label: 'Gerar etiquetas criará arquivos prontos para impressão a partir do pedido, com número, cliente, perfume, volume e quantidade. A etiqueta de transporte continuará sendo gerada pelo Melhor Envio quando essa função estiver habilitada.' })}
+              title="Gerar etiquetas por pedido"
+              subtitle="Abra um pedido e baixe o PDF de etiquetas internas de produção."
+              badge="ATIVO"
+              onPress={() => { setTab('pedidos'); setSystemView('main'); setSheet(null); }}
             />
           </SystemCard>
         </View>
@@ -3270,7 +3305,6 @@ export function Atelie({
           </View>
         </ScrollView>
       </View>
-
       {tab !== 'dashboard' && tab !== 'opinioes' && tab !== 'sistema' && (
         <Pressable onPress={openCreate} style={styles.fab} testID="fab-add">
           <Feather name="plus" size={24} color={COLORS.ink} />
@@ -3308,6 +3342,7 @@ export function Atelie({
             onSave={doSavePedido}
             onCancel={() => setSheet(null)}
             onDelete={requestDeletePedido}
+            onGenerateLabels={doGenerateLabels}
           />
         )}
         {sheet?.type === 'availability' && (

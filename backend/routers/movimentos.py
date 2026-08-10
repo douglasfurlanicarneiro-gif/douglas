@@ -22,10 +22,10 @@ _PIPELINE_ESTOQUE = STOCK_PIPELINE
 
 
 class MovimentoIn(BaseModel):
-    perfumeId: str
+    perfumeId: str = Field(min_length=1, max_length=80)
     tipo: str  # 'entrada' | 'saida'
-    quantidadeMl: int
-    motivo: str = ""
+    quantidadeMl: int = Field(gt=0, le=1_000_000)
+    motivo: str = Field(default="", max_length=200)
     categoria: str = "ajuste"
 
 
@@ -48,6 +48,16 @@ def calcular_ajuste_contagem(saldo_atual: int, quantidade_fisica: int) -> tuple[
     return ("entrada" if diferenca > 0 else "saida", abs(diferenca))
 
 
+def validar_saida_disponivel(quantidade: int, saldo: int, reservado: int) -> None:
+    disponivel = max(0, saldo - reservado)
+    if quantidade > disponivel:
+        raise HTTPException(
+            status_code=409,
+            detail=(f"Saída acima do estoque disponível: {disponivel}ml. "
+                    f"Há {reservado}ml reservados para pedidos."),
+        )
+
+
 @router.get("/api/movimentos")
 async def listar_movimentos(_: str = Depends(require_atelie_auth)):
     db = get_db()
@@ -63,6 +73,19 @@ async def criar_movimento(payload: MovimentoIn, _: str = Depends(require_atelie_
         raise HTTPException(status_code=400, detail="Quantidade deve ser maior que zero.")
     db = get_db()
     async with stock_lock(db):
+        try:
+            perfume_oid = ObjectId(payload.perfumeId)
+        except InvalidId as exc:
+            raise HTTPException(status_code=400, detail="Perfume inválido.") from exc
+        perfume = await db.perfumes.find_one({"_id": perfume_oid, "arquivadoEm": None}, {"_id": 1})
+        if not perfume:
+            raise HTTPException(status_code=404, detail="Perfume não encontrado.")
+        if payload.tipo == "saida":
+            saldos = await mapa_saldo_fisico(db)
+            reservas = await mapa_reservado(db)
+            saldo = int(saldos.get(payload.perfumeId, 0))
+            reservado = int(reservas.get(payload.perfumeId, 0))
+            validar_saida_disponivel(payload.quantidadeMl, saldo, reservado)
         doc = payload.model_dump()
         doc["data"] = datetime.now(timezone.utc).isoformat()
         doc["origem"] = "manual"

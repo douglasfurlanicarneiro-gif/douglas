@@ -135,6 +135,12 @@ export async function logout(): Promise<void> {
 
 // Perfumes
 export const listPerfumes = () => request<Perfume[]>('/perfumes', {}, true);
+export type CatalogAudit = {
+  total: number;
+  comProblemas: number;
+  itens: { id: string; seq?: number; nome: string; problemas: string[] }[];
+};
+export const auditCatalog = () => request<CatalogAudit>('/perfumes/auditoria', {}, true);
 export const createPerfume = (data: Omit<Perfume, 'id' | 'seq'>) => request<Perfume>('/perfumes', { method: 'POST', body: JSON.stringify(data) }, true);
 export const updatePerfume = (id: string, data: Partial<Perfume>) => request<Perfume>(`/perfumes/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
 export const deletePerfume = (id: string) => request<{ status: string }>(`/perfumes/${id}`, { method: 'DELETE' }, true);
@@ -451,6 +457,30 @@ export async function downloadBackup(): Promise<void> {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = match?.[1] || 'lessence-furlani-backup.lfe';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+}
+
+export async function downloadOrderLabels(orderId: string, seq?: number): Promise<void> {
+  const token = await getToken();
+  if (!token) throw new ApiError('Sua sessão expirou. Entre novamente.', 401);
+  if (typeof document === 'undefined') {
+    throw new ApiError('Abra o painel no navegador para baixar as etiquetas.', 400);
+  }
+  const response = await fetch(`${API}/pedidos/${encodeURIComponent(orderId)}/etiquetas`, {
+    headers: { 'x-atelie-token': token },
+  });
+  if (!response.ok) {
+    let message = 'Não foi possível gerar as etiquetas.';
+    try { message = (await response.json()).detail || message; } catch { /* resposta não JSON */ }
+    throw new ApiError(message, response.status);
+  }
+  const blob = await response.blob();
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `etiquetas-pedido-${String(seq || 0).padStart(3, '0')}.pdf`;
   document.body.appendChild(link);
   link.click();
   link.remove();

@@ -12,17 +12,20 @@ class Result:
 
 
 class FakeCollection:
-    def __init__(self):
-        self.documents = []
+    def __init__(self, documents=None):
+        self.documents = documents or []
 
     async def insert_one(self, document):
         saved = {"_id": ObjectId(), **document}
         self.documents.append(saved)
         return Result(inserted_id=saved["_id"])
 
-    async def find_one(self, query):
+    async def find_one(self, query, _projection=None):
         return next(
-            (dict(item) for item in self.documents if item["_id"] == query.get("_id")),
+            (dict(item) for item in self.documents
+             if item["_id"] == query.get("_id")
+             and ("publicavel" not in query or item.get("publicavel") == query["publicavel"])
+             and ("arquivadoEm" not in query or item.get("arquivadoEm") == query["arquivadoEm"])),
             None,
         )
 
@@ -40,6 +43,10 @@ class FakeCollection:
 class FakeDb:
     def __init__(self):
         self.opinioes = FakeCollection()
+        self.perfume_id = ObjectId()
+        self.perfumes = FakeCollection([{
+            "_id": self.perfume_id, "publicavel": True, "arquivadoEm": None,
+        }])
 
 
 async def _ignore_audit(*_args, **_kwargs):
@@ -53,7 +60,7 @@ def test_avaliacao_nova_aguarda_moderacao(monkeypatch):
     criada = asyncio.run(
         opinioes.criar_opiniao(
             opinioes.OpiniaoIn(
-                perfumeId="perfume-1",
+                perfumeId=str(db.perfume_id),
                 cliente=" Cliente ",
                 nota=5,
                 comentario=" Excelente ",
@@ -64,6 +71,28 @@ def test_avaliacao_nova_aguarda_moderacao(monkeypatch):
     assert criada["aprovada"] is False
     assert criada["cliente"] == "Cliente"
     assert criada["comentario"] == "Excelente"
+
+
+def test_avaliacao_rejeita_perfume_que_nao_esta_na_vitrine(monkeypatch):
+    db = FakeDb()
+    monkeypatch.setattr(opinioes, "get_db", lambda: db)
+
+    try:
+        asyncio.run(opinioes.criar_opiniao(opinioes.OpiniaoIn(
+            perfumeId=str(ObjectId()), cliente="Cliente", nota=5, comentario="Ótimo",
+        )))
+    except Exception as exc:
+        assert getattr(exc, "status_code", None) == 404
+    else:
+        raise AssertionError("Avaliação de perfume inexistente deveria ser recusada.")
+
+
+def test_nome_publico_nao_expoe_nome_completo():
+    documento = {
+        "_id": ObjectId(), "perfumeId": str(ObjectId()), "cliente": "Douglas Furlani",
+        "nota": 5, "comentario": "Excelente", "data": "2026-08-10T12:00:00+00:00",
+    }
+    assert opinioes._opiniao_publica(documento)["cliente"] == "Douglas F."
 
 
 def test_administrador_aprova_avaliacao_sem_apagar_registro(monkeypatch):

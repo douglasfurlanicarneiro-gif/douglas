@@ -12,7 +12,7 @@ from database import get_db
 from availability import apply_ready_delivery
 from routers.vitrine import marcar_vitrine_pendente, publicar_snapshot
 from security import require_atelie_auth
-from utils import next_seq, reparar_sequencias, serialize
+from utils import next_seq, serialize
 
 router = APIRouter(prefix="/api/perfumes", tags=["perfumes"])
 
@@ -165,13 +165,46 @@ def _oid(perfume_id: str) -> ObjectId:
 async def listar_perfumes(_: str = Depends(require_atelie_auth)):
     db = get_db()
     await _garantir_metadados_padronizados(db)
-    sequencias_reparadas = await reparar_sequencias(db, "perfumes")
-    if sequencias_reparadas:
-        await marcar_vitrine_pendente(db)
     perfumes = await db.perfumes.find(
         {"arquivadoEm": None}
     ).sort("seq", 1).to_list(2000)
     return [serialize(p) for p in perfumes]
+
+
+@router.get("/auditoria")
+async def auditar_catalogo(_: str = Depends(require_atelie_auth)):
+    """Aponta correções objetivas sem baixar imagens externas nem expor a API a SSRF."""
+    db = get_db()
+    perfumes = await db.perfumes.find(
+        {"arquivadoEm": None}, {"nome": 1, "seq": 1, "imagemUrl": 1, "precos": 1}
+    ).sort("seq", 1).to_list(5000)
+    problemas = []
+    for perfume in perfumes:
+        imagem = str(perfume.get("imagemUrl") or "").strip()
+        precos = perfume.get("precos") or []
+        motivos = []
+        if not imagem:
+            motivos.append("sem imagem")
+        elif not imagem.lower().startswith(("https://", "http://")):
+            motivos.append("endereço de imagem inválido")
+        def preco_positivo(item: object) -> bool:
+            if not isinstance(item, dict):
+                return False
+            try:
+                return float(item.get("preco", 0) or 0) > 0
+            except (TypeError, ValueError):
+                return False
+
+        if not any(preco_positivo(item) for item in precos):
+            motivos.append("sem preço válido")
+        if motivos:
+            problemas.append({
+                "id": str(perfume["_id"]),
+                "seq": perfume.get("seq"),
+                "nome": perfume.get("nome") or "Perfume sem nome",
+                "problemas": motivos,
+            })
+    return {"total": len(perfumes), "comProblemas": len(problemas), "itens": problemas}
 
 
 @router.post("")
