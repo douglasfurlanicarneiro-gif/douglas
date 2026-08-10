@@ -20,13 +20,13 @@ import {
   listPedidos, createPedido, updatePedido, deletePedido, getClientePorContato,
   listOpinioesAdmin, moderateOpiniao, deleteOpiniao,
   listSugestoes, deleteSugestao, listCompras, deleteCompra,
-  downloadBackup, getMetricas, resetAllOrders,
+  downloadBackup, validateBackup, restoreBackup, getOperationalSummary, retryFailedPayments, getMetricas, resetAllOrders,
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
   aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
   listArquivados, restoreArquivado,
   listSolicitacoesPrivacidade, updateSolicitacaoPrivacidade,
 } from '../api';
-import type { RegistroArquivado, SolicitacaoPrivacidade } from '../api';
+import type { OperationalSummary, RegistroArquivado, SolicitacaoPrivacidade } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
 import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, PedidoItem, Perfume, PriceOption, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
@@ -52,7 +52,7 @@ type PedidoEndereco = NonNullable<Pedido['endereco']>;
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'availability' }
-  | { type: 'confirm'; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
+  | { type: 'confirm'; title?: string; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
   | { type: 'whatsapp'; phone: string; message: string; statusLabel: string }
   | { type: 'info'; label: string };
 
@@ -1359,6 +1359,8 @@ export function Atelie({
   const [loadingArquivados, setLoadingArquivados] = useState(false);
   const [solicitacoesPrivacidade, setSolicitacoesPrivacidade] = useState<SolicitacaoPrivacidade[]>([]);
   const [loadingPrivacidade, setLoadingPrivacidade] = useState(false);
+  const [operationalSummary, setOperationalSummary] = useState<OperationalSummary | null>(null);
+  const [loadingOperation, setLoadingOperation] = useState(false);
   const [sheet, setSheet] = useState<SheetType>(null);
   const [search, setSearch] = useState('');
   const [stockSearch, setStockSearch] = useState('');
@@ -1422,7 +1424,7 @@ export function Atelie({
             { saldoAtualMl, reservadoMl: 0, disponivelMl: saldoAtualMl },
           ]));
         });
-      const [p, m, pe, o, s, c, e, metrics, shipping, store, catalogStock] = await Promise.all([
+      const [p, m, pe, o, s, c, e, metrics, shipping, store, catalogStock, operation] = await Promise.all([
         optional('catálogo', listPerfumes()),
         optional('movimentos', listMovimentos()),
         optional('pedidos', listPedidos()),
@@ -1434,6 +1436,7 @@ export function Atelie({
         optional('frete', getConfiguracaoFrete()),
         optional('configurações', getConfiguracoesLoja()),
         optional('resumo do catálogo', getCatalogoEstoqueResumo()),
+        optional('saúde operacional', getOperationalSummary()),
       ]);
       if (p) {
         setPerfumes(p);
@@ -1448,6 +1451,7 @@ export function Atelie({
       if (metrics) setMetricas(metrics);
       if (shipping) setFreteConfig(shipping);
       if (catalogStock) setCatalogoEstoque(catalogStock);
+      if (operation) setOperationalSummary(operation);
       if (store) setStoreConfig(store);
       if (shipping) {
         setFreteFeeInput(shipping.taxaEmbalagem.toFixed(2).replace('.', ','));
@@ -1951,6 +1955,99 @@ export function Atelie({
       setSheet({ type: 'info', label: 'Não foi possível baixar o backup. Abra o painel no navegador e tente novamente.' });
     }
   };
+  const refreshOperationalSummary = async (showResult = false) => {
+    setLoadingOperation(true);
+    try {
+      const result = await getOperationalSummary();
+      setOperationalSummary(result);
+      if (showResult) {
+        setSheet({
+          type: 'info',
+          label: result.pagamentosFalhos
+            ? `Atenção: existem ${result.pagamentosFalhos} confirmação(ões) de pagamento que esgotaram as tentativas automáticas. Consulte o número do pedido exibido na Saúde operacional.`
+            : `Operação saudável. Há ${result.pagamentosEmEspera} confirmação(ões) aguardando nova tentativa e ${result.pagamentosProcessando} em processamento.`,
+        });
+      }
+    } catch (error) {
+      if (showResult) {
+        setSheet({
+          type: 'info',
+          label: error instanceof ApiError ? error.message : 'Não foi possível atualizar a saúde operacional.',
+        });
+      }
+    } finally {
+      setLoadingOperation(false);
+    }
+  };
+  const reprocessFailedPayments = async () => {
+    setLoadingOperation(true);
+    try {
+      const result = await retryFailedPayments();
+      await refreshOperationalSummary();
+      setSheet({
+        type: 'info',
+        label: result.reprocessados
+          ? `${result.reprocessados} confirmação(ões) voltaram para a fila automática. O sistema continuará tentando em segundo plano.`
+          : 'Não há confirmações com falha para reprocessar.',
+      });
+    } catch (error) {
+      setSheet({
+        type: 'info',
+        label: error instanceof ApiError ? error.message : 'Não foi possível reprocessar as confirmações.',
+      });
+    } finally {
+      setLoadingOperation(false);
+    }
+  };
+  const chooseAndRestoreBackup = () => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') {
+      setSheet({ type: 'info', label: 'Abra o painel em um navegador para selecionar e restaurar o arquivo .lfe.' });
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.lfe,application/x-lessence-backup,application/octet-stream';
+    input.onchange = async () => {
+      const file = input.files?.item(0);
+      if (!file) return;
+      try {
+        const validation = await validateBackup(file);
+        const generatedAt = validation.geradoEm
+          ? new Date(validation.geradoEm).toLocaleString('pt-BR')
+          : 'data não informada';
+        setSheet({
+          type: 'confirm',
+          title: 'Restaurar backup',
+          label: `Backup válido, gerado em ${generatedAt}, com ${validation.totalRegistros} registro(s). Deseja substituir os dados atuais por esse conteúdo?`,
+          confirmLabel: 'Restaurar agora',
+          danger: true,
+          safetyText: 'A restauração é transacional: ou todas as coleções são substituídas, ou nenhuma alteração será aplicada. Exporte um backup atual antes de continuar.',
+          onConfirm: async () => {
+            try {
+              const result = await restoreBackup(file);
+              await load();
+              await refreshOperationalSummary();
+              setSheet({
+                type: 'info',
+                label: `Backup restaurado com segurança: ${result.totalRegistros} registro(s) aplicados.`,
+              });
+            } catch (error) {
+              setSheet({
+                type: 'info',
+                label: error instanceof ApiError ? error.message : 'Não foi possível restaurar o backup.',
+              });
+            }
+          },
+        });
+      } catch (error) {
+        setSheet({
+          type: 'info',
+          label: error instanceof ApiError ? error.message : 'O arquivo de backup não pôde ser validado.',
+        });
+      }
+    };
+    input.click();
+  };
   const doResetPedidos = async () => {
     try {
       const result = await resetAllOrders();
@@ -1983,7 +2080,7 @@ export function Atelie({
     sheet.type === 'pedido' ? (sheet.data ? 'Editar pedido' : 'Novo pedido') :
     sheet.type === 'availability' ? 'Gerenciar pronta entrega' :
     sheet.type === 'whatsapp' ? 'Avisar cliente' :
-    sheet.type === 'confirm' ? (sheet.danger ? 'Confirmar exclusão' : 'Confirmar') : 'Aviso';
+    sheet.type === 'confirm' ? (sheet.title || (sheet.danger ? 'Confirmar exclusão' : 'Confirmar')) : 'Aviso';
 
   const openCreate = () => {
     if (tab === 'catalogo') { setSheet({ type: 'perfume' }); return; }
@@ -2912,6 +3009,58 @@ export function Atelie({
             />
           </SystemCard>
 
+          <SystemCard
+            icon="activity"
+            title="Saúde operacional"
+            subtitle="Conciliação de pagamentos e recuperação dos dados."
+          >
+            <View style={styles.operationHealthGrid}>
+              <View style={styles.operationHealthItem}>
+                <Text style={[styles.operationHealthValue, operationalSummary?.pagamentosFalhos ? { color: COLORS.rust } : null]}>
+                  {operationalSummary?.pagamentosFalhos ?? '—'}
+                </Text>
+                <Text style={styles.operationHealthLabel}>Falhas</Text>
+              </View>
+              <View style={styles.operationHealthItem}>
+                <Text style={styles.operationHealthValue}>{operationalSummary?.pagamentosEmEspera ?? '—'}</Text>
+                <Text style={styles.operationHealthLabel}>Em espera</Text>
+              </View>
+              <View style={styles.operationHealthItem}>
+                <Text style={styles.operationHealthValue}>{operationalSummary?.pagamentosProcessando ?? '—'}</Text>
+                <Text style={styles.operationHealthLabel}>Processando</Text>
+              </View>
+            </View>
+            <Text style={styles.operationHealthHint}>
+              Último backup exportado: {operationalSummary?.ultimoBackupEm ? fmtDate(operationalSummary.ultimoBackupEm) : 'ainda não registrado'}
+            </Text>
+            {!!operationalSummary?.falhasRecentes[0] && (
+              <View style={styles.operationWarning}>
+                <Feather name="alert-triangle" size={15} color={COLORS.rust} />
+                <Text style={styles.operationWarningText}>
+                  Pedido {operationalSummary.falhasRecentes[0].orderNsu || 'não identificado'} · {operationalSummary.falhasRecentes[0].tentativas} tentativa(s)
+                </Text>
+              </View>
+            )}
+            {!!operationalSummary?.pagamentosFalhos && (
+              <SystemAction
+                icon="rotate-ccw"
+                title="Reprocessar confirmações com falha"
+                subtitle="Devolve os eventos à fila automática sem alterar o pedido manualmente."
+                onPress={() => void reprocessFailedPayments()}
+                disabled={loadingOperation}
+                danger
+              />
+            )}
+            <SystemAction
+              icon="refresh-cw"
+              title={loadingOperation ? 'Atualizando diagnóstico…' : 'Atualizar diagnóstico'}
+              subtitle="Confere agora a fila de confirmações de pagamento."
+              onPress={() => void refreshOperationalSummary(true)}
+              disabled={loadingOperation}
+              badge={operationalSummary?.status === 'atencao' ? 'ATENÇÃO' : operationalSummary ? 'OK' : undefined}
+            />
+          </SystemCard>
+
           <SystemCard icon="database" title="Base de dados" subtitle="Backup e limpezas protegidas por confirmação.">
             <SystemAction icon="download" title="Exportar backup criptografado" subtitle="Baixe uma cópia protegida e compactada dos dados atuais." onPress={doBackup} />
             <SystemAction
@@ -2928,7 +3077,12 @@ export function Atelie({
               onPress={() => void openPrivacidade()}
               badge={solicitacoesPrivacidade.filter((item) => item.status === 'recebida').length ? String(solicitacoesPrivacidade.filter((item) => item.status === 'recebida').length) : undefined}
             />
-            <SystemAction icon="upload" title="Restaurar backup" subtitle="Importação validada de um arquivo anterior." disabled badge="PRÓXIMA ETAPA" />
+            <SystemAction
+              icon="upload"
+              title="Restaurar backup"
+              subtitle="Valide e restaure um arquivo .lfe anterior com transação segura."
+              onPress={chooseAndRestoreBackup}
+            />
             <SystemAction
               icon="trash-2"
               title="Limpar pedidos"
@@ -3329,6 +3483,13 @@ const styles = StyleSheet.create({
   systemActionTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' },
   systemActionSubtitle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
   systemBadge: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.5, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border },
+  operationHealthGrid: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  operationHealthItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  operationHealthValue: { color: COLORS.bone, fontSize: FONT_SIZES.title, fontWeight: '700' },
+  operationHealthLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
+  operationHealthHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginBottom: 8 },
+  operationWarning: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: 4 },
+  operationWarningText: { flex: 1, color: COLORS.rust, fontSize: FONT_SIZES.caption, lineHeight: 15 },
   supplierActive: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 4, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.gold + '44' },
   supplierName: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
   supplierMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },

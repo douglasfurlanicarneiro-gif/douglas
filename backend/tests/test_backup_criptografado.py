@@ -4,9 +4,17 @@ import io
 import json
 import zipfile
 
+import pytest
+from bson import ObjectId
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
-from backup_service import BACKUP_COLLECTIONS, BACKUP_MAGIC, gerar_backup_criptografado
+from backup_service import (
+    BACKUP_COLLECTIONS,
+    BACKUP_MAGIC,
+    descriptografar_e_validar_backup,
+    gerar_backup_criptografado,
+    restaurar_backup_validado,
+)
 
 
 class CursorAssincrono:
@@ -36,8 +44,13 @@ class BancoFalso:
         self._colecoes = {
             nome: ColecaoFalsa([]) for nome in BACKUP_COLLECTIONS
         }
+        self.cliente_id = ObjectId()
         self._colecoes["clientes"] = ColecaoFalsa([
-            {"nome": "Cliente Sigiloso", "email": "privado@example.com"},
+            {
+                "_id": self.cliente_id,
+                "nome": "Cliente Sigiloso",
+                "email": "privado@example.com",
+            },
         ])
 
     def __getitem__(self, nome):
@@ -79,3 +92,97 @@ def test_backup_nao_expoe_dados_e_contem_manifesto_e_colecoes():
         assert cliente["email"] == "privado@example.com"
     finally:
         caminho.unlink(missing_ok=True)
+
+
+def test_backup_valida_autenticidade_e_rejeita_chave_incorreta_ou_adulteracao():
+    segredo = "segredo-de-backup-com-mais-de-trinta-e-dois-caracteres"
+    caminho, _ = asyncio.run(gerar_backup_criptografado(BancoFalso(), segredo))
+    zip_path = None
+    try:
+        zip_path, manifesto = descriptografar_e_validar_backup(caminho, segredo)
+        assert manifesto["colecoes"]["clientes"] == 1
+        zip_path.unlink(missing_ok=True)
+        zip_path = None
+
+        with pytest.raises(ValueError, match="adulterado|chave"):
+            descriptografar_e_validar_backup(
+                caminho,
+                "outra-chave-segura-com-mais-de-trinta-e-dois-caracteres",
+            )
+
+        conteudo = bytearray(caminho.read_bytes())
+        conteudo[len(BACKUP_MAGIC) + 20] ^= 0x01
+        caminho.write_bytes(conteudo)
+        with pytest.raises(ValueError, match="adulterado|chave"):
+            descriptografar_e_validar_backup(caminho, segredo)
+    finally:
+        caminho.unlink(missing_ok=True)
+        if zip_path:
+            zip_path.unlink(missing_ok=True)
+
+
+class ContextoAssincrono:
+    def __init__(self, valor):
+        self.valor = valor
+
+    async def __aenter__(self):
+        return self.valor
+
+    async def __aexit__(self, *_args):
+        return False
+
+
+class SessaoFalsa:
+    def start_transaction(self):
+        return ContextoAssincrono(self)
+
+
+class ClienteMongoFalso:
+    def start_session(self):
+        return ContextoAssincrono(SessaoFalsa())
+
+
+class ColecaoRestauravel:
+    def __init__(self):
+        self.documentos = [{"legado": True}]
+
+    async def delete_many(self, _filtro, session=None):
+        assert session is not None
+        self.documentos = []
+
+    async def insert_many(self, documentos, ordered=True, session=None):
+        assert ordered is True
+        assert session is not None
+        self.documentos.extend(documentos)
+
+
+class BancoRestauravel:
+    def __init__(self):
+        self.client = ClienteMongoFalso()
+        self.colecoes = {
+            nome: ColecaoRestauravel() for nome in BACKUP_COLLECTIONS
+        }
+
+    def __getitem__(self, nome):
+        return self.colecoes[nome]
+
+
+def test_restauracao_substitui_colecoes_e_reconstroi_object_id():
+    segredo = "segredo-de-backup-com-mais-de-trinta-e-dois-caracteres"
+    origem = BancoFalso()
+    caminho, _ = asyncio.run(gerar_backup_criptografado(origem, segredo))
+    zip_path = None
+    try:
+        zip_path, manifesto = descriptografar_e_validar_backup(caminho, segredo)
+        destino = BancoRestauravel()
+        resumo = asyncio.run(restaurar_backup_validado(destino, zip_path, manifesto))
+
+        assert resumo["totalRegistros"] == 1
+        cliente = destino.colecoes["clientes"].documentos[0]
+        assert cliente["_id"] == origem.cliente_id
+        assert isinstance(cliente["_id"], ObjectId)
+        assert destino.colecoes["perfumes"].documentos == []
+    finally:
+        caminho.unlink(missing_ok=True)
+        if zip_path:
+            zip_path.unlink(missing_ok=True)

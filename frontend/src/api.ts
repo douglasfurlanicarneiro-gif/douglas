@@ -456,3 +456,84 @@ export async function downloadBackup(): Promise<void> {
   link.remove();
   URL.revokeObjectURL(link.href);
 }
+
+export type BackupValidation = {
+  valido: boolean;
+  geradoEm: string;
+  versao: number;
+  colecoes: Record<string, number>;
+  totalRegistros: number;
+};
+
+export type OperationalSummary = {
+  status: 'ok' | 'atencao';
+  pagamentosFalhos: number;
+  pagamentosEmEspera: number;
+  pagamentosProcessando: number;
+  ultimoBackupEm: string | null;
+  ultimaRestauracaoEm: string | null;
+  falhasRecentes: {
+    id: string;
+    orderNsu: string;
+    tentativas: number;
+    erro: string;
+    ultimaTentativaEm: string | null;
+  }[];
+};
+
+async function uploadBackup<T>(path: string, file: Blob): Promise<T> {
+  const token = await getToken();
+  if (!token) throw new ApiError('Sua sessão expirou. Entre novamente.', 401);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
+  try {
+    const response = await fetch(`${API}${path}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-lessence-backup',
+        'x-atelie-token': token,
+      },
+      body: file,
+      signal: controller.signal,
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      if (response.status === 401) {
+        await clearToken();
+        sessionExpiredHandler?.();
+      }
+      throw new ApiError(
+        apiErrorMessage(body) || 'Não foi possível processar o backup.',
+        response.status,
+      );
+    }
+    return body as T;
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new ApiError('A restauração demorou demais. Tente novamente.', 408);
+    }
+    throw new ApiError('Não foi possível conectar ao servidor.', 0);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export const validateBackup = (file: Blob) =>
+  uploadBackup<BackupValidation>('/admin/backup/validar', file);
+
+export const restoreBackup = (file: Blob) =>
+  uploadBackup<{ status: string; colecoes: Record<string, number>; totalRegistros: number }>(
+    '/admin/backup/restaurar?confirmacao=RESTAURAR',
+    file,
+  );
+
+export const getOperationalSummary = () =>
+  request<OperationalSummary>('/admin/operacao/resumo', {}, true);
+
+export const retryFailedPayments = () =>
+  request<{ status: string; reprocessados: number }>(
+    '/admin/operacao/pagamentos/reprocessar-falhos',
+    { method: 'POST' },
+    true,
+  );

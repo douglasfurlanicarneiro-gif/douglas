@@ -1,18 +1,27 @@
 """Recursos operacionais do painel: métricas e backup."""
 
 import asyncio
+import logging
 import os
+import tempfile
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from bson import ObjectId
 from bson.errors import InvalidId
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from pymongo import ReturnDocument
 
 from audit import registrar_auditoria
-from backup_service import gerar_backup_criptografado, transmitir_e_remover
+from backup_service import (
+    MAX_BACKUP_ENCRYPTED_BYTES,
+    descriptografar_e_validar_backup,
+    gerar_backup_criptografado,
+    restaurar_backup_validado,
+    transmitir_e_remover,
+)
 from catalog_cache import invalidate_catalog_cache
 from config import BACKUP_ENCRYPTION_KEY, INFINITEPAY_HANDLE
 from database import get_db
@@ -24,6 +33,7 @@ from security import require_atelie_auth
 from stock import mapa_saldo_fisico
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+logger = logging.getLogger("atelie.admin")
 PEDIDOS_RESET_ID = "pedidos-reset"
 PEDIDOS_RESET_VERSAO_INICIAL = 2
 
@@ -213,6 +223,206 @@ async def baixar_backup(_: str = Depends(require_atelie_auth)):
             "Pragma": "no-cache",
         },
     )
+
+
+async def _salvar_backup_recebido(request: Request) -> Path:
+    if request.headers.get("content-type", "").split(";", 1)[0].strip() not in {
+        "application/octet-stream",
+        "application/x-lessence-backup",
+    }:
+        raise HTTPException(status_code=415, detail="Envie um arquivo de backup .lfe.")
+    arquivo_fd, arquivo_nome = tempfile.mkstemp(
+        prefix="lessence-upload-", suffix=".lfe"
+    )
+    os.close(arquivo_fd)
+    caminho = Path(arquivo_nome)
+    tamanho = 0
+    try:
+        with caminho.open("wb") as destino:
+            async for bloco in request.stream():
+                tamanho += len(bloco)
+                if tamanho > MAX_BACKUP_ENCRYPTED_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail="O arquivo excede o limite de segurança.",
+                    )
+                destino.write(bloco)
+        if tamanho == 0:
+            raise HTTPException(status_code=400, detail="O arquivo está vazio.")
+        return caminho
+    except Exception:
+        caminho.unlink(missing_ok=True)
+        raise
+
+
+@router.post("/backup/validar")
+async def validar_backup_recebido(
+    request: Request,
+    _: str = Depends(require_atelie_auth),
+):
+    if not BACKUP_ENCRYPTION_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Configure BACKUP_ENCRYPTION_KEY para validar o backup.",
+        )
+    caminho = await _salvar_backup_recebido(request)
+    zip_path: Path | None = None
+    try:
+        zip_path, manifesto = await asyncio.to_thread(
+            descriptografar_e_validar_backup,
+            caminho,
+            BACKUP_ENCRYPTION_KEY,
+        )
+        return {
+            "valido": True,
+            "geradoEm": manifesto.get("geradoEm"),
+            "versao": manifesto.get("versao"),
+            "colecoes": manifesto.get("colecoes", {}),
+            "totalRegistros": sum(manifesto.get("colecoes", {}).values()),
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    finally:
+        caminho.unlink(missing_ok=True)
+        if zip_path:
+            zip_path.unlink(missing_ok=True)
+
+
+@router.post("/backup/restaurar")
+async def restaurar_backup_recebido(
+    request: Request,
+    confirmacao: str = Query(default="", max_length=20),
+    _: str = Depends(require_atelie_auth),
+):
+    if confirmacao != "RESTAURAR":
+        raise HTTPException(
+            status_code=400,
+            detail="Confirmação de restauração inválida.",
+        )
+    if not BACKUP_ENCRYPTION_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Configure BACKUP_ENCRYPTION_KEY para restaurar o backup.",
+        )
+    caminho = await _salvar_backup_recebido(request)
+    zip_path: Path | None = None
+    db = get_db()
+    try:
+        zip_path, manifesto = await asyncio.to_thread(
+            descriptografar_e_validar_backup,
+            caminho,
+            BACKUP_ENCRYPTION_KEY,
+        )
+        async with stock_lock(db):
+            resumo = await restaurar_backup_validado(db, zip_path, manifesto)
+        invalidate_catalog_cache()
+        await registrar_auditoria(
+            db,
+            acao="restaurar",
+            recurso="backup",
+            recurso_id=str(manifesto.get("geradoEm") or "v3"),
+            titulo="Backup criptografado restaurado",
+            detalhes=f"{resumo['totalRegistros']} registro(s) restaurados com transação.",
+            metadados={"colecoes": resumo["colecoes"]},
+        )
+        return {"status": "Backup restaurado com segurança.", **resumo}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("backup_restore_failed")
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "A restauração não foi aplicada. Verifique se o MongoDB permite "
+                "transações e tente novamente."
+            ),
+        ) from exc
+    finally:
+        caminho.unlink(missing_ok=True)
+        if zip_path:
+            zip_path.unlink(missing_ok=True)
+
+
+@router.get("/operacao/resumo")
+async def resumo_operacional(_: str = Depends(require_atelie_auth)):
+    db = get_db()
+    (
+        falhos,
+        em_espera,
+        processando,
+        eventos,
+        ultimo_backup,
+        ultima_restauracao,
+    ) = await asyncio.gather(
+        db.eventos_pagamento.count_documents({"status": "falhou"}),
+        db.eventos_pagamento.count_documents({"status": {"$in": ["pendente", "repetir"]}}),
+        db.eventos_pagamento.count_documents({"status": "processando"}),
+        db.eventos_pagamento.find({"status": "falhou"})
+        .sort("ultimaTentativaEm", -1)
+        .limit(10)
+        .to_list(10),
+        db.operacoes_sistema.find_one(
+            {"tipo": "auditoria:exportar", "recurso": "backup"},
+            sort=[("data", -1)],
+        ),
+        db.operacoes_sistema.find_one(
+            {"tipo": "auditoria:restaurar", "recurso": "backup"},
+            sort=[("data", -1)],
+        ),
+    )
+    return {
+        "status": "atencao" if falhos else "ok",
+        "pagamentosFalhos": falhos,
+        "pagamentosEmEspera": em_espera,
+        "pagamentosProcessando": processando,
+        "ultimoBackupEm": (ultimo_backup or {}).get("data"),
+        "ultimaRestauracaoEm": (ultima_restauracao or {}).get("data"),
+        "falhasRecentes": [
+            {
+                "id": str(evento.get("_id", "")),
+                "orderNsu": str((evento.get("payload") or {}).get("order_nsu", "")),
+                "tentativas": int(evento.get("tentativas", 0)),
+                "erro": str(evento.get("ultimoErro", ""))[:300],
+                "ultimaTentativaEm": evento.get("ultimaTentativaEm"),
+            }
+            for evento in eventos
+        ],
+    }
+
+
+@router.post("/operacao/pagamentos/reprocessar-falhos")
+async def reprocessar_pagamentos_falhos(_: str = Depends(require_atelie_auth)):
+    db = get_db()
+    agora = datetime.now(timezone.utc)
+    resultado = await db.eventos_pagamento.update_many(
+        {"status": "falhou"},
+        {
+            "$set": {
+                "status": "repetir",
+                "tentativas": 0,
+                "proximaTentativaEm": agora,
+                "atualizadoEm": agora,
+            },
+            "$unset": {
+                "ultimoErro": "",
+                "ultimaTentativaEm": "",
+                "leaseExpiraEm": "",
+            },
+        },
+    )
+    total = int(resultado.modified_count)
+    if total:
+        await registrar_auditoria(
+            db,
+            acao="reprocessar",
+            recurso="pagamentos",
+            recurso_id="eventos-falhos",
+            titulo="Confirmações de pagamento reenfileiradas",
+            detalhes=f"{total} evento(s) voltaram para a fila automática.",
+        )
+    return {"status": "Eventos reenfileirados.", "reprocessados": total}
 
 
 @router.get("/metricas")
