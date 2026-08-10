@@ -355,6 +355,7 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
         eventos,
         ultimo_backup,
         ultima_restauracao,
+        esquema_banco,
     ) = await asyncio.gather(
         db.eventos_pagamento.count_documents({"status": "falhou"}),
         db.eventos_pagamento.count_documents({"status": {"$in": ["pendente", "repetir"]}}),
@@ -371,14 +372,27 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
             {"tipo": "auditoria:restaurar", "recurso": "backup"},
             sort=[("data", -1)],
         ),
+        db.configuracoes.find_one({"_id": "database_schema"}),
+    )
+    banco_pronto = (
+        (esquema_banco or {}).get("status") == "pronto"
+        and int((esquema_banco or {}).get("versao", 0)) >= 1
     )
     return {
-        "status": "atencao" if falhos else "ok",
+        "status": "atencao" if falhos or not banco_pronto else "ok",
         "pagamentosFalhos": falhos,
         "pagamentosEmEspera": em_espera,
         "pagamentosProcessando": processando,
         "ultimoBackupEm": (ultimo_backup or {}).get("data"),
         "ultimaRestauracaoEm": (ultima_restauracao or {}).get("data"),
+        "bancoDados": {
+            "status": "ok" if banco_pronto else "atencao",
+            "versaoEsquema": int((esquema_banco or {}).get("versao", 0)),
+            "indicesConfirmados": int(
+                (esquema_banco or {}).get("indicesConfirmados", 0)
+            ),
+            "verificadoEm": (esquema_banco or {}).get("concluidoEm"),
+        },
         "falhasRecentes": [
             {
                 "id": str(evento.get("_id", "")),

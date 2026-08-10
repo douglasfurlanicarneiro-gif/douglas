@@ -63,10 +63,22 @@ class OperacoesFalsas:
         self.inseridos.append(documento)
 
 
+class ConfiguracoesFalsas:
+    async def find_one(self, filtro):
+        assert filtro == {"_id": "database_schema"}
+        return {
+            "status": "pronto",
+            "versao": 1,
+            "indicesConfirmados": 33,
+            "concluidoEm": "2026-08-10T09:00:00+00:00",
+        }
+
+
 class BancoOperacionalFalso:
     def __init__(self):
         self.eventos_pagamento = EventosPagamentoFalsos()
         self.operacoes_sistema = OperacoesFalsas()
+        self.configuracoes = ConfiguracoesFalsas()
 
 
 def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
@@ -79,6 +91,8 @@ def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
     assert resumo["pagamentosEmEspera"] == 3
     assert resumo["pagamentosProcessando"] == 2
     assert resumo["ultimoBackupEm"] == "2026-08-10T10:00:00+00:00"
+    assert resumo["bancoDados"]["status"] == "ok"
+    assert resumo["bancoDados"]["versaoEsquema"] == 1
     assert resumo["falhasRecentes"][0]["orderNsu"] == "pedido-42"
     assert "customer_name" not in resumo["falhasRecentes"][0]
 

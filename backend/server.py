@@ -20,6 +20,7 @@ from starlette.middleware.gzip import GZipMiddleware
 from availability import ensure_initial_ready_delivery
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS, IS_RENDER
 from database import close_client, get_db
+from database_integrity import ensure_database_schema
 from locks import stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
                      clientes, compras, custos, fornecedores, frete, insumos,
@@ -35,6 +36,11 @@ logger = logging.getLogger("atelie")
 # está acordando. Ele não deve impedir o Uvicorn de abrir a porta no Render.
 _BOOTSTRAP_TIMEOUT_SECONDS = 120
 _PROCESS_STARTED_AT = time.monotonic()
+_BOOTSTRAP_STATE = {
+    "status": "iniciando",
+    "tentativas": 0,
+    "erro": None,
+}
 
 
 async def _seed_admin():
@@ -76,105 +82,95 @@ async def _seed_admin():
 
 
 async def _criar_indices():
-    """Índices de integridade e desempenho das rotas mais acessadas."""
+    """Compatibilidade interna para a aplicação do esquema versionado."""
+    return await ensure_database_schema(get_db())
+
+
+async def _bootstrap_database_once() -> dict:
+    """Executa uma tentativa completa e idempotente de preparação."""
     db = get_db()
-    await db.admins.create_index("usuario", unique=True)
-    await db.auth_login_attempts.create_index("expireAt", expireAfterSeconds=0)
-    await db.auth_revoked_tokens.create_index("expireAt", expireAfterSeconds=0)
-    await db.api_rate_limits.create_index("expiresAt", expireAfterSeconds=0)
-    await db.oauth_states.create_index("expiraEm", expireAfterSeconds=0)
-    await db.perfumes.create_index([("publicavel", 1), ("arquivadoEm", 1)])
-    await db.perfumes.create_index([("arquivadoEm", 1), ("nome", 1)])
-    await db.perfumes.create_index("seq", unique=True, name="perfumes_seq_unico")
-    await db.pedidos.create_index([("arquivadoEm", 1), ("seq", -1)])
-    await db.pedidos.create_index("seq", unique=True, name="pedidos_seq_unico")
-    await db.pedidos.create_index("status")
-    await db.pedidos.create_index([("status", 1), ("arquivadoEm", 1)])
-    await db.pedidos.create_index(
-        "checkoutIdempotencyKey",
-        unique=True,
-        sparse=True,
-    )
-    await db.pedidos.create_index("pagamento.transactionNsu", sparse=True)
-    await db.eventos_pagamento.create_index(
-        [("status", 1), ("proximaTentativaEm", 1)]
-    )
-    await db.eventos_pagamento.create_index([("status", 1), ("leaseExpiraEm", 1)])
-    await db.pedidos.create_index(
-        "codigoAcompanhamento",
-        unique=True,
-        sparse=True,
-    )
-    await db.movimentos.create_index([("perfumeId", 1), ("data", -1)])
-    await db.movimentos.create_index("origem")
-    await db.operacoes_sistema.create_index("data")
-    await db.opinioes.create_index([("arquivadoEm", 1), ("data", -1)])
-    await db.opinioes.create_index([("aprovada", 1), ("arquivadoEm", 1), ("data", -1)])
-    await db.sugestoes.create_index([("arquivadoEm", 1), ("data", -1)])
-    await db.clientes.create_index("contato")
-    await db.fornecedores.create_index("nome")
-    await db.cotacoes_fornecedores.create_index([("fornecedorId", 1), ("data", -1)])
-    await db.cotacoes_fornecedores.create_index([("perfumeId", 1), ("data", -1)])
-    await db.insumos.create_index([("categoria", 1), ("ativo", -1)])
-    await db.insumos.create_index("perfumeId")
-    await db.movimentos_insumos.create_index([("insumoId", 1), ("data", -1)])
-    await db.producoes.create_index([("perfumeId", 1), ("data", -1)])
-    await db.solicitacoes_privacidade.create_index("protocolo", unique=True)
-    await db.solicitacoes_privacidade.create_index([("status", 1), ("criadoEm", -1)])
+    # A unicidade deve existir antes do primeiro cadastro. Em uma subida com
+    # duas instâncias, ambas podem procurar o usuário ao mesmo tempo; este
+    # índice impede que a corrida produza dois administradores iguais.
+    await db.admins.create_index("usuario", name="usuario_1", unique=True)
+    await _seed_admin()
+    # O lease cobre o timeout total desta tentativa e evita que duas
+    # instâncias reparem as mesmas sequências simultaneamente durante deploys.
+    async with stock_lock(
+        db,
+        wait_seconds=15,
+        lease_seconds=_BOOTSTRAP_TIMEOUT_SECONDS + 30,
+    ):
+        sequencias_reparadas = await reparar_sequencias(db, "perfumes")
+        pedidos_reparados = await reparar_sequencias(db, "pedidos")
+        disponibilidade = await ensure_initial_ready_delivery(db)
+    # Criar/verificar indices não altera saldo e pode levar mais tempo em um
+    # banco restaurado. Portanto, não mantém o checkout preso à trava de estoque.
+    esquema = await _criar_indices()
+    if sequencias_reparadas:
+        await vitrine.marcar_vitrine_pendente(db)
+    return {
+        "sequenciasReparadas": sequencias_reparadas,
+        "pedidosReparados": pedidos_reparados,
+        "disponibilidade": disponibilidade,
+        "esquema": esquema,
+    }
 
 
 async def _bootstrap_database() -> None:
-    """Executa as preparações do banco sem bloquear a abertura da API.
+    """Prepara o banco em segundo plano e se recupera sem reiniciar a API.
 
     Antes, essas operações aconteciam antes do ``yield`` do lifespan. Se o
     MongoDB demorasse para responder, o Uvicorn não abria a porta e o Render
-    encerrava o deploy com ``no open ports detected``.
+    encerrava o deploy com ``no open ports detected``. Agora, uma falha
+    transitória também é repetida automaticamente dentro do mesmo processo.
     """
-    try:
-        async with asyncio.timeout(_BOOTSTRAP_TIMEOUT_SECONDS):
-            await _seed_admin()
-            db = get_db()
-            async with stock_lock(db):
-                sequencias_reparadas = await reparar_sequencias(db, "perfumes")
-                pedidos_reparados = await reparar_sequencias(db, "pedidos")
-                disponibilidade = await ensure_initial_ready_delivery(db)
-            await _criar_indices()
-            if sequencias_reparadas:
-                await vitrine.marcar_vitrine_pendente(db)
-    except TimeoutError:
-        logger.error(
-            "Bootstrap do banco excedeu %ss. A API continuará disponível e "
-            "uma nova tentativa ocorrerá no próximo reinício.",
-            _BOOTSTRAP_TIMEOUT_SECONDS,
-        )
-        return
-    except Exception:
-        # O erro fica registrado nos logs, mas não derruba o servidor web.
-        logger.exception(
-            "Não foi possível concluir o bootstrap do banco. "
-            "A API foi iniciada mesmo assim."
-        )
-        return
+    while True:
+        _BOOTSTRAP_STATE["tentativas"] += 1
+        _BOOTSTRAP_STATE.update(status="iniciando", erro=None)
+        try:
+            async with asyncio.timeout(_BOOTSTRAP_TIMEOUT_SECONDS):
+                resultado = await _bootstrap_database_once()
+        except asyncio.CancelledError:
+            raise
+        except TimeoutError:
+            _BOOTSTRAP_STATE.update(status="erro", erro="timeout")
+            logger.error(
+                "Bootstrap do banco excedeu %ss; uma nova tentativa será feita automaticamente.",
+                _BOOTSTRAP_TIMEOUT_SECONDS,
+            )
+        except Exception as exc:
+            _BOOTSTRAP_STATE.update(status="erro", erro=type(exc).__name__)
+            logger.exception(
+                "Não foi possível concluir o bootstrap do banco; "
+                "uma nova tentativa será feita automaticamente."
+            )
+        else:
+            _BOOTSTRAP_STATE.update(status="pronto", erro=None)
+            disponibilidade = resultado["disponibilidade"]
+            logger.info(
+                "Banco pronto no esquema v%s com %s indices. "
+                "Pronta entrega: %s item(ns), %s não encontrado(s), %s ambíguo(s).",
+                resultado["esquema"]["versao"],
+                resultado["esquema"]["indicesConfirmados"],
+                disponibilidade.get("prontaEntrega", 0),
+                len(disponibilidade.get("naoEncontrados", [])),
+                len(disponibilidade.get("ambiguos", [])),
+            )
+            if resultado["sequenciasReparadas"]:
+                logger.info(
+                    "%s sequencia(s) duplicada(s) do catalogo foram corrigidas.",
+                    resultado["sequenciasReparadas"],
+                )
+            if resultado["pedidosReparados"]:
+                logger.info(
+                    "%s sequencia(s) duplicada(s) de pedidos foram corrigidas.",
+                    resultado["pedidosReparados"],
+                )
+            return
 
-    logger.info(
-        "Pronta entrega configurada: %s item(ns), %s não encontrado(s), %s ambíguo(s). "
-        "Estoque zerado em %s item(ns) sob encomenda (%s ml).",
-        disponibilidade.get("prontaEntrega", 0),
-        len(disponibilidade.get("naoEncontrados", [])),
-        len(disponibilidade.get("ambiguos", [])),
-        disponibilidade.get("estoquesZerados", 0),
-        disponibilidade.get("quantidadeZeradaMl", 0),
-    )
-    if sequencias_reparadas:
-        logger.info(
-            "%s sequencia(s) duplicada(s) do catalogo foram corrigidas.",
-            sequencias_reparadas,
-        )
-    if pedidos_reparados:
-        logger.info(
-            "%s sequencia(s) duplicada(s) de pedidos foram corrigidas.",
-            pedidos_reparados,
-        )
+        retry_seconds = min(60, 5 * _BOOTSTRAP_STATE["tentativas"])
+        await asyncio.sleep(retry_seconds)
 
 
 @asynccontextmanager
@@ -319,11 +315,25 @@ async def health_ready(response: Response):
         from fastapi import HTTPException
         raise HTTPException(status_code=503, detail="Banco de dados indisponível.")
     database_latency_ms = (time.perf_counter() - started_at) * 1_000
+    if _BOOTSTRAP_STATE["status"] != "pronto":
+        from fastapi import HTTPException
+        detail = (
+            "Inicialização segura do banco em andamento."
+            if _BOOTSTRAP_STATE["status"] == "iniciando"
+            else "Integridade do banco ainda não confirmada. Nova tentativa em andamento."
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=detail,
+            headers={"Cache-Control": "no-store", "Retry-After": "5"},
+        )
     response.headers["Cache-Control"] = "no-store"
     response.headers["Server-Timing"] = f'database;dur={database_latency_ms:.1f}'
     return {
         "status": "ready",
         "database": "ok",
+        "databaseSchema": "ok",
+        "bootstrapAttempts": _BOOTSTRAP_STATE["tentativas"],
         "databaseLatencyMs": round(database_latency_ms, 1),
         "uptimeSeconds": round(time.monotonic() - _PROCESS_STARTED_AT, 1),
     }

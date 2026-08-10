@@ -23,3 +23,14 @@ def test_sequencias_validas_nao_sao_alteradas():
 
     assert reparos == []
     assert maior == 3
+
+
+def test_booleanos_e_numeros_fracionarios_nao_sao_sequencias_validas():
+    reparos, maior = planejar_reparo_sequencias([
+        {"_id": "01", "seq": True},
+        {"_id": "02", "seq": 2.5},
+        {"_id": "03", "seq": 418},
+    ])
+
+    assert reparos == [("01", 419), ("02", 420)]
+    assert maior == 420

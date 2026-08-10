@@ -87,7 +87,7 @@ def planejar_reparo_sequencias(documentos: list[dict]) -> tuple[list[tuple[objec
     sequencias_validas = [
         int(item["seq"])
         for item in ordenados
-        if isinstance(item.get("seq"), int) and int(item["seq"]) > 0
+        if type(item.get("seq")) is int and int(item["seq"]) > 0
     ]
     proximo = max(sequencias_validas, default=0)
     usados: set[int] = set()
@@ -95,7 +95,7 @@ def planejar_reparo_sequencias(documentos: list[dict]) -> tuple[list[tuple[objec
 
     for item in ordenados:
         seq = item.get("seq")
-        if isinstance(seq, int) and seq > 0 and seq not in usados:
+        if type(seq) is int and seq > 0 and seq not in usados:
             usados.add(seq)
             continue
         proximo += 1
