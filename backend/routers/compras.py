@@ -15,11 +15,11 @@ from config import INFINITEPAY_HANDLE
 from database import get_db
 from finance import estimar_custo_unitario, obter_config_custos
 from locks import distributed_lock, stock_lock
+from money import centavos_em_valor, subtotal_em_centavos, valor_em_centavos
 from payments.base import PaymentProviderError
 from payments.service import iniciar_pagamento
 from rate_limit import checkout_rate_limit
-from routers.pedidos import (_persistir_pedido_e_estoque,
-                             _validar_status_estoque)
+from routers.pedidos import _persistir_pedido_e_estoque, _validar_status_estoque
 from security import require_atelie_auth
 from shipping.melhor_envio import MelhorEnvioError, cotar_frete
 from stock import RESERVATION_TTL_MINUTES, validar_estoque
@@ -146,9 +146,9 @@ def _validar_reuso_idempotente(pedido: dict, payload_hash: str) -> None:
 @router.get("")
 async def listar_compras(_: str = Depends(require_atelie_auth)):
     db = get_db()
-    compras = await db.compras.find(
-        {"arquivadoEm": None}
-    ).sort("data", -1).to_list(2000)
+    compras = (
+        await db.compras.find({"arquivadoEm": None}).sort("data", -1).to_list(2000)
+    )
     return [serialize(c) for c in compras]
 
 
@@ -197,47 +197,66 @@ async def _criar_compra(
 ):
     db = get_db()
     itens_entrada = payload.itens or [
-        ItemCompraIn(perfumeId=payload.perfumeId or "", ml=payload.ml or 0, quantidade=1)
+        ItemCompraIn(
+            perfumeId=payload.perfumeId or "", ml=payload.ml or 0, quantidade=1
+        )
     ]
 
     ids: list[ObjectId] = []
     try:
         ids = [ObjectId(item.perfumeId) for item in itens_entrada]
     except InvalidId:
-        raise HTTPException(status_code=400, detail="Um dos produtos possui id inválido.")
+        raise HTTPException(
+            status_code=400, detail="Um dos produtos possui id inválido."
+        )
 
     perfumes = await db.perfumes.find({"_id": {"$in": ids}}).to_list(len(ids))
     perfumes_por_id = {str(p["_id"]): p for p in perfumes}
     config_custos = await obter_config_custos(db)
     itens_doc = []
-    total = 0.0
+    subtotal_centavos = 0
     for item in itens_entrada:
         perfume = perfumes_por_id.get(item.perfumeId)
         if not perfume or perfume.get("publicavel") is False:
-            raise HTTPException(status_code=404, detail="Produto não encontrado na vitrine.")
-        opcao = next((p for p in perfume.get("precos", []) if p.get("ml") == item.ml), None)
-        if not opcao or float(opcao.get("preco", 0)) <= 0:
-            raise HTTPException(status_code=400, detail=f"Tamanho indisponível para {perfume['nome']}.")
-        preco_unitario = float(opcao["preco"])
-        subtotal = round(preco_unitario * item.quantidade, 2)
-        total += subtotal
-        calculo_custo = estimar_custo_unitario(perfume, item.ml, preco_unitario, config_custos)
-        itens_doc.append({
-            "perfumeId": item.perfumeId,
-            "perfumeNome": perfume["nome"],
-            "ml": item.ml,
-            "quantidade": item.quantidade,
-            "precoUnitario": preco_unitario,
-            "subtotal": subtotal,
-            "custoUnitarioEstimado": float(calculo_custo["custoTotal"]),
-            "lucroUnitarioEstimado": float(calculo_custo["lucro"]),
-            "prontaEntrega": perfume.get("prontaEntrega") is True,
-            "tipoAtendimento": (
-                "pronta_entrega"
-                if perfume.get("prontaEntrega") is True
-                else "sob_encomenda"
-            ),
-        })
+            raise HTTPException(
+                status_code=404, detail="Produto não encontrado na vitrine."
+            )
+        opcao = next(
+            (p for p in perfume.get("precos", []) if p.get("ml") == item.ml), None
+        )
+        if not opcao or valor_em_centavos(opcao.get("preco", 0)) <= 0:
+            raise HTTPException(
+                status_code=400, detail=f"Tamanho indisponível para {perfume['nome']}."
+            )
+        preco_unitario_centavos = valor_em_centavos(opcao["preco"])
+        preco_unitario = centavos_em_valor(preco_unitario_centavos)
+        subtotal_centavos_item = subtotal_em_centavos(
+            preco_unitario,
+            item.quantidade,
+        )
+        subtotal = centavos_em_valor(subtotal_centavos_item)
+        subtotal_centavos += subtotal_centavos_item
+        calculo_custo = estimar_custo_unitario(
+            perfume, item.ml, preco_unitario, config_custos
+        )
+        itens_doc.append(
+            {
+                "perfumeId": item.perfumeId,
+                "perfumeNome": perfume["nome"],
+                "ml": item.ml,
+                "quantidade": item.quantidade,
+                "precoUnitario": preco_unitario,
+                "subtotal": subtotal,
+                "custoUnitarioEstimado": float(calculo_custo["custoTotal"]),
+                "lucroUnitarioEstimado": float(calculo_custo["lucro"]),
+                "prontaEntrega": perfume.get("prontaEntrega") is True,
+                "tipoAtendimento": (
+                    "pronta_entrega"
+                    if perfume.get("prontaEntrega") is True
+                    else "sob_encomenda"
+                ),
+            }
+        )
 
     _validar_aceite_prazo_encomenda(
         itens_doc,
@@ -255,12 +274,14 @@ async def _criar_compra(
         }
     )
     doc["itens"] = itens_doc
-    doc["subtotal"] = round(total, 2)
+    doc["subtotal"] = centavos_em_valor(subtotal_centavos)
     doc["frete"] = 0.0
     doc["entrega"] = None
     if payload.tipoEntrega == "entrega" and payload.freteEscolhido:
         if not payload.endereco:
-            raise HTTPException(status_code=400, detail="Informe o endereço de entrega.")
+            raise HTTPException(
+                status_code=400, detail="Informe o endereço de entrega."
+            )
         try:
             opcoes_frete = await cotar_frete(
                 db,
@@ -280,14 +301,19 @@ async def _criar_compra(
         if not escolha:
             raise HTTPException(
                 status_code=400,
-                detail="A opção de entrega escolhida não está mais disponível. Calcule novamente.",
+                detail=(
+                    "A opção de entrega escolhida não está mais disponível. "
+                    "Calcule novamente."
+                ),
             )
         nome_exibicao = escolha.get("nomeExibicao", "Entrega Padrão")
-        doc["frete"] = escolha["preco"]
+        frete_centavos = valor_em_centavos(escolha["preco"])
+        doc["frete"] = centavos_em_valor(frete_centavos)
         doc["entrega"] = {
             **escolha,
             "tipo": "entrega",
             "nomeExibicao": nome_exibicao,
+            "preco": doc["frete"],
         }
     elif payload.tipoEntrega == "retirada":
         doc["endereco"] = None
@@ -302,7 +328,9 @@ async def _criar_compra(
             "preco": 0.0,
             "prazoDias": 0,
         }
-    doc["total"] = round(total + doc["frete"], 2)
+    doc["total"] = centavos_em_valor(
+        subtotal_centavos + valor_em_centavos(doc["frete"])
+    )
     agora = datetime.now(timezone.utc).isoformat()
     doc["data"] = agora
     doc["criadoEm"] = agora
@@ -375,28 +403,25 @@ async def _criar_compra(
             if not atual or atual.get("publicavel") is False:
                 raise HTTPException(
                     status_code=409,
-                    detail="Um produto foi atualizado. Reabra o carrinho e tente novamente.",
+                    detail=(
+                        "Um produto foi atualizado. Reabra o carrinho e "
+                        "tente novamente."
+                    ),
                 )
             pronta = atual.get("prontaEntrega") is True
             item["prontaEntrega"] = pronta
-            item["tipoAtendimento"] = (
-                "pronta_entrega" if pronta else "sob_encomenda"
-            )
+            item["tipoAtendimento"] = "pronta_entrega" if pronta else "sob_encomenda"
         tem_sob_encomenda = _validar_aceite_prazo_encomenda(
             itens_doc,
             payload.aceitePrazoEncomenda,
             status_code=409,
         )
         doc["temSobEncomenda"] = tem_sob_encomenda
-        doc["prazoEncomendaDias"] = (
-            PRAZO_ENCOMENDA_DIAS if tem_sob_encomenda else 0
-        )
+        doc["prazoEncomendaDias"] = PRAZO_ENCOMENDA_DIAS if tem_sob_encomenda else 0
         doc["aceitePrazoEncomenda"] = (
             bool(payload.aceitePrazoEncomenda) if tem_sob_encomenda else False
         )
-        doc["aceitePrazoEncomendaEm"] = (
-            doc["criadoEm"] if tem_sob_encomenda else None
-        )
+        doc["aceitePrazoEncomendaEm"] = doc["criadoEm"] if tem_sob_encomenda else None
         await validar_estoque(
             db,
             itens_doc,
@@ -425,9 +450,13 @@ async def _criar_compra(
                     "cliente": {
                         "nome": payload.nomeCompleto or payload.cliente,
                         "email": str(payload.email or ""),
-                        "telefone": payload.whatsapp or payload.telefone or payload.contato,
+                        "telefone": payload.whatsapp
+                        or payload.telefone
+                        or payload.contato,
                     },
-                    "endereco": payload.endereco.model_dump() if payload.endereco else {},
+                    "endereco": (
+                        payload.endereco.model_dump() if payload.endereco else {}
+                    ),
                 },
             )
         except PaymentProviderError as exc:
@@ -460,7 +489,9 @@ class CompraStatusIn(BaseModel):
 
 
 @router.patch("/{compra_id}")
-async def atualizar_status_compra(compra_id: str, payload: CompraStatusIn, _: str = Depends(require_atelie_auth)):
+async def atualizar_status_compra(
+    compra_id: str, payload: CompraStatusIn, _: str = Depends(require_atelie_auth)
+):
     db = get_db()
     async with stock_lock(db):
         try:
@@ -519,7 +550,9 @@ async def apagar_compra(compra_id: str, _: str = Depends(require_atelie_auth)):
         if resultado.matched_count == 0:
             pedido = await db.pedidos.find_one({"_id": oid, "origem": "vitrine"})
             if not pedido:
-                raise HTTPException(status_code=404, detail="Pedido de compra não encontrado.")
+                raise HTTPException(
+                    status_code=404, detail="Pedido de compra não encontrado."
+                )
             if pedido.get("status") not in {"cancelado", "entregue"}:
                 raise HTTPException(
                     status_code=409,

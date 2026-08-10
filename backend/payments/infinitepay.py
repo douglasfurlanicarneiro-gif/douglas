@@ -8,14 +8,19 @@ aceito depois da consulta server-to-server em ``payment_check``.
 import asyncio
 import hashlib
 import hmac
-from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from urllib.parse import urlparse
 
 import requests
 
-from config import (INFINITEPAY_API_URL, INFINITEPAY_HANDLE, JWT_SECRET,
-                    PUBLIC_API_URL, STOREFRONT_URL)
+from config import (
+    INFINITEPAY_API_URL,
+    INFINITEPAY_HANDLE,
+    JWT_SECRET,
+    PUBLIC_API_URL,
+    STOREFRONT_URL,
+)
+from money import valor_em_centavos
 from payments.base import PaymentProvider, PaymentProviderError
 
 
@@ -35,15 +40,6 @@ def normalizar_telefone(valor: str | None) -> str:
     if len(digitos) in {12, 13} and digitos.startswith("55"):
         return f"+{digitos}"
     return ""
-
-
-def valor_em_centavos(valor: float | int | Decimal) -> int:
-    return int(
-        (Decimal(str(valor)) * Decimal("100")).quantize(
-            Decimal("1"),
-            rounding=ROUND_HALF_UP,
-        )
-    )
 
 
 def _token_webhook(referencia: str) -> str:
