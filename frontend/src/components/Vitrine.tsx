@@ -136,77 +136,29 @@ const resumirCategorias = (valores: string[], limite: number, singular: string, 
   return `${visiveis.join(' · ')} · +${restantes} ${restantes === 1 ? singular : plural}`;
 };
 
-const iconeOcasiao = (ocasiao: string): FeatherIconName => ({
-  Academia: 'activity',
-  Casual: 'coffee',
-  Dia: 'sun',
-  Encontros: 'users',
-  Festa: 'music',
-  Inverno: 'cloud-snow',
-  Noite: 'moon',
-  Trabalho: 'briefcase',
-  Verão: 'sun',
-  Viagem: 'map-pin',
-}[ocasiao] as FeatherIconName || 'clock');
-
-const separarGenero = (nome: string) => {
-  const match = nome.match(/(?:\s+-)?\s+(Masculino|Feminino|Compartilhável)$/i);
-  if (!match) return { nomeExibicao: nome, genero: '' };
-  return {
-    nomeExibicao: nome.slice(0, match.index).trim(),
-    genero: match[1],
-  };
-};
-
-const separarReferencia = (nome: string, inspiracao: string) => {
-  const referenciaCadastrada = inspiracao.trim();
-  if (referenciaCadastrada) return { nomeProduto: nome, referencia: referenciaCadastrada };
-
-  const partesComSeparador = nome.split(/\s+[–—-]\s+/).map((parte) => parte.trim()).filter(Boolean);
-  if (partesComSeparador.length > 1) {
-    return {
-      nomeProduto: partesComSeparador[0],
-      referencia: partesComSeparador.slice(1).join(' '),
-    };
-  }
-
-  const palavras = nome.split(/\s+/).filter(Boolean);
-  if (palavras.length >= 5) {
-    return {
-      nomeProduto: palavras.slice(0, -2).join(' '),
-      referencia: palavras.slice(-2).join(' '),
-    };
-  }
-
-  return { nomeProduto: nome, referencia: '' };
-};
-
 function VitrineCard({
   item,
   favorite,
   onBuy,
+  onReview,
   onDetails,
   onToggleFavorite,
 }: {
   item: VitrineItem;
   favorite: boolean;
   onBuy: (ml: number, preco: number) => void;
+  onReview: () => void;
   onDetails: () => void;
   onToggleFavorite: () => void;
 }) {
-  const { width } = useWindowDimensions();
-  const wideCard = width >= 900;
-  const narrowCard = width < 380;
-  const compactTypography = width < 430;
+  const temNotas = item.notasSaida || item.notasCoracao || item.notasFundo;
   const ocasioes = item.ocasioes || [];
   const familias = familiasDoPerfume(item);
+  const climaOcasiao = ocasioes.length ? resumirCategorias(ocasioes, 2, 'ocasião', 'ocasiões') : 'Versátil · Todas as ocasiões';
   const familiasResumo = resumirCategorias(familias, 2, 'família', 'famílias');
-  const { nomeExibicao, genero } = separarGenero(item.nome);
-  const { nomeProduto, referencia } = separarReferencia(nomeExibicao, item.inspiracao || '');
-  const notasResumo = item.notasSaida || item.notasCoracao || item.notasFundo || 'Notas olfativas em atualização';
 
   return (
-    <View style={[styles.card, wideCard && styles.cardWide]} testID={`vitrine-card-${item.id}`}>
+    <View style={styles.card} testID={`vitrine-card-${item.id}`}>
       <Pressable
         onPress={onToggleFavorite}
         style={styles.cardFavorite}
@@ -223,13 +175,9 @@ function VitrineCard({
         )}
       </Pressable>
 
-      <View style={[styles.productTop, narrowCard && styles.productTopNarrow, wideCard && styles.productTopWide]}>
+      <View style={styles.productTop}>
         <Pressable
-          style={[
-            styles.imageFrame,
-            narrowCard && styles.imageFrameNarrow,
-            wideCard && styles.imageFrameWide,
-          ]}
+          style={styles.imageFrame}
           onPress={onDetails}
           testID={`details-image-${item.id}`}
           accessibilityRole="button"
@@ -245,31 +193,19 @@ function VitrineCard({
           )}
         </Pressable>
 
-        <View style={[styles.productInfo, wideCard && styles.productInfoWide]}>
+        <View style={styles.productInfo}>
           <Pressable
             onPress={onDetails}
             testID={`details-title-${item.id}`}
             accessible={false}
             focusable={false}
           >
-            <Text family="editorial" style={[styles.cardTitle, compactTypography && styles.cardTitleMobile, wideCard && styles.cardTitleWide]} numberOfLines={wideCard ? 3 : 2}>
-              {nomeProduto}
-            </Text>
+            <Text style={styles.inspiredLabel}>INSPIRADO EM</Text>
+            <Text style={styles.cardTitle} numberOfLines={2}>{item.nome}</Text>
           </Pressable>
-          <Text family="editorial" style={styles.inspirationText} numberOfLines={2}>
-            {referencia ? `Inspirado em ${referencia}` : 'Fragrância inspirada'}
-          </Text>
-          {!!genero && <Text style={styles.genderText}>{genero}</Text>}
-
-          <View style={styles.occasionChips}>
-            {(ocasioes.length ? ocasioes.slice(0, 3) : ['Versátil']).map((ocasiao) => (
-              <View key={ocasiao} style={styles.occasionChip}>
-                <Feather name={iconeOcasiao(ocasiao)} size={10} color={PRODUCT_CARD_COLORS.muted} />
-                <Text style={styles.occasionChipText} numberOfLines={1}>{ocasiao}</Text>
-              </View>
-            ))}
-          </View>
-          {!!familiasResumo && <Text style={styles.familySummary} numberOfLines={1}>{familiasResumo}</Text>}
+          <Text style={styles.occasionLabel}>CLIMA & OCASIÃO</Text>
+          <Text style={styles.cardSub} numberOfLines={2}>{climaOcasiao}</Text>
+          {!!familiasResumo && <Text style={styles.familySummary} numberOfLines={2}>{familiasResumo}</Text>}
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>{nomeConcentracao(item.concentracao)}</Text>
             <View style={[styles.availabilityDot, { backgroundColor: item.prontaEntrega ? (item.disponivel ? COLORS.sage : COLORS.rust) : PRODUCT_CARD_COLORS.gold }]} />
@@ -278,21 +214,6 @@ function VitrineCard({
             </Text>
           </View>
 
-          <Pressable
-            onPress={onDetails}
-            style={styles.notesPreview}
-            accessibilityRole="button"
-            accessibilityLabel={`Ver notas olfativas de ${item.nome}`}
-          >
-            <Feather name="feather" size={12} color={PRODUCT_CARD_COLORS.gold} />
-            <View style={styles.notesPreviewCopy}>
-              <Text style={styles.notesPreviewText} numberOfLines={2}>Notas: {notasResumo}</Text>
-              <View style={styles.notesPreviewLinkRow}>
-                <Text family="editorial" style={styles.notesPreviewLink}>Ver notas</Text>
-                <Feather name="chevron-right" size={13} color={PRODUCT_CARD_COLORS.gold} />
-              </View>
-            </View>
-          </Pressable>
         </View>
       </View>
 
@@ -314,7 +235,7 @@ function VitrineCard({
                   !disponivel && styles.sizeButtonDisabled,
                 ]}
               >
-                <Text family="editorial" style={[styles.sizeButtonText, !disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>{pr.ml} ml</Text>
+                <Text style={[styles.sizeButtonText, !disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>{pr.ml} ml</Text>
                 <Text style={[styles.sizePrice, !disponivel && { color: PRODUCT_CARD_COLORS.muted }]}>
                   {disponivel ? (item.prontaEntrega ? brl(pr.preco) : 'Solicitar') : 'Indisponível'}
                 </Text>
@@ -323,15 +244,48 @@ function VitrineCard({
           })}
       </View>
 
+      {temNotas ? (
+        <View style={styles.notes}>
+          {!!item.notasSaida && <NoteRow label="TOPO" value={item.notasSaida} />}
+          {!!item.notasCoracao && <NoteRow label="CORAÇÃO" value={item.notasCoracao} />}
+          {!!item.notasFundo && <NoteRow label="FUNDO" value={item.notasFundo} />}
+        </View>
+      ) : (
+        <View style={styles.notesEmpty}>
+          <Text style={styles.notesEmptyText}>Notas olfativas em atualização</Text>
+        </View>
+      )}
+
+      <View style={styles.cardActions}>
+        <Pressable
+          onPress={onReview}
+          style={styles.reviewButton}
+          testID={`review-trigger-${item.id}`}
+          accessibilityRole="button"
+          accessibilityLabel={`Avaliar ${item.nome}`}
+        >
+          <Feather name="star" size={13} color={COLORS.gold} />
+          <Text style={styles.reviewText}>Avaliar</Text>
+        </Pressable>
       <Pressable
         onPress={onDetails}
-        style={({ pressed }) => [styles.detailsButton, pressed && styles.detailsButtonPressed]}
+        style={styles.detailsButton}
         accessibilityRole="button"
         accessibilityLabel={`Conhecer a fragrância ${item.nome}`}
       >
-        <Text family="editorial" style={styles.detailsText}>Conhecer fragrância</Text>
-        <Feather name="arrow-right" size={16} color={COLORS.ink} />
+          <Text style={styles.detailsText}>Conhecer a fragrância</Text>
+          <Feather name="arrow-right" size={13} color={COLORS.gold} />
       </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function NoteRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.noteRow}>
+      <Text style={styles.noteLabel} numberOfLines={1}>{label}</Text>
+      <Text style={styles.noteValue}>{value}</Text>
     </View>
   );
 }
@@ -957,6 +911,7 @@ export function Vitrine({
             item={item}
             favorite={favorites.has(item.id)}
             onBuy={(ml, preco) => addToCart(item, ml, preco)}
+            onReview={() => setReviewItem(item)}
             onDetails={() => setDetailItem(item)}
             onToggleFavorite={() => toggleFavorite(item.id)}
           />
@@ -1842,60 +1797,50 @@ const styles = StyleSheet.create({
   contactFallbackText: { color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.lg },
   contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
-    width: '100%',
-    maxWidth: 940,
-    alignSelf: 'center',
     backgroundColor: PRODUCT_CARD_COLORS.background,
     borderWidth: 1,
     borderColor: PRODUCT_CARD_COLORS.border,
     borderRadius: RADIUS.lg,
-    marginBottom: 16,
+    marginBottom: 14,
     padding: SPACING.md,
     shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowRadius: 14,
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 5 },
     elevation: 4,
   },
-  cardWide: { padding: SPACING.xl },
-  cardFavorite: { position: 'absolute', right: 11, top: 11, zIndex: 4, width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold },
+  cardFavorite: { position: 'absolute', right: 10, top: 9, zIndex: 4, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productTop: { flexDirection: 'row', gap: SPACING.md },
-  productTopNarrow: { gap: SPACING.sm },
-  productTopWide: { gap: SPACING.lg },
-  imageFrame: { width: 132, height: 232, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
-  imageFrameNarrow: { width: 104, height: 232 },
-  imageFrameWide: { width: 240, height: 292 },
+  imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
   imagePlaceholderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
-  productInfo: { flex: 1, minWidth: 0, paddingTop: 3, paddingRight: 27 },
-  productInfoWide: { paddingRight: 40 },
-  cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.title, lineHeight: 26, fontWeight: '400' },
-  cardTitleMobile: { fontSize: FONT_SIZES.title, lineHeight: 26 },
-  cardTitleWide: { fontSize: FONT_SIZES.display, lineHeight: 34 },
-  inspirationText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 4 },
-  genderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 2 },
-  occasionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },
-  occasionChip: { maxWidth: '100%', minHeight: 25, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, borderRadius: RADIUS.pill, backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border + '88' },
-  occasionChipText: { flexShrink: 1, color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
-  familySummary: { color: PRODUCT_CARD_COLORS.text, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 8 },
+  productInfo: { flex: 1, minWidth: 0, paddingTop: 2 },
+  inspiredLabel: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, lineHeight: 15, letterSpacing: 1.1, fontWeight: '600', marginBottom: 2 },
+  cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.subtitle, lineHeight: 21, fontWeight: '700' },
+  occasionLabel: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, marginTop: 9 },
+  cardSub: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 2 },
+  familySummary: { color: PRODUCT_CARD_COLORS.text, fontSize: FONT_SIZES.caption, lineHeight: 14, marginTop: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 5 },
   metaText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
   availabilityDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
-  notesPreview: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingTop: 8, marginTop: 8, borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border + '99' },
-  notesPreviewCopy: { flex: 1, minWidth: 0 },
-  notesPreviewText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15 },
-  notesPreviewLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
-  notesPreviewLink: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: SPACING.md },
-  sizeButton: { flex: 1, minWidth: 82, minHeight: 62, paddingHorizontal: 7, paddingVertical: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface },
+  sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold, alignItems: 'center', backgroundColor: COLORS.surface },
   sizeButtonPressed: { backgroundColor: COLORS.surfaceRaised },
   sizeButtonDisabled: { borderColor: PRODUCT_CARD_COLORS.border, opacity: 0.65 },
-  sizeButtonText: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.subtitle, lineHeight: 20, fontWeight: '400' },
+  sizeButtonText: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.label, lineHeight: 15, fontWeight: '700' },
   sizePrice: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 12, marginTop: 1 },
-  detailsButton: { minHeight: 54, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: SPACING.md, marginTop: SPACING.md, borderRadius: RADIUS.md, backgroundColor: PRODUCT_CARD_COLORS.gold },
-  detailsButtonPressed: { opacity: 0.86 },
-  detailsText: { color: COLORS.ink, fontSize: FONT_SIZES.subtitle, fontWeight: '400' },
+  notes: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10, gap: 6 },
+  noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  noteLabel: { width: 72, flexShrink: 0, color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, letterSpacing: 0.8 },
+  noteValue: { flex: 1, color: PRODUCT_CARD_COLORS.text, fontSize: FONT_SIZES.caption, lineHeight: 15, fontStyle: 'italic' },
+  notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
+  notesEmptyText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, fontStyle: 'italic' },
+  cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
+  reviewButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
+  reviewText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption },
+  detailsButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
+  detailsText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
   navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
