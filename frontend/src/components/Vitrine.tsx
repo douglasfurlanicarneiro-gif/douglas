@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet, Pressable, FlatList, ActivityIndicator, RefreshControl, Share, Linking, Platform, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Image } from 'expo-image';
@@ -180,6 +180,7 @@ function VitrineCard({
   const familiasResumo = resumirCategorias(familias, 2, 'família', 'famílias');
   const { nomeExibicao, genero } = separarGenero(item.nome);
   const notasResumo = item.notasSaida || item.notasCoracao || item.notasFundo || 'Notas olfativas em atualização';
+
   return (
     <View style={[styles.card, wideCard && styles.cardWide]} testID={`vitrine-card-${item.id}`}>
       <Pressable
@@ -197,6 +198,7 @@ function VitrineCard({
           <Feather name="heart" size={18} color={PRODUCT_CARD_COLORS.gold} />
         )}
       </Pressable>
+
       <View style={[styles.productTop, wideCard && styles.productTopWide]}>
         <Pressable
           style={[
@@ -210,7 +212,7 @@ function VitrineCard({
           accessibilityLabel={`Conhecer ${item.nome}`}
         >
           {item.imagemUrl ? (
-            <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="cover" transition={180} />
+            <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="contain" transition={180} />
           ) : (
             <View style={styles.imagePlaceholder}>
               <Feather name="image" size={25} color={PRODUCT_CARD_COLORS.muted} />
@@ -218,6 +220,7 @@ function VitrineCard({
             </View>
           )}
         </Pressable>
+
         <View style={[styles.productInfo, wideCard && styles.productInfoWide]}>
           <Pressable
             onPress={onDetails}
@@ -233,6 +236,7 @@ function VitrineCard({
             {item.inspiracao?.trim() ? `Inspirado em ${item.inspiracao.trim()}` : 'Fragrância inspirada'}
           </Text>
           {!!genero && <Text style={styles.genderText}>{genero}</Text>}
+
           <View style={styles.occasionChips}>
             {(ocasioes.length ? ocasioes.slice(0, 3) : ['Versátil']).map((ocasiao) => (
               <View key={ocasiao} style={styles.occasionChip}>
@@ -249,6 +253,7 @@ function VitrineCard({
               {item.prontaEntrega ? (item.disponivel ? 'Pronta entrega' : 'Indisponível') : 'Sob encomenda'}
             </Text>
           </View>
+
           <Pressable
             onPress={onDetails}
             style={styles.notesPreview}
@@ -293,6 +298,7 @@ function VitrineCard({
             );
           })}
       </View>
+
       <Pressable
         onPress={onDetails}
         style={({ pressed }) => [styles.detailsButton, pressed && styles.detailsButtonPressed]}
@@ -318,6 +324,7 @@ export function Vitrine({
   onReady?: () => void;
 }) {
   const { width: viewportWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const narrowViewport = viewportWidth < 410;
   const phoneViewport = viewportWidth < 900;
   const currentStore = publicStoreConfig(storeConfig);
@@ -1069,7 +1076,12 @@ export function Vitrine({
                         setOcasiaoAtiva('Todas');
                         setDisponibilidadeAtiva('todas');
                       }}
-                      style={[styles.quickFilterButton, narrowViewport && styles.quickFilterButtonNarrow, styles.quickFilterSecondary, familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive]}
+                      style={[
+                        styles.quickFilterButton,
+                        narrowViewport && styles.quickFilterButtonNarrow,
+                        styles.quickFilterSecondary,
+                        familiaAtiva === 'Favoritos' && styles.quickFilterButtonActive,
+                      ]}
                       testID="filter-favorites"
                       accessibilityRole="button"
                       accessibilityLabel="Mostrar perfumes favoritos"
@@ -1087,7 +1099,12 @@ export function Vitrine({
                         if (familiaAtiva === 'Favoritos') setFamiliaAtiva('Todas');
                         setFiltersOpen(true);
                       }}
-                      style={[styles.quickFilterButton, narrowViewport && styles.quickFilterButtonNarrow, styles.quickFilterCompact, filtrosAtivos > 0 && styles.quickFilterButtonActive]}
+                      style={[
+                        styles.quickFilterButton,
+                        narrowViewport && styles.quickFilterButtonNarrow,
+                        styles.quickFilterCompact,
+                        filtrosAtivos > 0 && styles.quickFilterButtonActive,
+                      ]}
                       testID="filter-open"
                       accessibilityRole="button"
                       accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
@@ -1127,14 +1144,16 @@ export function Vitrine({
             </View>
           )
         }
-        contentContainerStyle={styles.catalogContent}
+        contentContainerStyle={[
+          styles.catalogContent,
+          { paddingBottom: 122 + insets.bottom },
+        ]}
         />
       </View>
 
-      {/* Atendimento e sugestões em um único ponto de contato */}
       <Pressable
         onPress={() => setContactOpen(true)}
-        style={styles.fabSuggestion}
+        style={[styles.fabSuggestion, { bottom: 82 + Math.max(insets.bottom, 12) }]}
         testID="contact-fab"
         accessibilityRole="button"
         accessibilityLabel="Abrir atendimento"
@@ -1142,7 +1161,10 @@ export function Vitrine({
         <Feather name="message-circle" size={22} color={COLORS.ink} />
       </Pressable>
 
-      <View style={styles.bottomNav}>
+      <View style={[
+        styles.bottomNav,
+        { paddingBottom: Math.max(insets.bottom, 12) },
+      ]}>
         <View style={styles.navItem}>
           <Feather name="home" size={22} color={COLORS.gold} />
           <Text style={styles.navTextActive}>Vitrine</Text>
@@ -1731,7 +1753,7 @@ export function Vitrine({
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: STOREFRONT_COLORS.background },
+  screen: { flex: 1, overflow: 'hidden', backgroundColor: STOREFRONT_COLORS.background },
   pullRefreshIndicator: { position: 'absolute', zIndex: 20, top: 6, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, minHeight: 34, borderRadius: RADIUS.pill, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border },
   pullRefreshText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption },
   catalogContent: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: SPACING.lg, paddingBottom: 160 },
@@ -1791,6 +1813,7 @@ const styles = StyleSheet.create({
   contactFallbackText: { color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.lg },
   contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
+    width: '100%',
     backgroundColor: PRODUCT_CARD_COLORS.background,
     borderWidth: 1,
     borderColor: PRODUCT_CARD_COLORS.border,
