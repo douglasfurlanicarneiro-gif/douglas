@@ -223,7 +223,7 @@ function VitrineCard({
         )}
       </Pressable>
 
-      <View style={[styles.productTop, wideCard && styles.productTopWide]}>
+      <View style={[styles.productTop, narrowCard && styles.productTopNarrow, wideCard && styles.productTopWide]}>
         <Pressable
           style={[
             styles.imageFrame,
@@ -256,7 +256,7 @@ function VitrineCard({
               {nomeProduto}
             </Text>
           </Pressable>
-          <Text family="editorial" style={styles.inspirationText} numberOfLines={1}>
+          <Text family="editorial" style={styles.inspirationText} numberOfLines={2}>
             {referencia ? `Inspirado em ${referencia}` : 'Fragrância inspirada'}
           </Text>
           {!!genero && <Text style={styles.genderText}>{genero}</Text>}
@@ -349,6 +349,7 @@ export function Vitrine({
 }) {
   const { width: viewportWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const ultraNarrowViewport = viewportWidth < 360;
   const narrowViewport = viewportWidth < 410;
   const phoneViewport = viewportWidth < 900;
   const currentStore = publicStoreConfig(storeConfig);
@@ -1036,17 +1037,19 @@ export function Vitrine({
                       accessibilityLabel="Mostrar perfumes a pronta entrega"
                       accessibilityState={{ selected: disponibilidadeAtiva === 'pronta' }}
                     >
-                      <Feather
-                        name="package"
-                        size={13}
-                        color={
-                          disponibilidadeAtiva === 'pronta'
-                            && familiaAtiva === 'Todas'
-                            && ocasiaoAtiva === 'Todas'
-                            ? COLORS.ink
-                            : COLORS.gold
-                        }
-                      />
+                      {!ultraNarrowViewport && (
+                        <Feather
+                          name="package"
+                          size={13}
+                          color={
+                            disponibilidadeAtiva === 'pronta'
+                              && familiaAtiva === 'Todas'
+                              && ocasiaoAtiva === 'Todas'
+                              ? COLORS.ink
+                              : COLORS.gold
+                          }
+                        />
+                      )}
                       <Text family="editorial" style={[
                         styles.quickFilterText,
                         disponibilidadeAtiva === 'pronta'
@@ -1075,17 +1078,19 @@ export function Vitrine({
                       accessibilityLabel="Mostrar perfumes sob encomenda"
                       accessibilityState={{ selected: disponibilidadeAtiva === 'encomenda' }}
                     >
-                      <Feather
-                        name="clock"
-                        size={13}
-                        color={
-                          disponibilidadeAtiva === 'encomenda'
-                            && familiaAtiva === 'Todas'
-                            && ocasiaoAtiva === 'Todas'
-                            ? COLORS.ink
-                            : COLORS.gold
-                        }
-                      />
+                      {!ultraNarrowViewport && (
+                        <Feather
+                          name="clock"
+                          size={13}
+                          color={
+                            disponibilidadeAtiva === 'encomenda'
+                              && familiaAtiva === 'Todas'
+                              && ocasiaoAtiva === 'Todas'
+                              ? COLORS.ink
+                              : COLORS.gold
+                          }
+                        />
+                      )}
                       <Text family="editorial" style={[
                         styles.quickFilterText,
                         disponibilidadeAtiva === 'encomenda'
@@ -1111,11 +1116,11 @@ export function Vitrine({
                       accessibilityLabel="Mostrar perfumes favoritos"
                       accessibilityState={{ selected: familiaAtiva === 'Favoritos' }}
                     >
-                      {familiaAtiva === 'Favoritos' ? (
+                      {!ultraNarrowViewport && (familiaAtiva === 'Favoritos' ? (
                         <FontAwesome name="heart" size={14} color={COLORS.favorite} />
                       ) : (
                         <Feather name="heart" size={14} color={COLORS.gold} />
-                      )}
+                      ))}
                       <Text family="editorial" style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1}>Favoritos</Text>
                     </Pressable>
                     <Pressable
@@ -1133,7 +1138,7 @@ export function Vitrine({
                       accessibilityRole="button"
                       accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
                     >
-                      <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />
+                      {!ultraNarrowViewport && <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />}
                       <Text family="editorial" style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1}>Filtros</Text>
                       {filtrosAtivos > 0 && (
                         <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{filtrosAtivos}</Text></View>
@@ -1803,10 +1808,10 @@ const styles = StyleSheet.create({
   quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   quickFilterButton: { minHeight: 42, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   quickFilterButtonNarrow: { paddingHorizontal: 3, gap: 2 },
-  quickFilterReady: { flex: 1.22 },
-  quickFilterOrder: { flex: 1.32 },
-  quickFilterSecondary: { flex: 0.93 },
-  quickFilterCompact: { flex: 0.73 },
+  quickFilterReady: { flex: 1.32 },
+  quickFilterOrder: { flex: 1.28 },
+  quickFilterSecondary: { flex: 0.9 },
+  quickFilterCompact: { flex: 0.7 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '400' },
   quickFilterTextActive: { color: COLORS.ink },
@@ -1838,6 +1843,8 @@ const styles = StyleSheet.create({
   contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
     width: '100%',
+    maxWidth: 940,
+    alignSelf: 'center',
     backgroundColor: PRODUCT_CARD_COLORS.background,
     borderWidth: 1,
     borderColor: PRODUCT_CARD_COLORS.border,
@@ -1853,9 +1860,10 @@ const styles = StyleSheet.create({
   cardWide: { padding: SPACING.xl },
   cardFavorite: { position: 'absolute', right: 11, top: 11, zIndex: 4, width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold },
   productTop: { flexDirection: 'row', gap: SPACING.md },
+  productTopNarrow: { gap: SPACING.sm },
   productTopWide: { gap: SPACING.lg },
   imageFrame: { width: 132, height: 232, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
-  imageFrameNarrow: { width: 116, height: 232 },
+  imageFrameNarrow: { width: 104, height: 232 },
   imageFrameWide: { width: 240, height: 292 },
   productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
@@ -1865,7 +1873,7 @@ const styles = StyleSheet.create({
   cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.title, lineHeight: 26, fontWeight: '400' },
   cardTitleMobile: { fontSize: FONT_SIZES.title, lineHeight: 26 },
   cardTitleWide: { fontSize: FONT_SIZES.display, lineHeight: 34 },
-  inspirationText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.bodySmall, lineHeight: 18, marginTop: 4 },
+  inspirationText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 4 },
   genderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 2 },
   occasionChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },
   occasionChip: { maxWidth: '100%', minHeight: 25, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, borderRadius: RADIUS.pill, backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border + '88' },
