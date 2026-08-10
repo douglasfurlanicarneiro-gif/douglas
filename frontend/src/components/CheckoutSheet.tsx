@@ -409,6 +409,7 @@ export function CheckoutSheet({
         accessibilityRole="radio"
         accessibilityLabel={`${displayName}, prazo estimado ${opcao.prazoDias} ${opcao.prazoDias === 1 ? 'dia útil' : 'dias úteis'}, ${brl(opcao.preco)}`}
         accessibilityState={{ selected: active }}
+        testID={`shipping-option-${opcao.categoriaFrete || opcao.serviceId}`}
         style={{
           padding: 13,
           borderRadius: 12,
@@ -535,11 +536,12 @@ export function CheckoutSheet({
             <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>
               DADOS DO CLIENTE
             </Text>
-            <Field label="Nome completo"><TInput value={form.nomeCompleto} onChangeText={(nomeCompleto) => setForm({ ...form, nomeCompleto })} /></Field>
-            <Field label="Celular / WhatsApp"><TInput keyboardType="phone-pad" autoComplete="tel" value={form.whatsapp} onChangeText={(whatsapp) => setForm({ ...form, whatsapp })} /></Field>
+            <Field label="Nome completo"><TInput accessibilityLabel="Nome completo" testID="checkout-name" autoComplete="name" value={form.nomeCompleto} onChangeText={(nomeCompleto) => setForm({ ...form, nomeCompleto })} /></Field>
+            <Field label="Celular / WhatsApp"><TInput accessibilityLabel="Celular / WhatsApp" testID="checkout-whatsapp" keyboardType="phone-pad" autoComplete="tel" value={form.whatsapp} onChangeText={(whatsapp) => setForm({ ...form, whatsapp })} /></Field>
             <Field label="E-mail">
               <TInput
                 accessibilityLabel="E-mail"
+                testID="checkout-email"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={form.email}
@@ -572,7 +574,7 @@ export function CheckoutSheet({
 
             <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
               <SecondaryButton label="Continuar comprando" onPress={onClose} />
-              <PrimaryButton label="Ir para entrega" onPress={() => setStep('entrega')} disabled={!dadosCompletos} />
+              <PrimaryButton label="Ir para entrega" onPress={() => setStep('entrega')} disabled={!dadosCompletos} testID="checkout-to-delivery" />
             </View>
           </View>
         )}
@@ -595,6 +597,7 @@ export function CheckoutSheet({
                     accessibilityRole="radio"
                     accessibilityLabel={`${method.title}, ${method.meta}`}
                     accessibilityState={{ selected: active }}
+                    testID={`delivery-method-${method.id}`}
                     style={{
                       flex: 1,
                       padding: SPACING.md,
@@ -636,19 +639,19 @@ export function CheckoutSheet({
               <View>
                 <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>ENDEREÇO</Text>
                 <Field label="CEP">
-                  <TInput accessibilityLabel="CEP" keyboardType="numeric" autoComplete="postal-code" maxLength={9} value={form.endereco.cep} onChangeText={handleCep} />
+                  <TInput accessibilityLabel="CEP" testID="checkout-cep" keyboardType="numeric" autoComplete="postal-code" maxLength={9} value={form.endereco.cep} onChangeText={handleCep} />
                   {cepLoading && <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 5 }}>Buscando endereço…</Text>}
                   {!!cepError && <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 5 }}>{cepError}</Text>}
                 </Field>
-                <Field label="Endereço"><TInput value={form.endereco.endereco} onChangeText={(value) => setAddress('endereco', value)} /></Field>
+                <Field label="Endereço"><TInput accessibilityLabel="Endereço" testID="checkout-street" autoComplete="street-address" value={form.endereco.endereco} onChangeText={(value) => setAddress('endereco', value)} /></Field>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 1 }}><Field label="Número"><TInput value={form.endereco.numero} onChangeText={(value) => setAddress('numero', value)} /></Field></View>
-                  <View style={{ flex: 2 }}><Field label="Complemento"><TInput value={form.endereco.complemento} onChangeText={(value) => setAddress('complemento', value)} /></Field></View>
+                  <View style={{ flex: 1 }}><Field label="Número"><TInput accessibilityLabel="Número" testID="checkout-number" value={form.endereco.numero} onChangeText={(value) => setAddress('numero', value)} /></Field></View>
+                  <View style={{ flex: 2 }}><Field label="Complemento"><TInput accessibilityLabel="Complemento" testID="checkout-complement" value={form.endereco.complemento} onChangeText={(value) => setAddress('complemento', value)} /></Field></View>
                 </View>
-                <Field label="Bairro"><TInput value={form.endereco.bairro} onChangeText={(value) => setAddress('bairro', value)} /></Field>
+                <Field label="Bairro"><TInput accessibilityLabel="Bairro" testID="checkout-neighborhood" value={form.endereco.bairro} onChangeText={(value) => setAddress('bairro', value)} /></Field>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <View style={{ flex: 3 }}><Field label="Cidade"><TInput value={form.endereco.cidade} onChangeText={(value) => setAddress('cidade', value)} /></Field></View>
-                  <View style={{ flex: 1 }}><Field label="UF"><TInput maxLength={2} autoCapitalize="characters" value={form.endereco.estado} onChangeText={(value) => setAddress('estado', value)} /></Field></View>
+                  <View style={{ flex: 3 }}><Field label="Cidade"><TInput accessibilityLabel="Cidade" testID="checkout-city" value={form.endereco.cidade} onChangeText={(value) => setAddress('cidade', value)} /></Field></View>
+                  <View style={{ flex: 1 }}><Field label="UF"><TInput accessibilityLabel="UF" testID="checkout-state" maxLength={2} autoCapitalize="characters" value={form.endereco.estado} onChangeText={(value) => setAddress('estado', value)} /></Field></View>
                 </View>
 
                 {freteLoading && (
@@ -686,7 +689,7 @@ export function CheckoutSheet({
 
             <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
               <SecondaryButton label="Voltar" onPress={() => setStep('dados')} />
-              <PrimaryButton label="Ir para pagamento" onPress={() => setStep('pagamento')} disabled={!entregaCompleta || freteLoading} />
+              <PrimaryButton label="Ir para pagamento" onPress={() => setStep('pagamento')} disabled={!entregaCompleta || freteLoading} testID="checkout-to-payment" />
             </View>
           </View>
         )}
@@ -870,6 +873,7 @@ export function CheckoutSheet({
                 accessibilityRole="button"
                 accessibilityLabel={`${loading ? 'Abrindo pagamento' : 'Ir para pagamento'}, total ${brl(total)}`}
                 accessibilityState={{ disabled: !complete || loading }}
+                testID="checkout-submit"
                 style={({ pressed }) => [
                   styles.paymentSubmitButton,
                   isWide && styles.paymentButtonWide,

@@ -64,3 +64,7 @@ jobs:
         env:
           EXPO_PUBLIC_BACKEND_URL: https://lessence-furlani-api.onrender.com
         run: npm run build:web
+      - name: Instalar navegador de testes
+        run: npx playwright install --with-deps chromium
+      - name: Testar vitrine, carrinho, frete e checkout
+        run: npm run test:e2e
