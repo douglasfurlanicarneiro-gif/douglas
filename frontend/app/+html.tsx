@@ -104,12 +104,12 @@ export default function Root({ children }: PropsWithChildren) {
                 border-radius: 46% 54% 38% 62% / 28% 34% 66% 72%;
                 background: linear-gradient(90deg,
                   rgba(239, 211, 157, 0) 0%,
-                  rgba(255, 249, 240, 0.18) 28%,
-                  rgba(255, 239, 204, 0.72) 50%,
-                  rgba(199, 162, 92, 0.18) 72%,
+                  rgba(255, 249, 240, 0.24) 28%,
+                  rgba(255, 247, 226, 0.88) 50%,
+                  rgba(199, 162, 92, 0.24) 72%,
                   rgba(199, 162, 92, 0) 100%);
-                filter: blur(3px);
-                box-shadow: 0 0 54px rgba(255, 239, 204, 0.22);
+                filter: blur(4px);
+                box-shadow: 0 0 64px rgba(255, 239, 204, 0.3);
                 animation: brand-page-shine 1.45s ease-in-out infinite;
                 pointer-events: none;
               }
@@ -160,8 +160,8 @@ export default function Root({ children }: PropsWithChildren) {
               }
               @keyframes brand-page-shine {
                 0% { opacity: 0; transform: translate3d(-70vw, 0, 0) rotate(9deg) scaleX(.82); }
-                16% { opacity: .92; }
-                82% { opacity: .92; }
+                14% { opacity: 1; }
+                84% { opacity: 1; }
                 100% { opacity: 0; transform: translate3d(170vw, 0, 0) rotate(9deg) scaleX(1.08); }
               }
               @media (prefers-reduced-motion: reduce) {

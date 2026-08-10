@@ -17,6 +17,11 @@ const LazyLaunchIntro = lazy(() => import('../src/components/LaunchIntro').then(
   default: module.LaunchIntro,
 })));
 
+// Garante que a assinatura visual complete ao menos uma passagem do brilho
+// quando a vitrine abre rapidamente. A espera só existe enquanto o preloader
+// cobre a tela; carregamentos mais longos não recebem atraso adicional.
+const WEB_PRELOADER_MIN_VISIBLE_MS = 1450;
+
 function AdminLoading() {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background }}>
@@ -89,8 +94,13 @@ export default function Index() {
     const preloader = document.getElementById('brand-preloader');
     if (!preloader || preloader.dataset.hiding === 'true') return;
     preloader.dataset.hiding = 'true';
-    preloader.style.opacity = '0';
-    window.setTimeout(() => preloader.remove(), 320);
+
+    const elapsed = typeof performance !== 'undefined' ? performance.now() : WEB_PRELOADER_MIN_VISIBLE_MS;
+    const remaining = Math.max(0, WEB_PRELOADER_MIN_VISIBLE_MS - elapsed);
+    window.setTimeout(() => {
+      preloader.style.opacity = '0';
+      window.setTimeout(() => preloader.remove(), 320);
+    }, remaining);
   }, []);
 
   useEffect(() => {
