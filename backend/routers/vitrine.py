@@ -204,6 +204,11 @@ async def garantir_vitrine_atualizada(db, *, forcar: bool = False) -> dict | Non
         return None
 
     alterada_em = estado.get("alteradaEm")
+    # O MongoDB devolve datas UTC sem ``tzinfo`` quando o cliente não usa
+    # ``tz_aware=True``. Normalize antes da subtração para que uma alteração
+    # pendente nunca derrube a vitrine pública com erro 500.
+    if isinstance(alterada_em, datetime) and alterada_em.tzinfo is None:
+        alterada_em = alterada_em.replace(tzinfo=timezone.utc)
     if (
         not forcar
         and isinstance(alterada_em, datetime)

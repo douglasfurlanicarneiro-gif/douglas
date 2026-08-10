@@ -92,6 +92,25 @@ def test_janela_de_agrupamento_evitas_publicacoes_intermediarias(monkeypatch):
     assert db.configuracoes.document["pendente"] is True
 
 
+def test_janela_de_agrupamento_aceita_data_utc_sem_timezone(monkeypatch):
+    db = FakeDb()
+    db.configuracoes.document = {
+        "_id": vitrine._PUBLICATION_STATE_ID,
+        "revisao": 2,
+        "pendente": True,
+        # O PyMongo retorna esse formato por padrão.
+        "alteradaEm": datetime.now(timezone.utc).replace(tzinfo=None),
+    }
+
+    async def fail_publish(*args, **kwargs):
+        raise AssertionError("não deveria publicar antes do fim da janela")
+
+    monkeypatch.setattr(vitrine, "_publicar_snapshot_sem_trava", fail_publish)
+
+    assert asyncio.run(vitrine.garantir_vitrine_atualizada(db)) is None
+    assert db.configuracoes.document["pendente"] is True
+
+
 def test_leitura_do_estado_existente_nao_faz_escrita_desnecessaria():
     db = FakeDb()
     db.configuracoes.document = {
