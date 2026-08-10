@@ -971,7 +971,7 @@ export function Vitrine({
                     <Feather name="compass" size={phoneViewport ? 23 : 19} color={COLORS.gold} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text family="editorial" style={styles.quizTitle}>Encontre seu perfume</Text>
+                    <Text style={styles.quizTitle}>Encontre seu perfume</Text>
                     <Text style={styles.quizSubtitle}>Uma seleção personalizada em poucos passos</Text>
                   </View>
                   <Feather name="chevron-right" size={18} color={COLORS.gold} />
@@ -1011,7 +1011,7 @@ export function Vitrine({
                           }
                         />
                       )}
-                      <Text family="editorial" style={[
+                      <Text style={[
                         styles.quickFilterText,
                         disponibilidadeAtiva === 'pronta'
                           && familiaAtiva === 'Todas'
@@ -1052,7 +1052,7 @@ export function Vitrine({
                           }
                         />
                       )}
-                      <Text family="editorial" style={[
+                      <Text style={[
                         styles.quickFilterText,
                         disponibilidadeAtiva === 'encomenda'
                           && familiaAtiva === 'Todas'
@@ -1082,7 +1082,7 @@ export function Vitrine({
                       ) : (
                         <Feather name="heart" size={14} color={COLORS.gold} />
                       ))}
-                      <Text family="editorial" style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1}>Favoritos</Text>
+                      <Text style={[styles.quickFilterText, familiaAtiva === 'Favoritos' && styles.quickFilterTextActive]} numberOfLines={1}>Favoritos</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1100,7 +1100,7 @@ export function Vitrine({
                       accessibilityLabel={`Abrir filtros${filtrosAtivos ? `, ${filtrosAtivos} ativo${filtrosAtivos > 1 ? 's' : ''}` : ''}`}
                     >
                       {!ultraNarrowViewport && <Feather name="sliders" size={14} color={filtrosAtivos > 0 ? COLORS.ink : COLORS.gold} />}
-                      <Text family="editorial" style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1}>Filtros</Text>
+                      <Text style={[styles.quickFilterText, filtrosAtivos > 0 && styles.quickFilterTextActive]} numberOfLines={1}>Filtros</Text>
                       {filtrosAtivos > 0 && (
                         <View style={styles.filterBadge}><Text style={styles.filterBadgeText}>{filtrosAtivos}</Text></View>
                       )}
@@ -1114,7 +1114,7 @@ export function Vitrine({
         ListEmptyComponent={
           showEmpty ? (
             <View style={{ padding: SPACING.xl, alignItems: 'center' }}>
-              <Text family="editorial" style={[styles.h1, { fontSize: FONT_SIZES.titleLarge, marginTop: 32 }]}>
+              <Text style={styles.loadingTitle}>
                 Vitrine em preparação
               </Text>
               <Text style={{ color: COLORS.muted, marginTop: 6, textAlign: 'center' }}>
@@ -1771,20 +1771,21 @@ const styles = StyleSheet.create({
   brandHeader: { alignItems: 'center', paddingHorizontal: 64, paddingTop: 32, paddingBottom: 28 },
   brandHeaderPhone: { paddingTop: 36, paddingBottom: 30 },
   storeLogo: { width: 118, height: 86, marginBottom: 4 },
-  eyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 5, fontWeight: '500' },
+  eyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 5, fontWeight: '500' },
   h1: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.hero, lineHeight: 43, letterSpacing: 2.4, fontWeight: '400', marginTop: 7 },
   h1Phone: { fontSize: FONT_SIZES.hero, lineHeight: 43 },
-  subtitle: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 2.2, marginTop: 5 },
+  subtitle: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, letterSpacing: 2.2, marginTop: 5 },
+  loadingTitle: { ...TYPOGRAPHY.titleLarge, color: STOREFRONT_COLORS.ink, marginTop: 32 },
   atelieAccess: { position: 'absolute', top: 58, right: SPACING.lg, zIndex: 40, width: 38, height: 38, borderRadius: 19, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 20, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.lg, marginBottom: 14 },
   searchBoxPhone: { height: 64 },
-  searchInput: { flex: 1, color: STOREFRONT_COLORS.ink, paddingVertical: 15, fontSize: FONT_SIZES.body },
+  searchInput: { ...TYPOGRAPHY.body, flex: 1, color: STOREFRONT_COLORS.ink, paddingVertical: 15 },
   quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 13, height: 68, paddingHorizontal: 18, paddingVertical: 8, borderRadius: RADIUS.lg, backgroundColor: STOREFRONT_COLORS.surfaceRaised, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold + '88', marginBottom: 14 },
   quizBannerPhone: { height: 72 },
   quizIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   quizIconPhone: { width: 44, height: 44, borderRadius: 22 },
-  quizTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.subtitle, fontWeight: '400' },
-  quizSubtitle: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
+  quizTitle: { ...TYPOGRAPHY.subtitle, color: STOREFRONT_COLORS.ink },
+  quizSubtitle: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, marginTop: 2 },
   quickFilters: { paddingVertical: 8, marginBottom: SPACING.md },
   quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   quickFilterButton: { minHeight: 42, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
@@ -1794,7 +1795,7 @@ const styles = StyleSheet.create({
   quickFilterSecondary: { flex: 0.9 },
   quickFilterCompact: { flex: 0.7 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
-  quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '400' },
+  quickFilterText: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, fontWeight: '500' },
   quickFilterTextActive: { color: COLORS.ink },
   storefrontEmpty: { alignItems: 'center', padding: SPACING.xl, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   storefrontEmptyTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
@@ -1846,26 +1847,26 @@ const styles = StyleSheet.create({
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
   imagePlaceholderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
   productInfo: { flex: 1, minWidth: 0, paddingTop: 2 },
-  inspiredLabel: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, lineHeight: 15, letterSpacing: 1.1, fontWeight: '600', marginBottom: 2 },
-  cardTitle: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.subtitle, lineHeight: 21, fontWeight: '700' },
-  occasionLabel: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, marginTop: 9 },
-  cardSub: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: 2 },
-  familySummary: { color: PRODUCT_CARD_COLORS.text, fontSize: FONT_SIZES.caption, lineHeight: 14, marginTop: 6 },
+  inspiredLabel: { ...TYPOGRAPHY.eyebrow, color: PRODUCT_CARD_COLORS.gold, letterSpacing: 1.1, marginBottom: 2 },
+  cardTitle: { ...TYPOGRAPHY.subtitle, color: PRODUCT_CARD_COLORS.ink, fontWeight: '700' },
+  occasionLabel: { ...TYPOGRAPHY.eyebrow, color: PRODUCT_CARD_COLORS.gold, letterSpacing: 1.1, marginTop: 9 },
+  cardSub: { ...TYPOGRAPHY.caption, color: PRODUCT_CARD_COLORS.muted, marginTop: 2 },
+  familySummary: { ...TYPOGRAPHY.caption, color: PRODUCT_CARD_COLORS.text, marginTop: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 5 },
-  metaText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
+  metaText: { ...TYPOGRAPHY.caption, color: PRODUCT_CARD_COLORS.muted },
   availabilityDot: { width: 6, height: 6, borderRadius: 3, marginLeft: 2 },
   sizeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: SPACING.md },
   sizeButton: { flexGrow: 1, minWidth: 86, paddingHorizontal: 9, paddingVertical: 7, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.gold, alignItems: 'center', backgroundColor: COLORS.surface },
   sizeButtonPressed: { backgroundColor: COLORS.surfaceRaised },
   sizeButtonDisabled: { borderColor: PRODUCT_CARD_COLORS.border, opacity: 0.65 },
-  sizeButtonText: { color: PRODUCT_CARD_COLORS.ink, fontSize: FONT_SIZES.label, lineHeight: 15, fontWeight: '700' },
-  sizePrice: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 12, marginTop: 1 },
+  sizeButtonText: { ...TYPOGRAPHY.label, color: PRODUCT_CARD_COLORS.ink, fontWeight: '700' },
+  sizePrice: { ...TYPOGRAPHY.caption, color: PRODUCT_CARD_COLORS.muted, marginTop: 1 },
   notes: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10, gap: 6 },
   noteRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  noteLabel: { width: 72, flexShrink: 0, color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, letterSpacing: 0.8 },
-  noteValue: { flex: 1, color: PRODUCT_CARD_COLORS.text, fontSize: FONT_SIZES.caption, lineHeight: 15, fontStyle: 'italic' },
+  noteLabel: { ...TYPOGRAPHY.caption, width: 72, flexShrink: 0, color: PRODUCT_CARD_COLORS.muted, letterSpacing: 0.8 },
+  noteValue: { ...TYPOGRAPHY.bodySmall, flex: 1, color: PRODUCT_CARD_COLORS.text, fontStyle: 'italic' },
   notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
-  notesEmptyText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption, fontStyle: 'italic' },
+  notesEmptyText: { ...TYPOGRAPHY.bodySmall, color: PRODUCT_CARD_COLORS.muted, fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
   reviewButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
   reviewText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption },
