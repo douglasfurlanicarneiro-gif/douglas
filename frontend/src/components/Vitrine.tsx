@@ -10,8 +10,7 @@ import { BottomSheet } from './BottomSheet';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
 import { Field, TInput, PrimaryButton, SecondaryButton, Chip, Stars } from './atoms';
 import { ApiError, confirmarPagamentoInfinitePay, createOpiniao, createSolicitacaoPrivacidade, createSugestao, getOrdersResetVersion, getVitrine } from '../api';
-import { CartItem, CheckoutSheet } from './CheckoutSheet';
-import { OrdersSheet, PerfumeDetailSheet, QuizSheet } from './CustomerSheets';
+import type { CartItem } from './CheckoutSheet';
 import { storage } from '../utils/storage';
 import { tamanhoDisponivel } from '../utils/availability';
 import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
@@ -25,6 +24,10 @@ import type { Acompanhamento, Compra, ConfiguracoesLojaPublicas, Perfume } from 
 
 type VitrineItem = Perfume;
 const LazyPixQrCode = React.lazy(() => import('./PixQrCode'));
+const LazyCheckoutSheet = React.lazy(() => import('./CheckoutSheet').then((module) => ({ default: module.CheckoutSheet })));
+const LazyOrdersSheet = React.lazy(() => import('./CustomerSheets').then((module) => ({ default: module.OrdersSheet })));
+const LazyPerfumeDetailSheet = React.lazy(() => import('./CustomerSheets').then((module) => ({ default: module.PerfumeDetailSheet })));
+const LazyQuizSheet = React.lazy(() => import('./CustomerSheets').then((module) => ({ default: module.QuizSheet })));
 type AvailabilityFilter = 'pronta' | 'encomenda' | 'todas';
 const FAVORITES_KEY = 'favorite-perfumes-v1';
 const ORDERS_KEY_PREFIX = 'customer-orders-v';
@@ -168,11 +171,13 @@ function VitrineCard({
         accessibilityLabel={`${favorite ? 'Remover' : 'Adicionar'} ${item.nome} ${favorite ? 'dos' : 'aos'} favoritos`}
         accessibilityState={{ selected: favorite }}
       >
-        {favorite ? (
-          <FontAwesome name="heart" size={18} color={COLORS.favorite} />
-        ) : (
-          <Feather name="heart" size={18} color={PRODUCT_CARD_COLORS.gold} />
-        )}
+        <View style={styles.cardFavoriteVisual}>
+          {favorite ? (
+            <FontAwesome name="heart" size={18} color={COLORS.favorite} />
+          ) : (
+            <Feather name="heart" size={18} color={PRODUCT_CARD_COLORS.gold} />
+          )}
+        </View>
       </Pressable>
 
       <View style={styles.productTop}>
@@ -184,7 +189,14 @@ function VitrineCard({
           accessibilityLabel={`Conhecer ${item.nome}`}
         >
           {item.imagemUrl ? (
-            <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="cover" transition={180} />
+            <Image
+              source={{ uri: item.imagemUrl }}
+              style={styles.productImage}
+              contentFit="cover"
+              transition={180}
+              accessible={false}
+              accessibilityLabel=""
+            />
           ) : (
             <View style={styles.imagePlaceholder}>
               <Feather name="image" size={25} color={PRODUCT_CARD_COLORS.muted} />
@@ -194,22 +206,17 @@ function VitrineCard({
         </Pressable>
 
         <View style={styles.productInfo}>
-          <Pressable
-            onPress={onDetails}
-            testID={`details-title-${item.id}`}
-            accessible={false}
-            focusable={false}
-          >
+          <View testID={`details-title-${item.id}`}>
             <Text style={styles.inspiredLabel}>INSPIRADO EM</Text>
-            <Text style={styles.cardTitle} numberOfLines={2}>{item.nome}</Text>
-          </Pressable>
+            <Text style={styles.cardTitle} numberOfLines={2} accessibilityRole="header">{item.nome}</Text>
+          </View>
           <Text style={styles.occasionLabel}>CLIMA & OCASIÃO</Text>
           <Text style={styles.cardSub} numberOfLines={2}>{climaOcasiao}</Text>
           {!!familiasResumo && <Text style={styles.familySummary} numberOfLines={2}>{familiasResumo}</Text>}
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>{nomeConcentracao(item.concentracao)}</Text>
             <View style={[styles.availabilityDot, { backgroundColor: item.prontaEntrega ? (item.disponivel ? COLORS.sage : COLORS.rust) : PRODUCT_CARD_COLORS.gold }]} />
-            <Text style={[styles.metaText, { color: item.prontaEntrega ? (item.disponivel ? COLORS.sage : COLORS.rust) : PRODUCT_CARD_COLORS.gold }]}>
+            <Text style={[styles.metaText, { color: item.prontaEntrega ? (item.disponivel ? COLORS.sageText : COLORS.rust) : COLORS.goldText }]}>
               {item.prontaEntrega ? (item.disponivel ? 'Pronta entrega' : 'Indisponível') : 'Sob encomenda'}
             </Text>
           </View>
@@ -227,7 +234,7 @@ function VitrineCard({
                 onPress={() => onBuy(pr.ml, pr.preco)}
                 testID={`buy-${item.id}-${pr.ml}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}, ${pr.ml} mililitros, ${brl(pr.preco)}`}
+                accessibilityLabel={`${pr.ml} ml, ${disponivel ? (item.prontaEntrega ? brl(pr.preco) : 'Solicitar') : 'Indisponível'}. ${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}`}
                 accessibilityState={{ disabled: !disponivel }}
                 style={({ pressed }) => [
                   styles.sizeButton,
@@ -865,8 +872,8 @@ export function Vitrine({
     return (
       <SafeAreaView style={styles.screen} edges={['top']}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={COLORS.gold} />
-          <Text style={{ color: COLORS.gold, marginTop: 12 }}>Conectando à vitrine…</Text>
+          <ActivityIndicator color={COLORS.gold} accessibilityLabel="Carregando vitrine" />
+          <Text style={{ color: COLORS.goldText, marginTop: 12 }}>Conectando à vitrine…</Text>
           <Text style={{ color: COLORS.muted, marginTop: 6, textAlign: 'center', paddingHorizontal: 32 }}>
             No primeiro acesso, o servidor gratuito pode levar alguns instantes para acordar.
           </Text>
@@ -894,7 +901,12 @@ export function Vitrine({
       <View style={{ flex: 1 }} {...pullToRefresh.panHandlers}>
         {(refreshing || pullToRefresh.pullDistance > 0) && Platform.OS === 'web' && (
           <View style={styles.pullRefreshIndicator} pointerEvents="none">
-            <ActivityIndicator size="small" color={COLORS.gold} animating={refreshing} />
+            <ActivityIndicator
+              size="small"
+              color={COLORS.gold}
+              animating={refreshing}
+              accessibilityLabel="Atualizando vitrine"
+            />
             <Text style={styles.pullRefreshText}>
               {refreshing
                 ? 'Atualizando vitrine…'
@@ -905,6 +917,7 @@ export function Vitrine({
           </View>
         )}
         <FlatList
+        accessibilityRole="list"
         key={`catalog-${desktopColumns}`}
         data={filtrados}
         numColumns={desktopColumns}
@@ -943,7 +956,7 @@ export function Vitrine({
                 />
               )}
               {(!currentStore.logoUrl || storeLogoFailed) && !!brand.eyebrow && <Text style={styles.eyebrow}>{brand.eyebrow}</Text>}
-              {(!currentStore.logoUrl || storeLogoFailed) && <Text family="editorial" style={[styles.h1, phoneViewport && styles.h1Phone]}>{brand.title}</Text>}
+              {(!currentStore.logoUrl || storeLogoFailed) && <Text family="editorial" style={[styles.h1, phoneViewport && styles.h1Phone]} accessibilityRole="header">{brand.title}</Text>}
               <Text style={styles.subtitle}>PERFUMARIA AUTORAL</Text>
             </View>
             {!showEmpty && (
@@ -965,7 +978,7 @@ export function Vitrine({
                   style={[styles.quizBanner, phoneViewport && styles.quizBannerPhone]}
                   testID="quiz-open"
                   accessibilityRole="button"
-                  accessibilityLabel="Encontre seu perfume com uma seleção personalizada"
+                  accessibilityLabel="Encontre seu perfume. Uma seleção personalizada em poucos passos."
                 >
                   <View style={[styles.quizIcon, phoneViewport && styles.quizIconPhone]}>
                     <Feather name="compass" size={phoneViewport ? 23 : 19} color={COLORS.gold} />
@@ -996,7 +1009,7 @@ export function Vitrine({
                       testID="filter-ready-delivery"
                       accessibilityRole="button"
                       accessibilityLabel="Mostrar perfumes a pronta entrega"
-                      accessibilityState={{ selected: disponibilidadeAtiva === 'pronta' }}
+                      accessibilityState={{ selected: familiaAtiva === 'Todas' && ocasiaoAtiva === 'Todas' && disponibilidadeAtiva === 'pronta' }}
                     >
                       {!ultraNarrowViewport && (
                         <Feather
@@ -1038,7 +1051,7 @@ export function Vitrine({
                       testID="filter-made-to-order"
                       accessibilityRole="button"
                       accessibilityLabel="Mostrar perfumes sob encomenda"
-                      accessibilityState={{ selected: disponibilidadeAtiva === 'encomenda' }}
+                      accessibilityState={{ selected: familiaAtiva === 'Todas' && ocasiaoAtiva === 'Todas' && disponibilidadeAtiva === 'encomenda' }}
                     >
                       {!ultraNarrowViewport && (
                         <Feather
@@ -1192,7 +1205,7 @@ export function Vitrine({
         </Pressable>
       </View>
 
-      <CheckoutSheet
+      {cartOpen && <React.Suspense fallback={null}><LazyCheckoutSheet
         visible={cartOpen}
         items={cart}
         cartaoOnlineAtivo={currentStore.cartaoOnlineAtivo}
@@ -1216,9 +1229,9 @@ export function Vitrine({
           setOrderSuccess(message);
           load();
         }}
-      />
+      /></React.Suspense>}
 
-      <PerfumeDetailSheet
+      {!!detailItem && <React.Suspense fallback={null}><LazyPerfumeDetailSheet
         perfume={detailItem}
         favorite={!!detailItem && favorites.has(detailItem.id)}
         onClose={() => setDetailItem(null)}
@@ -1233,8 +1246,8 @@ export function Vitrine({
           addToCart(detailItem, ml, preco);
           setDetailItem(null);
         }}
-      />
-      <QuizSheet
+      /></React.Suspense>}
+      {quizOpen && <React.Suspense fallback={null}><LazyQuizSheet
         visible={quizOpen}
         perfumes={itens}
         onClose={() => setQuizOpen(false)}
@@ -1242,8 +1255,8 @@ export function Vitrine({
           setQuizOpen(false);
           setDetailItem(perfume);
         }}
-      />
-      <OrdersSheet
+      /></React.Suspense>}
+      {ordersOpen && <React.Suspense fallback={null}><LazyOrdersSheet
         visible={ordersOpen}
         codes={orderCodes}
         onClose={() => setOrdersOpen(false)}
@@ -1252,7 +1265,7 @@ export function Vitrine({
         onRemoveCode={removeOrderCode}
         supportWhatsapp={currentStore.whatsapp}
         storeName={currentStore.nomeLoja}
-      />
+      /></React.Suspense>}
 
       <BottomSheet visible={filtersOpen} onClose={() => setFiltersOpen(false)} title="Filtrar fragrâncias" compact testID="filters-sheet">
         <View>
@@ -1610,7 +1623,7 @@ export function Vitrine({
                 </View>
               </View>
               <View style={styles.qrFrame}>
-                <React.Suspense fallback={<ActivityIndicator color={COLORS.gold} />}>
+                <React.Suspense fallback={<ActivityIndicator color={COLORS.gold} accessibilityLabel="Carregando atendimento" />}>
                   <LazyPixQrCode
                     value={manualPixCode}
                     size={176}
@@ -1773,12 +1786,12 @@ const styles = StyleSheet.create({
   brandHeader: { alignItems: 'center', paddingHorizontal: 64, paddingTop: 32, paddingBottom: 28 },
   brandHeaderPhone: { paddingTop: 36, paddingBottom: 30 },
   storeLogo: { width: 118, height: 86, marginBottom: 4 },
-  eyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 5, fontWeight: '500' },
+  eyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 5, fontWeight: '500' },
   h1: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.hero, lineHeight: 43, letterSpacing: 2.4, fontWeight: '400', marginTop: 7 },
   h1Phone: { fontSize: FONT_SIZES.hero, lineHeight: 43 },
   subtitle: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, letterSpacing: 2.2, marginTop: 5 },
   loadingTitle: { ...TYPOGRAPHY.titleLarge, color: STOREFRONT_COLORS.ink, marginTop: 32 },
-  atelieAccess: { position: 'absolute', top: 58, right: SPACING.lg, zIndex: 40, width: 38, height: 38, borderRadius: 19, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold, alignItems: 'center', justifyContent: 'center' },
+  atelieAccess: { position: 'absolute', top: 55, right: SPACING.lg, zIndex: 40, width: 44, height: 44, borderRadius: 22, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 20, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.lg, marginBottom: 14 },
   searchBoxPhone: { height: 64 },
   searchInput: { ...TYPOGRAPHY.body, flex: 1, color: STOREFRONT_COLORS.ink, paddingVertical: 15 },
@@ -1790,8 +1803,8 @@ const styles = StyleSheet.create({
   quizSubtitle: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, marginTop: 2 },
   quickFilters: { paddingVertical: 8, marginBottom: SPACING.md },
   quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  quickFilterButton: { minHeight: 42, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
-  quickFilterButtonNarrow: { paddingHorizontal: 1, gap: 1 },
+  quickFilterButton: { minHeight: 44, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
+  quickFilterButtonNarrow: { paddingHorizontal: 2, gap: 2 },
   quickFilterReady: { flex: 1.25 },
   quickFilterOrder: { flex: 1.25 },
   quickFilterSecondary: { flex: 0.9 },
@@ -1805,7 +1818,7 @@ const styles = StyleSheet.create({
   storefrontEmptyText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 5, textAlign: 'center' },
   filterBadge: { minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
   filterBadgeText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700' },
-  filterSheetLabel: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.2, marginBottom: 9 },
+  filterSheetLabel: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.2, marginBottom: 9 },
   filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg },
   filterSheetActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
   contactIntro: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.md },
@@ -1813,7 +1826,7 @@ const styles = StyleSheet.create({
   privacyNoticeHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
   privacyNoticeTitle: { ...TYPOGRAPHY.subtitle, flex: 1, color: COLORS.bone },
   privacyNoticeText: { ...TYPOGRAPHY.bodySmall, color: COLORS.muted, marginBottom: SPACING.sm },
-  formSectionLabel: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600', letterSpacing: 1.2, marginBottom: SPACING.sm },
+  formSectionLabel: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, fontWeight: '600', letterSpacing: 1.2, marginBottom: SPACING.sm },
   privacyConfirmation: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
   privacyConfirmationText: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18 },
   contactAction: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
@@ -1843,16 +1856,17 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 5 },
     elevation: 4,
   },
-  cardFavorite: { position: 'absolute', right: 10, top: 9, zIndex: 4, width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
+  cardFavorite: { position: 'absolute', right: 4, top: 3, zIndex: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  cardFavoriteVisual: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productTop: { flexDirection: 'row', gap: SPACING.md },
   imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
   imagePlaceholderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
   productInfo: { flex: 1, minWidth: 0, paddingTop: 2 },
-  inspiredLabel: { ...TYPOGRAPHY.eyebrow, color: PRODUCT_CARD_COLORS.gold, letterSpacing: 1.1, marginBottom: 2 },
+  inspiredLabel: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.1, marginBottom: 2 },
   cardTitle: { ...TYPOGRAPHY.subtitle, color: PRODUCT_CARD_COLORS.ink, fontWeight: '700' },
-  occasionLabel: { ...TYPOGRAPHY.eyebrow, color: PRODUCT_CARD_COLORS.gold, letterSpacing: 1.1, marginTop: 9 },
+  occasionLabel: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.1, marginTop: 9 },
   cardSub: { ...TYPOGRAPHY.caption, color: PRODUCT_CARD_COLORS.muted, marginTop: 2 },
   familySummary: { ...TYPOGRAPHY.caption, color: PRODUCT_CARD_COLORS.text, marginTop: 6 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginTop: 5 },
@@ -1871,32 +1885,32 @@ const styles = StyleSheet.create({
   notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
   notesEmptyText: { ...TYPOGRAPHY.bodySmall, color: PRODUCT_CARD_COLORS.muted, fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
-  reviewButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
-  reviewText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption },
-  detailsButton: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4 },
-  detailsText: { color: PRODUCT_CARD_COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  reviewButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 },
+  reviewText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption },
+  detailsButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingHorizontal: 4 },
+  detailsText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
   navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
-  navTextActive: { color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 3 },
+  navTextActive: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, marginTop: 3 },
   navText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
   cartBadge: { position: 'absolute', top: -7, right: -10, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   cartBadgeText: { color: COLORS.ink, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   successSheetBody: { paddingTop: SPACING.md, paddingBottom: SPACING.xl },
   successContent: { alignItems: 'center', paddingTop: 0 },
   successIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md },
-  successEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.6, textAlign: 'center' },
+  successEyebrow: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.6, textAlign: 'center' },
   successTitle: { color: COLORS.bone, fontSize: FONT_SIZES.title, lineHeight: 25, fontWeight: '700', textAlign: 'center', marginTop: 5 },
-  successOrderNumber: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.2, marginTop: 7 },
+  successOrderNumber: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.2, marginTop: 7 },
   successText: { width: '100%', color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, textAlign: 'center', marginTop: 7, marginBottom: SPACING.md },
   successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.lg },
   pixCard: { width: '100%', padding: SPACING.lg, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface, marginBottom: SPACING.md },
   pixHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
-  pixEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.2 },
+  pixEyebrow: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.2 },
   pixValue: { color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '700', marginTop: 2 },
   pixPendingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: COLORS.gold + '66', borderRadius: RADIUS.pill, paddingHorizontal: 9, paddingVertical: 5 },
   pixPendingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gold },
-  pixPendingText: { color: COLORS.gold, fontSize: FONT_SIZES.caption },
+  pixPendingText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption },
   qrFrame: { alignSelf: 'center', backgroundColor: COLORS.white, padding: 12, borderRadius: RADIUS.md, marginBottom: SPACING.md },
   pixHint: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 17, textAlign: 'center', marginBottom: SPACING.md },
   copyPixButton: { minHeight: 46, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
@@ -1911,8 +1925,8 @@ const styles = StyleSheet.create({
   trackingAccessTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
   trackingAccessHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   trackingCodeCard: { width: '100%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.gold + '0C', marginTop: 8 },
-  trackingCodeLabel: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, textAlign: 'center' },
+  trackingCodeLabel: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, textAlign: 'center' },
   trackingCode: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700', letterSpacing: 1.2, marginTop: 8 },
   shareCodeButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 12, marginTop: 7 },
-  shareCodeText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  shareCodeText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, fontWeight: '600' },
 });

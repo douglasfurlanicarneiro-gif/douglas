@@ -2125,7 +2125,7 @@ export function Atelie({
   };
 
   const renderContent = () => {
-    if (loading) return <View style={{ padding: 40, alignItems: 'center' }}><ActivityIndicator color={COLORS.gold} /></View>;
+    if (loading) return <View style={{ padding: 40, alignItems: 'center' }}><ActivityIndicator color={COLORS.gold} accessibilityLabel="Carregando painel de controle" /></View>;
 
     if (tab === 'dashboard') {
       return (
@@ -2696,7 +2696,7 @@ export function Atelie({
               <Text style={styles.systemBackText}>Voltar ao Sistema</Text>
             </Pressable>
             <SystemCard icon="archive" title="Itens arquivados" subtitle="Registros preservados fora das telas operacionais.">
-              {loadingArquivados && <ActivityIndicator color={COLORS.gold} style={{ marginVertical: SPACING.xl }} />}
+              {loadingArquivados && <ActivityIndicator color={COLORS.gold} style={{ marginVertical: SPACING.xl }} accessibilityLabel="Carregando pedidos arquivados" />}
               {!loadingArquivados && arquivados.length === 0 && (
                 <Text style={styles.catalogHistoryEmpty}>Nenhum registro arquivado.</Text>
               )}
@@ -2740,7 +2740,7 @@ export function Atelie({
               <Text style={styles.systemBackText}>Voltar ao Sistema</Text>
             </Pressable>
             <SystemCard icon="shield" title="Central de Privacidade" subtitle="Solicitações feitas pelos clientes na vitrine.">
-              {loadingPrivacidade && <ActivityIndicator color={COLORS.gold} style={{ marginVertical: SPACING.xl }} />}
+              {loadingPrivacidade && <ActivityIndicator color={COLORS.gold} style={{ marginVertical: SPACING.xl }} accessibilityLabel="Carregando solicitações de privacidade" />}
               {!loadingPrivacidade && solicitacoesPrivacidade.length === 0 && (
                 <Text style={styles.catalogHistoryEmpty}>Nenhuma solicitação de privacidade recebida.</Text>
               )}
@@ -3284,7 +3284,12 @@ export function Atelie({
       <View style={{ flex: 1 }} {...pullToRefresh.panHandlers}>
         {(refreshing || pullToRefresh.pullDistance > 0) && Platform.OS === 'web' && (
           <View style={styles.pullRefreshIndicator} pointerEvents="none">
-            <ActivityIndicator size="small" color={COLORS.gold} animating={refreshing} />
+            <ActivityIndicator
+              size="small"
+              color={COLORS.gold}
+              animating={refreshing}
+              accessibilityLabel="Atualizando painel de controle"
+            />
             <Text style={styles.pullRefreshText}>
               {refreshing
                 ? 'Atualizando painel…'

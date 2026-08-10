@@ -18,7 +18,7 @@ const LazyAtelie = lazy(() => import('../src/components/Atelie').then((module) =
 function AdminLoading() {
   return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.background }}>
-      <ActivityIndicator color={COLORS.gold} />
+      <ActivityIndicator color={COLORS.gold} accessibilityLabel="Carregando painel de controle" />
       <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label, marginTop: SPACING.sm }}>Abrindo painel…</Text>
     </View>
   );

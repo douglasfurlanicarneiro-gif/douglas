@@ -64,6 +64,14 @@ export default function Root({ children }: PropsWithChildren) {
               body { font-family: DMSans_400Regular, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
               [role="tablist"] [role="tab"] * { overflow: visible !important; }
               [role="heading"], [role="heading"] * { overflow: visible !important; }
+              button:focus-visible,
+              [role="button"]:focus-visible,
+              [role="link"]:focus-visible,
+              input:focus-visible,
+              textarea:focus-visible {
+                outline: 3px solid #744E14 !important;
+                outline-offset: 3px !important;
+              }
               input:-webkit-autofill,
               input:-webkit-autofill:hover,
               input:-webkit-autofill:focus {

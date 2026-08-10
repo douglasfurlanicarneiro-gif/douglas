@@ -183,7 +183,7 @@ export function CustosView({ onChanged }: { onChanged?: () => void }) {
     .map((group) => ({ ...group, frascos: [...group.frascos].sort((a, b) => b.ml - a.ml) }))
     .sort((a, b) => Math.max(...b.frascos.map((item) => item.lucro)) - Math.max(...a.frascos.map((item) => item.lucro)));
 
-  if (loading) return <ActivityIndicator color={COLORS.gold} style={{ margin: SPACING.xl }} />;
+  if (loading) return <ActivityIndicator color={COLORS.gold} style={{ margin: SPACING.xl }} accessibilityLabel="Carregando dados operacionais" />;
 
   const setField = (key: keyof CustosConfig, value: string) => {
     setConfig((current) => ({ ...current, [key]: parseNumber(value) }));
@@ -449,7 +449,7 @@ export function InsumosView({ perfumes, onChanged }: { perfumes: Perfume[]; onCh
   const totalValue = items.reduce((sum, item) => sum + item.valorEstoque, 0);
   const below = items.filter((item) => item.ativo && item.saldoAtual <= item.estoqueMinimo).length;
 
-  if (loading) return <ActivityIndicator color={COLORS.gold} style={{ margin: SPACING.xl }} />;
+  if (loading) return <ActivityIndicator color={COLORS.gold} style={{ margin: SPACING.xl }} accessibilityLabel="Carregando dados operacionais" />;
   return (
     <View style={styles.page}>
       <InlineNotice text={message} /><InlineNotice text={error} error />
@@ -668,7 +668,7 @@ export function FornecedoresView({ perfumes, onChanged }: { perfumes: Perfume[];
     finally { setBusy(false); }
   };
 
-  if (loading) return <ActivityIndicator color={COLORS.gold} style={{ margin: SPACING.xl }} />;
+  if (loading) return <ActivityIndicator color={COLORS.gold} style={{ margin: SPACING.xl }} accessibilityLabel="Carregando dados operacionais" />;
   const selectedSupplier = suppliers.find((item) => item.id === selected);
   return (
     <View style={styles.page}>

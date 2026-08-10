@@ -541,7 +541,7 @@ export function OrdersSheet({
       title="Meus pedidos"
       contentContainerStyle={!loading && orders.length === 0 ? styles.emptyOrdersContent : undefined}
     >
-      {loading && <ActivityIndicator color={COLORS.gold} style={{ margin: 30 }} />}
+      {loading && <ActivityIndicator color={COLORS.gold} style={{ margin: 30 }} accessibilityLabel="Carregando pedidos" />}
       {!loading && orders.length === 0 && (
         <View style={styles.emptyOrders}>
           <View style={styles.emptyOrdersGlow}>
