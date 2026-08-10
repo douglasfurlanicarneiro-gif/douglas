@@ -1791,7 +1791,7 @@ const styles = StyleSheet.create({
   quickFilters: { paddingVertical: 8, marginBottom: SPACING.md },
   quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   quickFilterButton: { minHeight: 42, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
-  quickFilterButtonNarrow: { paddingHorizontal: 3, gap: 2 },
+  quickFilterButtonNarrow: { paddingHorizontal: 1, gap: 1 },
   quickFilterReady: { flex: 1.25 },
   quickFilterOrder: { flex: 1.25 },
   quickFilterSecondary: { flex: 0.9 },
