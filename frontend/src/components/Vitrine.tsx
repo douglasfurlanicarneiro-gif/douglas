@@ -5,7 +5,7 @@ import Feather from '@expo/vector-icons/Feather';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Image } from 'expo-image';
 import * as Clipboard from 'expo-clipboard';
-import { COLORS, SPACING, RADIUS, FONT_SIZES, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
+import { COLORS, SPACING, RADIUS, FONT_SIZES, TYPOGRAPHY, brl, familiasDoPerfume, nomeConcentracao, padSeq } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
 import { Field, TInput, PrimaryButton, SecondaryButton, Chip, Stars } from './atoms';
@@ -306,6 +306,7 @@ export function Vitrine({
   const ultraNarrowViewport = viewportWidth < 360;
   const narrowViewport = viewportWidth < 410;
   const phoneViewport = viewportWidth < 900;
+  const desktopColumns = viewportWidth >= 1200 ? 2 : 1;
   const currentStore = publicStoreConfig(storeConfig);
   const brand = storeNameParts(currentStore.nomeLoja);
   const supportNumber = whatsappNumber(currentStore.whatsapp);
@@ -904,17 +905,22 @@ export function Vitrine({
           </View>
         )}
         <FlatList
+        key={`catalog-${desktopColumns}`}
         data={filtrados}
+        numColumns={desktopColumns}
+        columnWrapperStyle={desktopColumns > 1 ? styles.catalogColumns : undefined}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
-          <VitrineCard
-            item={item}
-            favorite={favorites.has(item.id)}
-            onBuy={(ml, preco) => addToCart(item, ml, preco)}
-            onReview={() => setReviewItem(item)}
-            onDetails={() => setDetailItem(item)}
-            onToggleFavorite={() => toggleFavorite(item.id)}
-          />
+          <View style={desktopColumns > 1 ? styles.catalogColumnItem : undefined}>
+            <VitrineCard
+              item={item}
+              favorite={favorites.has(item.id)}
+              onBuy={(ml, preco) => addToCart(item, ml, preco)}
+              onReview={() => setReviewItem(item)}
+              onDetails={() => setDetailItem(item)}
+              onToggleFavorite={() => toggleFavorite(item.id)}
+            />
+          </View>
         )}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshCatalog} tintColor={COLORS.gold} />}
         onScroll={pullToRefresh.onScroll}
@@ -1130,6 +1136,7 @@ export function Vitrine({
         }
         contentContainerStyle={[
           styles.catalogContent,
+          !phoneViewport && styles.catalogContentWide,
           { paddingBottom: 122 + insets.bottom },
         ]}
         />
@@ -1188,6 +1195,7 @@ export function Vitrine({
         items={cart}
         cartaoOnlineAtivo={currentStore.cartaoOnlineAtivo}
         pixManualAtivo={currentStore.pixManualAtivo}
+        onOpenPrivacyNotice={() => setPrivacyOpen(true)}
         onClose={() => setCartOpen(false)}
         onChangeQuantity={(index, quantity) => setCart((current) => (
           quantity <= 0
@@ -1461,6 +1469,21 @@ export function Vitrine({
 
       <BottomSheet visible={privacyOpen} onClose={() => setPrivacyOpen(false)} title="Privacidade e seus dados" testID="privacy-sheet">
         <View>
+          <View style={styles.privacyNoticeCard}>
+            <View style={styles.privacyNoticeHeader}>
+              <Feather name="shield" size={18} color={COLORS.gold} />
+              <Text style={styles.privacyNoticeTitle}>Aviso de privacidade</Text>
+            </View>
+            <Text style={styles.privacyNoticeText}>
+              Usamos nome, celular, e-mail e endereço para criar, processar, entregar e permitir o acompanhamento do pedido.
+            </Text>
+            <Text style={styles.privacyNoticeText}>
+              Os dados necessários podem ser enviados aos serviços de pagamento, entrega e infraestrutura usados para concluir sua compra. Os dados do cartão são informados diretamente no ambiente seguro do provedor de pagamento.
+            </Text>
+            <Text style={styles.privacyNoticeText}>
+              Salvar seus dados neste aparelho para compras futuras é opcional. Abaixo você pode solicitar acesso, correção, exclusão ou revogação.
+            </Text>
+          </View>
           <Text style={styles.contactIntro}>
             Use este canal para exercer seus direitos sobre os dados pessoais tratados em suas compras.
           </Text>
@@ -1741,6 +1764,9 @@ const styles = StyleSheet.create({
   pullRefreshIndicator: { position: 'absolute', zIndex: 20, top: 6, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, minHeight: 34, borderRadius: RADIUS.pill, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border },
   pullRefreshText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption },
   catalogContent: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: SPACING.lg, paddingBottom: 160 },
+  catalogContentWide: { maxWidth: 1840, paddingHorizontal: 32 },
+  catalogColumns: { gap: SPACING.lg },
+  catalogColumnItem: { flex: 1, minWidth: 0 },
   headerControls: { width: '100%' },
   brandHeader: { alignItems: 'center', paddingHorizontal: 64, paddingTop: 32, paddingBottom: 28 },
   brandHeaderPhone: { paddingTop: 36, paddingBottom: 30 },
@@ -1779,6 +1805,10 @@ const styles = StyleSheet.create({
   filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg },
   filterSheetActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
   contactIntro: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.md },
+  privacyNoticeCard: { padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.gold, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceRaised },
+  privacyNoticeHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
+  privacyNoticeTitle: { ...TYPOGRAPHY.subtitle, flex: 1, color: COLORS.bone },
+  privacyNoticeText: { ...TYPOGRAPHY.bodySmall, color: COLORS.muted, marginBottom: SPACING.sm },
   formSectionLabel: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600', letterSpacing: 1.2, marginBottom: SPACING.sm },
   privacyConfirmation: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
   privacyConfirmationText: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18 },

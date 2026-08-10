@@ -1342,6 +1342,7 @@ export function Atelie({
   onStoreConfigChange?: (config: ConfiguracoesLoja) => void;
 }) {
   const { width } = useWindowDimensions();
+  const desktopViewport = width >= 1200;
   const [tab, setTab] = useState('dashboard');
   const [systemView, setSystemView] = useState<'main' | 'historico' | 'arquivados' | 'privacidade' | 'fornecedores' | 'custos' | 'insumos'>('main');
   const [loading, setLoading] = useState(true);
@@ -3105,12 +3106,14 @@ export function Atelie({
           </View>
         )}
         <ScrollView
-          contentContainerStyle={{ paddingBottom: 120 }}
+          contentContainerStyle={styles.adminScrollContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refreshPanel} tintColor={COLORS.gold} />}
           onScroll={pullToRefresh.onScroll}
           scrollEventThrottle={16}
         >
-          {renderContent()}
+          <View style={[styles.adminContent, desktopViewport && styles.adminContentWide]}>
+            {renderContent()}
+          </View>
         </ScrollView>
       </View>
 
@@ -3204,6 +3207,9 @@ export function Atelie({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },
+  adminScrollContent: { flexGrow: 1, paddingBottom: 120 },
+  adminContent: { width: '100%' },
+  adminContentWide: { maxWidth: 1840, alignSelf: 'center' },
   pullRefreshIndicator: { position: 'absolute', zIndex: 20, top: 6, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, minHeight: 34, borderRadius: RADIUS.pill, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   pullRefreshText: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.md },

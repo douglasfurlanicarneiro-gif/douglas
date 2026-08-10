@@ -65,6 +65,7 @@ type Props = {
   onRemove: (index: number) => void;
   onSuccess: (order: Compra, message: string) => void | Promise<void>;
   onStockConflict?: () => void | Promise<void>;
+  onOpenPrivacyNotice: () => void;
   cartaoOnlineAtivo: boolean;
   pixManualAtivo: boolean;
 };
@@ -77,6 +78,7 @@ export function CheckoutSheet({
   onRemove,
   onSuccess,
   onStockConflict,
+  onOpenPrivacyNotice,
   cartaoOnlineAtivo,
   pixManualAtivo,
 }: Props) {
@@ -775,24 +777,14 @@ export function CheckoutSheet({
             </View>
 
             {contemSobEncomenda && (
-              <View
-                style={{
-                  padding: SPACING.md,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: COLORS.gold,
-                  backgroundColor: COLORS.surfaceRaised,
-                  marginBottom: SPACING.md,
-                }}
-                testID="made-to-order-deadline-notice"
-              >
+              <View style={styles.orderDeadlineNotice} testID="made-to-order-deadline-notice">
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
                   <Feather name="clock" size={19} color={COLORS.gold} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' }}>
+                    <Text style={styles.orderDeadlineTitle}>
                       Prazo para itens sob encomenda
                     </Text>
-                    <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 18, marginTop: 5 }}>
+                    <Text style={styles.orderDeadlineText}>
                       A disponibilidade, preparação e maturação podem levar até 14 dias antes da postagem ou retirada. Em caso de envio, depois desse período soma-se o prazo da transportadora escolhido na etapa anterior.
                     </Text>
                   </View>
@@ -824,25 +816,38 @@ export function CheckoutSheet({
               </View>
             )}
 
-            <Pressable
-              onPress={() => setPrivacidadeAceita((current) => !current)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: privacidadeAceita }}
-              style={[styles.consentRow, styles.privacyConsent]}
-              testID="accept-privacy-notice"
-            >
-              <Feather
-                name={privacidadeAceita ? 'check-square' : 'square'}
-                size={19}
-                color={privacidadeAceita ? COLORS.gold : COLORS.muted}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.consentTitle}>Li o aviso de privacidade</Text>
-                <Text style={styles.consentHint}>
-                  Meus dados serão usados para processar, entregar e permitir o acompanhamento deste pedido. O salvamento para compras futuras é opcional.
-                </Text>
-              </View>
-            </Pressable>
+            <View style={[styles.consentRow, styles.privacyConsent]}>
+              <Pressable
+                onPress={() => setPrivacidadeAceita((current) => !current)}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: privacidadeAceita }}
+                style={styles.privacyCheckbox}
+                testID="accept-privacy-notice"
+              >
+                <Feather
+                  name={privacidadeAceita ? 'check-square' : 'square'}
+                  size={19}
+                  color={privacidadeAceita ? COLORS.gold : COLORS.muted}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.consentTitle}>Li o aviso de privacidade</Text>
+                  <Text style={styles.consentHint}>
+                    Meus dados serão usados para processar, entregar e permitir o acompanhamento deste pedido. O salvamento para compras futuras é opcional.
+                  </Text>
+                </View>
+              </Pressable>
+              <Pressable
+                onPress={onOpenPrivacyNotice}
+                accessibilityRole="link"
+                accessibilityLabel="Ler aviso de privacidade"
+                style={styles.privacyNoticeLink}
+                testID="open-privacy-notice"
+              >
+                <Feather name="shield" size={15} color={COLORS.gold} />
+                <Text style={styles.privacyNoticeLinkText}>Ler aviso de privacidade</Text>
+                <Feather name="chevron-right" size={15} color={COLORS.gold} />
+              </Pressable>
+            </View>
 
             {!!error && <Text style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
             <View style={[styles.paymentActions, isWide && styles.paymentActionsWide]}>
@@ -905,9 +910,9 @@ const styles = StyleSheet.create({
   },
   checkoutContentWide: {
     width: '100%',
-    maxWidth: 1480,
+    maxWidth: 1840,
     alignSelf: 'center',
-    paddingHorizontal: 56,
+    paddingHorizontal: 32,
     paddingTop: SPACING.xl,
     paddingBottom: SPACING.xl,
   },
@@ -1038,7 +1043,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   securePaymentTitleWide: {
-    ...TYPOGRAPHY.titleLarge,
+    ...TYPOGRAPHY.heading,
     color: COLORS.bone,
     marginBottom: SPACING.sm,
   },
@@ -1048,9 +1053,9 @@ const styles = StyleSheet.create({
     maxWidth: 560,
   },
   securePaymentTextWide: {
-    ...TYPOGRAPHY.bodyLarge,
+    ...TYPOGRAPHY.body,
     color: COLORS.bone,
-    lineHeight: 25,
+    lineHeight: 22,
   },
   manualPaymentHint: {
     ...TYPOGRAPHY.caption,
@@ -1201,8 +1206,50 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   privacyConsent: {
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 0,
     borderColor: COLORS.gold,
     backgroundColor: COLORS.surfaceRaised,
+  },
+  privacyCheckbox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.sm,
+  },
+  privacyNoticeLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  privacyNoticeLinkText: {
+    ...TYPOGRAPHY.label,
+    flex: 1,
+    color: COLORS.gold,
+    textDecorationLine: 'underline',
+  },
+  orderDeadlineNotice: {
+    padding: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: COLORS.gold,
+    backgroundColor: COLORS.surfaceRaised,
+    marginBottom: SPACING.md,
+  },
+  orderDeadlineTitle: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.bone,
+    fontWeight: '700',
+  },
+  orderDeadlineText: {
+    ...TYPOGRAPHY.body,
+    color: COLORS.muted,
+    lineHeight: 21,
+    marginTop: 6,
   },
   consentTitle: {
     ...TYPOGRAPHY.label,
