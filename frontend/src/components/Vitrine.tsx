@@ -158,6 +158,29 @@ const separarGenero = (nome: string) => {
   };
 };
 
+const separarReferencia = (nome: string, inspiracao: string) => {
+  const referenciaCadastrada = inspiracao.trim();
+  if (referenciaCadastrada) return { nomeProduto: nome, referencia: referenciaCadastrada };
+
+  const partesComSeparador = nome.split(/\s+[–—-]\s+/).map((parte) => parte.trim()).filter(Boolean);
+  if (partesComSeparador.length > 1) {
+    return {
+      nomeProduto: partesComSeparador[0],
+      referencia: partesComSeparador.slice(1).join(' '),
+    };
+  }
+
+  const palavras = nome.split(/\s+/).filter(Boolean);
+  if (palavras.length >= 5) {
+    return {
+      nomeProduto: palavras.slice(0, -2).join(' '),
+      referencia: palavras.slice(-2).join(' '),
+    };
+  }
+
+  return { nomeProduto: nome, referencia: '' };
+};
+
 function VitrineCard({
   item,
   favorite,
@@ -179,6 +202,7 @@ function VitrineCard({
   const familias = familiasDoPerfume(item);
   const familiasResumo = resumirCategorias(familias, 2, 'família', 'famílias');
   const { nomeExibicao, genero } = separarGenero(item.nome);
+  const { nomeProduto, referencia } = separarReferencia(nomeExibicao, item.inspiracao || '');
   const notasResumo = item.notasSaida || item.notasCoracao || item.notasFundo || 'Notas olfativas em atualização';
 
   return (
@@ -212,7 +236,7 @@ function VitrineCard({
           accessibilityLabel={`Conhecer ${item.nome}`}
         >
           {item.imagemUrl ? (
-            <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="contain" transition={180} />
+            <Image source={{ uri: item.imagemUrl }} style={styles.productImage} contentFit="cover" transition={180} />
           ) : (
             <View style={styles.imagePlaceholder}>
               <Feather name="image" size={25} color={PRODUCT_CARD_COLORS.muted} />
@@ -229,11 +253,11 @@ function VitrineCard({
             focusable={false}
           >
             <Text family="editorial" style={[styles.cardTitle, compactTypography && styles.cardTitleMobile, wideCard && styles.cardTitleWide]} numberOfLines={wideCard ? 3 : 2}>
-              {nomeExibicao}
+              {nomeProduto}
             </Text>
           </Pressable>
           <Text family="editorial" style={styles.inspirationText} numberOfLines={1}>
-            {item.inspiracao?.trim() ? `Inspirado em ${item.inspiracao.trim()}` : 'Fragrância inspirada'}
+            {referencia ? `Inspirado em ${referencia}` : 'Fragrância inspirada'}
           </Text>
           {!!genero && <Text style={styles.genderText}>{genero}</Text>}
 
@@ -1779,10 +1803,10 @@ const styles = StyleSheet.create({
   quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   quickFilterButton: { minHeight: 42, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   quickFilterButtonNarrow: { paddingHorizontal: 3, gap: 2 },
-  quickFilterReady: { flex: 1.15 },
-  quickFilterOrder: { flex: 1.35 },
-  quickFilterSecondary: { flex: 0.95 },
-  quickFilterCompact: { flex: 0.75 },
+  quickFilterReady: { flex: 1.22 },
+  quickFilterOrder: { flex: 1.32 },
+  quickFilterSecondary: { flex: 0.93 },
+  quickFilterCompact: { flex: 0.73 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '400' },
   quickFilterTextActive: { color: COLORS.ink },
