@@ -16,12 +16,15 @@ def test_ready_exige_bootstrap_integral(monkeypatch):
     monkeypatch.setattr(server, "get_db", lambda: _ReadyDatabase())
     monkeypatch.setitem(server._BOOTSTRAP_STATE, "status", "iniciando")
     monkeypatch.setitem(server._BOOTSTRAP_STATE, "tentativas", 1)
+    monkeypatch.setitem(server._BOOTSTRAP_STATE, "erro", "OperationFailure")
 
     with pytest.raises(HTTPException) as erro:
         asyncio.run(server.health_ready(Response()))
 
     assert erro.value.status_code == 503
     assert erro.value.headers["Retry-After"] == "5"
+    assert erro.value.detail["code"] == "OperationFailure"
+    assert erro.value.detail["attempts"] == 1
 
 
 def test_ready_confirma_esquema_e_banco(monkeypatch):

@@ -331,7 +331,11 @@ async def health_ready(response: Response):
         )
         raise HTTPException(
             status_code=503,
-            detail=detail,
+            detail={
+                "message": detail,
+                "code": _BOOTSTRAP_STATE.get("erro") or "EM_ANDAMENTO",
+                "attempts": int(_BOOTSTRAP_STATE.get("tentativas", 0)),
+            },
             headers={"Cache-Control": "no-store", "Retry-After": "5"},
         )
     response.headers["Cache-Control"] = "no-store"
