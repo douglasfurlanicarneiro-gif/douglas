@@ -25,6 +25,18 @@ async function mockAdminApi(page: Page) {
     if (path === '/api/admin/pedidos/reset-version') return json({ version: 1 });
     if (path === '/api/auth/login') return json({ ok: true, token: 'sessao-e2e' });
     if (path === '/api/auth/step-up') return json({ ok: true, token: 'stepup-e2e', expiresInSeconds: 300 });
+    if (path === '/api/perfumes') return json([
+      { id: 'perfume-a', seq: 1, nome: 'Âmbar Noturno', prontaEntrega: true, precos: [] },
+      { id: 'perfume-b', seq: 2, nome: 'Brisa Dourada', prontaEntrega: false, precos: [] },
+    ]);
+    if (path === '/api/admin/catalogo-estoque/disponibilidade' && request.method() === 'PUT') {
+      return json({
+        prontaEntrega: 2,
+        sobEncomenda: 0,
+        encontrados: ['perfume-a', 'perfume-b'],
+        naoEncontrados: [],
+      });
+    }
     if (path === '/api/admin/operacao/resumo') return json({
       status: 'atencao',
       pagamentosFalhos: 1,
@@ -96,4 +108,29 @@ test('painel mostra saúde, recuperação e valida o backup antes de restaurar',
   await page.getByTestId('critical-password').fill('senha-local');
   await page.getByText('Restaurar agora').click();
   await expect(page.getByText(/Backup restaurado com segurança: 2 registro/)).toBeVisible();
+});
+
+
+test('gerencia a disponibilidade e revisa antes de salvar', async ({ page }) => {
+  await mockAdminApi(page);
+  await openAdminSystem(page);
+
+  await page.getByText('Gerenciar pronta entrega').click();
+  await expect(page.getByTestId('availability-search')).toBeVisible();
+  await expect(page.getByTestId('availability-perfume-a')).toBeVisible();
+
+  await page.getByTestId('availability-search').fill('Brisa');
+  await expect(page.getByTestId('availability-perfume-a')).toHaveCount(0);
+  await page.getByTestId('availability-perfume-b').click();
+  await page.getByTestId('availability-save').click();
+
+  await expect(page.getByText(/Confirmar 2 perfume/)).toBeVisible();
+  const saveRequest = page.waitForRequest((request) => (
+    request.url().endsWith('/api/admin/catalogo-estoque/disponibilidade')
+    && request.method() === 'PUT'
+  ));
+  await page.getByText('Salvar disponibilidade').click();
+  const request = await saveRequest;
+  expect(request.postDataJSON()).toEqual({ ids: ['perfume-a', 'perfume-b'] });
+  await expect(page.getByText(/Disponibilidade salva: 2 em pronta entrega/)).toBeVisible();
 });

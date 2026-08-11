@@ -38,6 +38,7 @@ import {
   SystemCard,
   type ConfirmSheet,
 } from './AdminSystemComponents';
+import { AdminAvailabilityManager } from './AdminAvailabilityManager';
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 type PerfumeFormState = Omit<Perfume, 'id' | 'seq' | 'inspiracao'> & {
@@ -337,121 +338,6 @@ function KanbanPedidoCard({
         </Pressable>
       </View>
     </Animated.View>
-  );
-}
-
-function AvailabilityManager({
-  perfumes,
-  onSave,
-  onCancel,
-}: {
-  perfumes: Perfume[];
-  onSave: (ids: string[]) => void;
-  onCancel: () => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState(
-    () => new Set(perfumes.filter((perfume) => perfume.prontaEntrega).map((perfume) => perfume.id)),
-  );
-  const ordered = useMemo(
-    () => [...perfumes].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
-    [perfumes],
-  );
-  const filtered = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase('pt-BR');
-    if (!term) return ordered;
-    return ordered.filter((perfume) => perfume.nome.toLocaleLowerCase('pt-BR').includes(term));
-  }, [ordered, query]);
-
-  const toggle = (id: string) => {
-    setSelected((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  const selectVisible = () => {
-    setSelected((current) => new Set([...current, ...filtered.map((perfume) => perfume.id)]));
-  };
-
-  const clearVisible = () => {
-    const visibleIds = new Set(filtered.map((perfume) => perfume.id));
-    setSelected((current) => new Set([...current].filter((id) => !visibleIds.has(id))));
-  };
-
-  const save = () => {
-    const ids = perfumes
-      .filter((perfume) => selected.has(perfume.id))
-      .map((perfume) => perfume.id);
-    onSave(ids);
-  };
-
-  return (
-    <View>
-      <View style={styles.availabilitySummary}>
-        <View>
-          <Text style={styles.availabilityCount}>{selected.size}</Text>
-          <Text style={styles.availabilityCountLabel}>Pronta entrega</Text>
-        </View>
-        <View style={styles.availabilitySummaryDivider} />
-        <View>
-          <Text style={styles.availabilityCount}>{Math.max(0, perfumes.length - selected.size)}</Text>
-          <Text style={styles.availabilityCountLabel}>Sob encomenda</Text>
-        </View>
-      </View>
-      <TInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder="Buscar perfume…"
-        testID="availability-search"
-      />
-      <View style={styles.availabilityTools}>
-        <Pressable onPress={selectVisible} style={styles.availabilityToolButton}>
-          <Text style={styles.availabilityToolText}>Marcar exibidos</Text>
-        </Pressable>
-        <Pressable onPress={clearVisible} style={styles.availabilityToolButton}>
-          <Text style={styles.availabilityToolText}>Desmarcar exibidos</Text>
-        </Pressable>
-      </View>
-      <View style={styles.availabilityList}>
-        {filtered.map((perfume) => {
-          const checked = selected.has(perfume.id);
-          return (
-            <Pressable
-              key={perfume.id}
-              onPress={() => toggle(perfume.id)}
-              style={({ pressed }) => [
-                styles.availabilityRow,
-                checked && styles.availabilityRowChecked,
-                pressed && { opacity: 0.8 },
-              ]}
-              testID={`availability-${perfume.id}`}
-            >
-              <View style={[styles.availabilityCheck, checked && styles.availabilityCheckActive]}>
-                {checked && <Feather name="check" size={13} color={COLORS.ink} />}
-              </View>
-              <Text style={styles.availabilityName}>{perfume.nome}</Text>
-              <Text style={[styles.availabilityState, checked && { color: COLORS.sage }]}>
-                {checked ? 'Pronta' : 'Encomenda'}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-      <View style={styles.availabilityFooter}>
-        <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <Pressable
-          onPress={save}
-          disabled={selected.size === 0}
-          style={[styles.confirmAction, selected.size === 0 && styles.confirmActionDisabled]}
-          testID="availability-save"
-        >
-          <Text style={{ color: COLORS.ink, fontWeight: '700' }}>Revisar e salvar</Text>
-        </Pressable>
-      </View>
-    </View>
   );
 }
 
@@ -3474,7 +3360,7 @@ export function Atelie({
           />
         )}
         {sheet?.type === 'availability' && (
-          <AvailabilityManager
+          <AdminAvailabilityManager
             perfumes={perfumes}
             onSave={requestSaveAvailability}
             onCancel={() => setSheet(null)}
@@ -3604,21 +3490,6 @@ const styles = StyleSheet.create({
   privacyAdminCard: { paddingVertical: SPACING.md, gap: 7, borderTopWidth: 1, borderTopColor: COLORS.border },
   privacyAdminHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.sm },
   privacyAdminMessage: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, lineHeight: 18, padding: SPACING.sm, borderRadius: RADIUS.sm, backgroundColor: COLORS.surface },
-  availabilitySummary: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
-  availabilitySummaryDivider: { width: 1, height: 42, backgroundColor: COLORS.border },
-  availabilityCount: { color: COLORS.bone, fontSize: FONT_SIZES.display, fontWeight: '700', textAlign: 'center' },
-  availabilityCountLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textAlign: 'center', marginTop: 2 },
-  availabilityTools: { flexDirection: 'row', gap: 7, marginVertical: SPACING.sm },
-  availabilityToolButton: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 34, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  availabilityToolText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
-  availabilityList: { borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, overflow: 'hidden' },
-  availabilityRow: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 10, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border, backgroundColor: COLORS.surface },
-  availabilityRowChecked: { backgroundColor: COLORS.gold + '12' },
-  availabilityCheck: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border },
-  availabilityCheckActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
-  availabilityName: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.caption },
-  availabilityState: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textTransform: 'uppercase' },
-  availabilityFooter: { flexDirection: 'row', gap: 8, marginTop: SPACING.md },
   storePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 104, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surface },
   storePreviewVisual: { width: 74, height: 74, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
   storePreviewLogo: { width: '100%', height: '100%' },
@@ -3756,8 +3627,6 @@ const styles = StyleSheet.create({
   swipeOrderDeleteText: { color: COLORS.inverse, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   swipeOrderFront: { backgroundColor: COLORS.surface },
   swipeOrderCard: { padding: SPACING.md, minHeight: 88, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, justifyContent: 'center' },
-  confirmAction: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  confirmActionDisabled: { opacity: 0.45 },
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
   catalogThumb: { width: 84, minHeight: 126, backgroundColor: COLORS.surface },
   catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
