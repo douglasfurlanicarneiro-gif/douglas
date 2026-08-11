@@ -25,7 +25,6 @@ import {
   aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
   listArquivados, restoreArquivado,
   listSolicitacoesPrivacidade, updateSolicitacaoPrivacidade,
-  reauthenticateCriticalAction,
 } from '../api';
 import type { OperationalSummary, RegistroArquivado, SolicitacaoPrivacidade } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
@@ -33,6 +32,12 @@ import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoj
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
 import { CustosView, FornecedoresView, InsumosView } from './GestaoOperacional';
 import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
+import {
+  ConfirmSheetContent,
+  SystemAction,
+  SystemCard,
+  type ConfirmSheet,
+} from './AdminSystemComponents';
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
 type PerfumeFormState = Omit<Perfume, 'id' | 'seq' | 'inspiracao'> & {
@@ -54,7 +59,7 @@ type PedidoEndereco = NonNullable<Pedido['endereco']>;
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'payment-operation'; data: Pedido }
   | { type: 'availability' }
-  | { type: 'confirm'; title?: string; label: string; onConfirm: () => void | Promise<void>; confirmLabel?: string; danger?: boolean; safetyText?: string; requiresReauth?: boolean }
+  | ConfirmSheet
   | { type: 'whatsapp'; phone: string; message: string; statusLabel: string }
   | { type: 'info'; label: string };
 
@@ -242,65 +247,6 @@ function SwipeablePedidoCard({
   );
 }
 
-function SystemCard({
-  icon,
-  title,
-  subtitle,
-  children,
-}: {
-  icon: FeatherIconName;
-  title: string;
-  subtitle: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <View style={styles.systemCard}>
-      <View style={styles.systemCardHeader}>
-        <View style={styles.systemCardIcon}><Feather name={icon} size={17} color={COLORS.gold} /></View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.systemCardTitle}>{title}</Text>
-          <Text style={styles.systemCardSubtitle}>{subtitle}</Text>
-        </View>
-      </View>
-      {children}
-    </View>
-  );
-}
-
-function SystemAction({
-  icon,
-  title,
-  subtitle,
-  onPress,
-  danger,
-  disabled,
-  badge,
-}: {
-  icon: FeatherIconName;
-  title: string;
-  subtitle: string;
-  onPress?: () => void;
-  danger?: boolean;
-  disabled?: boolean;
-  badge?: string;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      style={({ pressed }) => [styles.systemAction, disabled && { opacity: 0.5 }, pressed && { opacity: 0.75 }]}
-    >
-      <Feather name={icon} size={15} color={danger ? COLORS.rust : COLORS.gold} />
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.systemActionTitle, danger && { color: COLORS.rust }]}>{title}</Text>
-        <Text style={styles.systemActionSubtitle}>{subtitle}</Text>
-      </View>
-      {!!badge && <Text style={styles.systemBadge}>{badge}</Text>}
-      {!disabled && <Feather name="chevron-right" size={15} color={COLORS.muted} />}
-    </Pressable>
-  );
-}
-
 function KanbanPedidoCard({
   pedido,
   onOpen,
@@ -391,92 +337,6 @@ function KanbanPedidoCard({
         </Pressable>
       </View>
     </Animated.View>
-  );
-}
-
-function ConfirmSheetContent({
-  sheet,
-  onCancel,
-}: {
-  sheet: Extract<NonNullable<SheetType>, { type: 'confirm' }>;
-  onCancel: () => void;
-}) {
-  const [ready, setReady] = useState(!sheet.danger);
-  const [password, setPassword] = useState('');
-  const [securityError, setSecurityError] = useState('');
-  const [confirming, setConfirming] = useState(false);
-
-  useEffect(() => {
-    if (!sheet.danger) {
-      setReady(true);
-      return;
-    }
-    setReady(false);
-    const timer = setTimeout(() => setReady(true), 700);
-    return () => clearTimeout(timer);
-  }, [sheet]);
-
-  const confirm = async () => {
-    if (!ready || confirming || (sheet.requiresReauth && !password)) return;
-    setConfirming(true);
-    setSecurityError('');
-    try {
-      if (sheet.requiresReauth) await reauthenticateCriticalAction(password);
-      await sheet.onConfirm();
-    } catch (error) {
-      setSecurityError(error instanceof ApiError ? error.message : 'Não foi possível confirmar sua identidade.');
-    } finally {
-      setConfirming(false);
-    }
-  };
-
-  return (
-    <View>
-      <Text style={{ color: COLORS.bone, marginBottom: SPACING.lg }}>{sheet.label}</Text>
-      {sheet.danger && (
-        <View style={styles.deleteSafetyNotice}>
-          <Feather name="shield" size={15} color={COLORS.gold} />
-          <Text style={styles.deleteSafetyText}>
-            {sheet.safetyText || 'Esta ação é permanente. Confirme somente se deseja realmente excluir.'}
-          </Text>
-        </View>
-      )}
-      {sheet.requiresReauth && (
-        <View style={styles.stepUpCard}>
-          <View style={styles.stepUpHeading}>
-            <Feather name="lock" size={16} color={COLORS.gold} />
-            <Text style={styles.stepUpTitle}>Confirmação de identidade</Text>
-          </View>
-          <Text style={styles.stepUpHint}>Digite novamente a senha do painel. Ela não será salva.</Text>
-          <TInput
-            value={password}
-            onChangeText={(value) => { setPassword(value); setSecurityError(''); }}
-            placeholder="Senha administrativa"
-            secureTextEntry
-            autoCapitalize="none"
-            testID="critical-password"
-          />
-          {!!securityError && <Text style={styles.stepUpError}>{securityError}</Text>}
-        </View>
-      )}
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <Pressable
-          onPress={confirm}
-          disabled={!ready || confirming || Boolean(sheet.requiresReauth && !password)}
-          testID="confirm-ok"
-          style={[
-            styles.confirmAction,
-            { backgroundColor: sheet.danger ? COLORS.rust : COLORS.gold },
-            (!ready || confirming || Boolean(sheet.requiresReauth && !password)) && styles.confirmActionDisabled,
-          ]}
-        >
-          <Text style={{ color: sheet.danger ? COLORS.inverse : COLORS.ink, fontWeight: '600' }}>
-            {!ready ? 'Aguarde…' : confirming ? 'Confirmando…' : (sheet.confirmLabel || (sheet.danger ? 'Sim, excluir' : 'Confirmar'))}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
   );
 }
 
@@ -3723,11 +3583,6 @@ const styles = StyleSheet.create({
   systemEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.4 },
   systemTitle: { color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '600', marginTop: 1 },
   systemIntro: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 16, marginTop: 3 },
-  systemCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
-  systemCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SPACING.md },
-  systemCardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  systemCardTitle: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700' },
-  systemCardSubtitle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 14, marginTop: 2 },
   catalogStatsGrid: { flexDirection: 'row', gap: 8, marginBottom: SPACING.sm },
   catalogStat: { flex: 1, padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   catalogStatValue: { color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '700' },
@@ -3782,10 +3637,6 @@ const styles = StyleSheet.create({
   systemMiniActions: { flexDirection: 'row', gap: 6, marginTop: 7 },
   systemMiniButton: { flex: 1, minHeight: 35, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   systemMiniText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600', textAlign: 'center' },
-  systemAction: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
-  systemActionTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' },
-  systemActionSubtitle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
-  systemBadge: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.5, paddingHorizontal: 7, paddingVertical: 4, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border },
   operationHealthGrid: { flexDirection: 'row', gap: 8, marginBottom: 10 },
   operationHealthItem: { flex: 1, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   operationHealthValue: { color: COLORS.bone, fontSize: FONT_SIZES.title, fontWeight: '700' },
@@ -3905,13 +3756,6 @@ const styles = StyleSheet.create({
   swipeOrderDeleteText: { color: COLORS.inverse, fontSize: FONT_SIZES.caption, fontWeight: '700' },
   swipeOrderFront: { backgroundColor: COLORS.surface },
   swipeOrderCard: { padding: SPACING.md, minHeight: 88, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, justifyContent: 'center' },
-  deleteSafetyNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  stepUpCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold, backgroundColor: COLORS.surfaceRaised },
-  stepUpHeading: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
-  stepUpTitle: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
-  stepUpHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginBottom: SPACING.sm },
-  stepUpError: { color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 6 },
-  deleteSafetyText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 16, flex: 1 },
   confirmAction: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   confirmActionDisabled: { opacity: 0.45 },
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
