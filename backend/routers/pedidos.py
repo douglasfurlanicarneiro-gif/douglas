@@ -14,6 +14,7 @@ from locks import stock_lock
 from label_service import gerar_etiquetas_producao
 from order_status import validar_transicao_status
 from money import centavos_em_valor, subtotal_em_centavos, valor_em_centavos
+from payment_status import PAYMENT_STATUSES_THAT_BLOCK_CANCELLATION
 from security import require_atelie_auth
 from stock import quantidades_por_perfume, validar_estoque
 from utils import next_seq, serialize
@@ -224,6 +225,70 @@ async def _persistir_pedido_e_estoque(
     status_anterior = str(existente.get("status", "pendente"))
     validar_transicao_status(status_anterior, novo_status)
 
+    pagamento_atual = dict(existente.get("pagamento") or {})
+    status_pagamento = str(pagamento_atual.get("status") or "")
+    if (
+        novo_status == "cancelado"
+        and status_pagamento in PAYMENT_STATUSES_THAT_BLOCK_CANCELLATION
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PAGAMENTO_EXIGE_ESTORNO",
+                "message": (
+                    "Este pedido possui pagamento recebido. Faça o estorno no "
+                    "provedor ou banco e registre a conclusão no pagamento antes de cancelar."
+                ),
+                "statusPagamento": status_pagamento,
+            },
+        )
+
+    if status_anterior == "pendente" and novo_status == "pagamento_confirmado":
+        if (
+            pagamento_atual.get("provedor") == "infinitepay"
+            and status_pagamento != "pago"
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "CONFIRMACAO_GATEWAY_NECESSARIA",
+                    "message": (
+                        "Este pagamento deve ser confirmado automaticamente pela "
+                        "InfinitePay. Não o marque manualmente como recebido."
+                    ),
+                },
+            )
+        if status_pagamento != "pago":
+            agora_pagamento = datetime.now(timezone.utc)
+            pagamento_atual.update(
+                {
+                    "metodo": pagamento_atual.get("metodo") or "manual",
+                    "provedor": pagamento_atual.get("provedor") or "painel",
+                    "status": "pago",
+                    "valorCentavos": int(
+                        atualizacao.get("totalCentavos")
+                        or existente.get("totalCentavos")
+                        or valor_em_centavos(
+                            atualizacao.get("total", existente.get("total", 0))
+                        )
+                    ),
+                    "pagoEm": agora_pagamento,
+                    "historico": [
+                        *(pagamento_atual.get("historico") or []),
+                        {
+                            "operacao": "confirmar_pagamento_manual",
+                            "statusAnterior": status_pagamento or "pendente",
+                            "status": "pago",
+                            "motivo": "Pagamento confirmado pelo painel administrativo.",
+                            "referencia": "painel",
+                            "ator": "administrador",
+                            "data": agora_pagamento,
+                        },
+                    ],
+                }
+            )
+            atualizacao["pagamento"] = pagamento_atual
+
     movimento_antecipado = _status_consume_estoque(novo_status)
     if movimento_antecipado:
         await _sincronizar_movimentos_do_pedido(
@@ -326,6 +391,25 @@ async def criar_pedido(payload: PedidoIn, _: str = Depends(require_atelie_auth))
         agora = datetime.now(timezone.utc)
         doc["criadoEm"] = agora
         doc["historicoStatus"] = [{"status": payload.status, "data": agora}]
+        if payload.status != "pendente":
+            doc["pagamento"] = {
+                "metodo": "manual",
+                "provedor": "painel",
+                "status": "pago",
+                "valorCentavos": doc["totalCentavos"],
+                "pagoEm": agora,
+                "historico": [
+                    {
+                        "operacao": "confirmar_pagamento_manual",
+                        "statusAnterior": "pendente",
+                        "status": "pago",
+                        "motivo": "Pedido criado como pago no painel administrativo.",
+                        "referencia": "painel",
+                        "ator": "administrador",
+                        "data": agora,
+                    }
+                ],
+            }
         resultado = await db.pedidos.insert_one(doc)
         pedido_id = str(resultado.inserted_id)
         try:

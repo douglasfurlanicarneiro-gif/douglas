@@ -17,7 +17,7 @@ import {
   listMovimentos, createMovimento, getEstoqueMap, getEstoqueResumo, conferirEstoque,
   atualizarDisponibilidadeCatalogo,
   getCatalogoEstoqueResumo, completarEstoqueProntaEntrega, zerarEstoqueSobEncomenda,
-  listPedidos, createPedido, updatePedido, deletePedido, getClientePorContato,
+  listPedidos, createPedido, updatePedido, deletePedido, registerPaymentOperation, getClientePorContato,
   listOpinioesAdmin, moderateOpiniao, deleteOpiniao,
   listSugestoes, deleteSugestao, listCompras, deleteCompra,
   downloadBackup, downloadOrderLabels, auditCatalog, validateBackup, restoreBackup, getOperationalSummary, retryFailedPayments, getMetricas, resetAllOrders,
@@ -28,7 +28,7 @@ import {
 } from '../api';
 import type { OperationalSummary, RegistroArquivado, SolicitacaoPrivacidade } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
-import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, Pedido, PedidoItem, Perfume, PriceOption, Sugestao } from '../types';
+import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, PaymentOperation, Pedido, PedidoItem, Perfume, PriceOption, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
 import { CustosView, FornecedoresView, InsumosView } from './GestaoOperacional';
 import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
@@ -51,6 +51,7 @@ type PedidoSaveData = PedidoFormState & {
 type PedidoEndereco = NonNullable<Pedido['endereco']>;
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
+  | { type: 'payment-operation'; data: Pedido }
   | { type: 'availability' }
   | { type: 'confirm'; title?: string; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
   | { type: 'whatsapp'; phone: string; message: string; statusLabel: string }
@@ -883,6 +884,125 @@ function StockCountForm({ perfumes, resumo, initial, onSave, onCancel }: {
   );
 }
 
+const PAYMENT_OPERATION_COPY: Record<PaymentOperation, { label: string; hint: string }> = {
+  solicitar_estorno: {
+    label: 'Solicitar estorno',
+    hint: 'Marca o valor como aguardando devolução.',
+  },
+  confirmar_estorno: {
+    label: 'Confirmar estorno realizado',
+    hint: 'Use somente depois de concluir o cancelamento no provedor.',
+  },
+  registrar_contestacao: {
+    label: 'Registrar contestação',
+    hint: 'Sinaliza uma venda contestada pelo titular do cartão.',
+  },
+  resolver_contestacao_favoravel: {
+    label: 'Contestação favorável',
+    hint: 'O pagamento continua válido para a loja.',
+  },
+  resolver_chargeback: {
+    label: 'Confirmar chargeback',
+    hint: 'O valor foi devolvido ao titular e deixa de compor a receita.',
+  },
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  aguardando_pagamento: 'Aguardando pagamento',
+  pendente: 'Pendente',
+  pago: 'Pago',
+  estorno_solicitado: 'Estorno solicitado',
+  estornado: 'Estornado',
+  contestado: 'Em contestação',
+  chargeback_confirmado: 'Chargeback confirmado',
+};
+
+function PaymentOperationForm({
+  pedido,
+  onSave,
+  onCancel,
+}: {
+  pedido: Pedido;
+  onSave: (operacao: PaymentOperation, motivo: string, referencia: string) => void | Promise<void>;
+  onCancel: () => void;
+}) {
+  const status = pedido.pagamento?.status || '';
+  const operacoes: PaymentOperation[] = status === 'pago'
+    ? ['solicitar_estorno', 'registrar_contestacao']
+    : status === 'estorno_solicitado'
+      ? ['confirmar_estorno', 'registrar_contestacao']
+      : status === 'contestado'
+        ? ['resolver_contestacao_favoravel', 'resolver_chargeback']
+        : [];
+  const [operacao, setOperacao] = useState<PaymentOperation | null>(operacoes[0] || null);
+  const [motivo, setMotivo] = useState('');
+  const [referencia, setReferencia] = useState('');
+  const [saving, setSaving] = useState(false);
+  const exigeReferencia = operacao != null && [
+    'confirmar_estorno',
+    'resolver_contestacao_favoravel',
+    'resolver_chargeback',
+  ].includes(operacao);
+  const valido = Boolean(operacao && motivo.trim().length >= 5 && (!exigeReferencia || referencia.trim().length >= 3));
+  const submit = async () => {
+    if (!operacao || !valido || saving) return;
+    setSaving(true);
+    try {
+      await onSave(operacao, motivo.trim(), referencia.trim());
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <View>
+      <View style={styles.paymentProviderNotice}>
+        <Feather name="alert-circle" size={19} color={COLORS.gold} />
+        <Text style={styles.paymentProviderNoticeText}>
+          O ERP não movimenta dinheiro. Faça o estorno ou acompanhe a contestação no provedor ou banco (InfinitePay, quando aplicável) e registre aqui o resultado.
+        </Text>
+      </View>
+      <Text style={styles.paymentOperationStatus}>
+        Pedido Nº {padSeq(pedido.seq)} · situação atual: {PAYMENT_STATUS_LABELS[status] || 'Não informada'}
+      </Text>
+      {operacoes.map((item) => {
+        const selected = operacao === item;
+        return (
+          <Pressable
+            key={item}
+            onPress={() => setOperacao(item)}
+            style={[styles.paymentOperationChoice, selected && styles.paymentOperationChoiceActive]}
+          >
+            <Feather name={selected ? 'check-circle' : 'circle'} size={18} color={selected ? COLORS.gold : COLORS.muted} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.paymentOperationChoiceTitle}>{PAYMENT_OPERATION_COPY[item].label}</Text>
+              <Text style={styles.paymentOperationChoiceHint}>{PAYMENT_OPERATION_COPY[item].hint}</Text>
+            </View>
+          </Pressable>
+        );
+      })}
+      {operacoes.length === 0 && (
+        <Text style={styles.paymentOperationEmpty}>Este pagamento não possui operações pendentes.</Text>
+      )}
+      {operacoes.length > 0 && (
+        <>
+          <Field label="Motivo ou observação">
+            <TInput value={motivo} onChangeText={setMotivo} placeholder="Ex.: cliente solicitou cancelamento" multiline />
+          </Field>
+          <Field label={exigeReferencia ? 'Protocolo, NSU ou referência' : 'Referência (opcional)'}>
+            <TInput value={referencia} onChangeText={setReferencia} placeholder="Informe o comprovante do provedor" />
+          </Field>
+        </>
+      )}
+      <View style={{ flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm }}>
+        <SecondaryButton label="Voltar" onPress={onCancel} />
+        {operacoes.length > 0 && (
+          <PrimaryButton label={saving ? 'Salvando…' : 'Registrar operação'} disabled={!valido || saving} onPress={submit} testID="payment-operation-save" />
+        )}
+      </View>
+    </View>
+  );
+}
+
 function PedidoForm({
   perfumes,
   initial,
@@ -890,6 +1010,7 @@ function PedidoForm({
   onCancel,
   onDelete,
   onGenerateLabels,
+  onPaymentOperation,
 }: {
   perfumes: Perfume[];
   initial?: Pedido;
@@ -897,6 +1018,7 @@ function PedidoForm({
   onCancel: () => void;
   onDelete?: (pedido: Pedido) => void | Promise<void>;
   onGenerateLabels?: (pedido: Pedido) => void | Promise<void>;
+  onPaymentOperation?: (pedido: Pedido) => void;
 }) {
   const [f, setF] = useState<PedidoFormState>(initial || {
     cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [],
@@ -1141,13 +1263,30 @@ function PedidoForm({
             <Text style={styles.orderDeliveryMeta}>
               {String(initial.pagamento.metodo || initial.formaPagamento || '').toUpperCase()}
               {' · '}{initial.pagamento.provedor || 'Confirmação manual'}
-              {' · '}{initial.pagamento.status || 'pendente'}
+              {' · '}{PAYMENT_STATUS_LABELS[initial.pagamento.status] || initial.pagamento.status || 'Pendente'}
             </Text>
             {!!initial.pagamento.parcelas && initial.pagamento.parcelas > 1 && (
               <Text style={styles.orderDeliveryMeta}>{initial.pagamento.parcelas} parcelas</Text>
             )}
             {!!initial.pagamento.transactionNsu && (
               <Text style={styles.orderDeliveryMeta}>Transação: {initial.pagamento.transactionNsu}</Text>
+            )}
+            {!!initial.pagamento.historico?.length && (
+              <Text style={styles.orderDeliveryMeta}>
+                Última operação: {PAYMENT_OPERATION_COPY[
+                  initial.pagamento.historico[initial.pagamento.historico.length - 1].operacao as PaymentOperation
+                ]?.label || 'Pagamento confirmado'}
+              </Text>
+            )}
+            {['pago', 'estorno_solicitado', 'contestado'].includes(initial.pagamento.status) && onPaymentOperation && (
+              <Pressable
+                onPress={() => onPaymentOperation(initial)}
+                style={styles.paymentManageButton}
+                testID="manage-payment"
+              >
+                <Feather name="shield" size={14} color={COLORS.gold} />
+                <Text style={styles.paymentManageButtonText}>Gerenciar estorno ou contestação</Text>
+              </Pressable>
             )}
           </View>
         </View>
@@ -1228,7 +1367,7 @@ function PedidoForm({
           ))}
         </View>
       </Field>
-      {pedidoRecebido && initial?.pagamento?.metodo === 'pix' && f.status === 'pendente' && (
+      {pedidoRecebido && initial?.pagamento?.metodo === 'pix' && initial.pagamento.provedor !== 'infinitepay' && f.status === 'pendente' && (
         <Pressable
           onPress={() => onSave(pedidoParaSalvar('pagamento_confirmado'))}
           style={styles.confirmPaymentButton}
@@ -1919,6 +2058,27 @@ export function Atelie({
     }
     await persistPedido(data, anterior);
   };
+  const doPaymentOperation = async (
+    pedido: Pedido,
+    operacao: PaymentOperation,
+    motivo: string,
+    referencia: string,
+  ) => {
+    try {
+      const atualizado = await registerPaymentOperation(pedido.id, { operacao, motivo, referencia });
+      await load();
+      const status = atualizado.pagamento?.status || 'atualizado';
+      const complemento = status === 'estornado' || status === 'chargeback_confirmado'
+        ? ' Agora o pedido pode ser cancelado sem manter receita indevida.'
+        : '';
+      setSheet({ type: 'info', label: `Situação financeira registrada: ${PAYMENT_STATUS_LABELS[status] || status}.${complemento}` });
+    } catch (error) {
+      setSheet({
+        type: 'info',
+        label: error instanceof ApiError ? error.message : 'Não foi possível registrar a operação financeira.',
+      });
+    }
+  };
   const doDelPedido = async (id: string) => { await deletePedido(id); setSheet(null); load(); };
   const requestDeletePedido = (pedido: Pedido) => {
     setSheet({
@@ -1953,8 +2113,13 @@ export function Atelie({
       const saved = await updatePedido(pedido.id, pedidoPayload({ ...pedido, status }));
       await load();
       offerWhatsAppStatusUpdate(saved, pedido.status);
-    } catch {
-      setSheet({ type: 'info', label: 'Não foi possível mover o pedido. Verifique a conexão e tente novamente.' });
+    } catch (error) {
+      setSheet({
+        type: 'info',
+        label: error instanceof ApiError
+          ? error.message
+          : 'Não foi possível mover o pedido. Verifique a conexão e tente novamente.',
+      });
     } finally {
       setMovingOrderId(null);
     }
@@ -2114,6 +2279,7 @@ export function Atelie({
     sheet.type === 'movimento' ? 'Lançar estoque' :
     sheet.type === 'stock-count' ? 'Conferir estoque físico' :
     sheet.type === 'pedido' ? (sheet.data ? 'Editar pedido' : 'Novo pedido') :
+    sheet.type === 'payment-operation' ? 'Conciliação do pagamento' :
     sheet.type === 'availability' ? 'Gerenciar pronta entrega' :
     sheet.type === 'whatsapp' ? 'Avisar cliente' :
     sheet.type === 'confirm' ? (sheet.title || (sheet.danger ? 'Confirmar exclusão' : 'Confirmar')) : 'Aviso';
@@ -2181,6 +2347,17 @@ export function Atelie({
                   <Text style={styles.metricSubtle}>{metricas.pedidosPagos} pedido(s) pago(s)</Text>
                 </View>
               </View>
+              {(metricas.receitaEmRisco > 0 || metricas.valorEstornado > 0 || metricas.valorChargeback > 0) && (
+                <View style={styles.financialAttentionCard}>
+                  <Feather name="alert-circle" size={17} color={COLORS.rust} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.financialAttentionTitle}>Atenção financeira</Text>
+                    <Text style={styles.financialAttentionText}>
+                      Em análise {brl(metricas.receitaEmRisco)} · estornado {brl(metricas.valorEstornado)} · chargeback {brl(metricas.valorChargeback)}
+                    </Text>
+                  </View>
+                </View>
+              )}
               {metricas.serieDiaria?.length > 0 && (() => {
                 const dias = metricas.serieDiaria.slice(-14);
                 const maxReceita = Math.max(1, ...dias.map((dia) => dia.receita));
@@ -3363,6 +3540,14 @@ export function Atelie({
             onCancel={() => setSheet(null)}
             onDelete={requestDeletePedido}
             onGenerateLabels={doGenerateLabels}
+            onPaymentOperation={(pedido) => setSheet({ type: 'payment-operation', data: pedido })}
+          />
+        )}
+        {sheet?.type === 'payment-operation' && (
+          <PaymentOperationForm
+            pedido={sheet.data}
+            onSave={(operacao, motivo, referencia) => doPaymentOperation(sheet.data, operacao, motivo, referencia)}
+            onCancel={() => setSheet({ type: 'pedido', data: sheet.data })}
           />
         )}
         {sheet?.type === 'availability' && (
@@ -3675,6 +3860,19 @@ const styles = StyleSheet.create({
   confirmPaymentButton: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.gold },
   confirmPaymentTitle: { color: COLORS.ink, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
   confirmPaymentHint: { color: COLORS.ink, opacity: 0.72, fontSize: FONT_SIZES.caption, marginTop: 2 },
+  paymentManageButton: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 9, paddingHorizontal: 10, minHeight: 34, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
+  paymentManageButtonText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700' },
+  paymentProviderNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.gold, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceRaised },
+  paymentProviderNoticeText: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, lineHeight: 20 },
+  paymentOperationStatus: { color: COLORS.muted, fontSize: FONT_SIZES.label, marginBottom: SPACING.sm },
+  paymentOperationChoice: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginBottom: SPACING.sm, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
+  paymentOperationChoiceActive: { borderColor: COLORS.gold, backgroundColor: COLORS.surfaceRaised },
+  paymentOperationChoiceTitle: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  paymentOperationChoiceHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
+  paymentOperationEmpty: { color: COLORS.muted, fontSize: FONT_SIZES.bodySmall, paddingVertical: SPACING.md },
+  financialAttentionCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surfaceRaised },
+  financialAttentionTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
+  financialAttentionText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   cancelAdminOrderButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '80' },
   cancelAdminOrderText: { color: COLORS.rust, fontSize: FONT_SIZES.label, fontWeight: '700' },
   deleteAdminOrderButton: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.rust },

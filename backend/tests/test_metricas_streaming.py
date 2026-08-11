@@ -124,3 +124,32 @@ def test_metricas_filtram_periodo_com_data_bson(monkeypatch):
     limite = banco.pedidos.ultimo_filtro["criadoEm"]["$gte"]
     assert isinstance(limite, datetime)
     assert limite.tzinfo is not None
+
+
+def test_metricas_separam_estorno_chargeback_e_receita_em_risco(monkeypatch):
+    banco = BancoFalso()
+    base = {
+        "status": "pagamento_confirmado",
+        "criadoEm": "2026-08-09T12:00:00+00:00",
+        "itens": [],
+    }
+    banco.pedidos.documentos = [
+        {**base, "total": 100, "pagamento": {"status": "estornado"}},
+        {**base, "total": 80, "pagamento": {"status": "chargeback_confirmado"}},
+        {**base, "total": 60, "pagamento": {"status": "contestado"}},
+        {**base, "total": 40, "pagamento": {"status": "estorno_solicitado"}},
+    ]
+    monkeypatch.setattr(admin, "get_db", lambda: banco)
+
+    async def config_custos(_db):
+        return {}
+
+    monkeypatch.setattr(admin, "obter_config_custos", config_custos)
+    resultado = asyncio.run(admin.obter_metricas(periodo="todos", _="admin"))
+
+    assert resultado["receitaConfirmada"] == 100
+    assert resultado["receitaEmRisco"] == 100
+    assert resultado["valorEstornado"] == 100
+    assert resultado["valorChargeback"] == 80
+    assert resultado["pedidosEstornados"] == 1
+    assert resultado["chargebacks"] == 1

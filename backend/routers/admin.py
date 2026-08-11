@@ -505,6 +505,11 @@ async def obter_metricas(
     receita_produtos = 0.0
     lucro_produtos_estimado = 0.0
     ml_vendidos = 0
+    pedidos_estornados = 0
+    chargebacks = 0
+    valor_estornado = 0.0
+    valor_chargeback = 0.0
+    receita_em_risco = 0.0
 
     async for pedido in db.pedidos.find(filtro):
         pedidos_total += 1
@@ -518,11 +523,22 @@ async def obter_metricas(
         if status == "pendente":
             pedidos_pendentes += 1
             a_receber += float(pedido.get("total", 0) or 0)
+        status_pagamento = str((pedido.get("pagamento") or {}).get("status") or "")
+        total_pedido = float(pedido.get("total", 0) or 0)
+        if status_pagamento == "estornado":
+            pedidos_estornados += 1
+            valor_estornado += total_pedido
+            continue
+        if status_pagamento == "chargeback_confirmado":
+            chargebacks += 1
+            valor_chargeback += total_pedido
+            continue
+        if status_pagamento in {"estorno_solicitado", "contestado"}:
+            receita_em_risco += total_pedido
         if status not in status_pagos:
             continue
 
         pedidos_pagos += 1
-        total_pedido = float(pedido.get("total", 0) or 0)
         receita_confirmada += total_pedido
         if status == "entregue":
             receita_entregue += total_pedido
@@ -650,12 +666,17 @@ async def obter_metricas(
         "pedidosPagos": pedidos_pagos,
         "pedidosPendentes": pedidos_pendentes,
         "pedidosCancelados": pedidos_cancelados,
+        "pedidosEstornados": pedidos_estornados,
+        "chargebacks": chargebacks,
         "pedidosPorStatus": por_status,
         # Mantido por compatibilidade; agora significa receita confirmada.
         "faturamento": round(receita_confirmada, 2),
         "receitaConfirmada": round(receita_confirmada, 2),
         "receitaEntregue": round(receita_entregue, 2),
         "aReceber": round(a_receber, 2),
+        "valorEstornado": round(valor_estornado, 2),
+        "valorChargeback": round(valor_chargeback, 2),
+        "receitaEmRisco": round(receita_em_risco, 2),
         "ticketMedio": round(ticket_medio, 2),
         "custoEstimado": round(custo_estimado, 2),
         "lucroEstimado": round(lucro_estimado, 2),

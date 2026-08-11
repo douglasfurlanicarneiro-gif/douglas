@@ -114,6 +114,26 @@ export type PaymentDetails = {
   recebedor?: string;
   instituicao?: string;
   observacao?: string;
+  estornadoEm?: string;
+  chargebackEm?: string;
+  historico?: PaymentHistoryItem[];
+};
+
+export type PaymentOperation =
+  | 'solicitar_estorno'
+  | 'confirmar_estorno'
+  | 'registrar_contestacao'
+  | 'resolver_contestacao_favoravel'
+  | 'resolver_chargeback';
+
+export type PaymentHistoryItem = {
+  operacao: PaymentOperation | 'confirmar_pagamento_manual';
+  statusAnterior: string;
+  status: string;
+  motivo: string;
+  referencia?: string;
+  ator?: string;
+  data: string;
 };
 
 export type Pedido = {
@@ -246,11 +266,16 @@ export type Metricas = {
   pedidosPagos: number;
   pedidosPendentes: number;
   pedidosCancelados: number;
+  pedidosEstornados: number;
+  chargebacks: number;
   pedidosPorStatus: Record<string, number>;
   faturamento: number;
   receitaConfirmada: number;
   receitaEntregue: number;
   aReceber: number;
+  valorEstornado: number;
+  valorChargeback: number;
+  receitaEmRisco: number;
   ticketMedio: number;
   custoEstimado: number;
   lucroEstimado: number;

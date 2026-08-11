@@ -281,6 +281,13 @@ export const listPedidos = () => request<Pedido[]>('/pedidos', {}, true);
 export const createPedido = (data: Omit<Pedido, 'id' | 'seq' | 'criadoEm'>) => request<Pedido>('/pedidos', { method: 'POST', body: JSON.stringify(data) }, true);
 export const updatePedido = (id: string, data: Partial<Pedido>) => request<Pedido>(`/pedidos/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
 export const deletePedido = (id: string) => request<{ status: string }>(`/pedidos/${id}`, { method: 'DELETE' }, true);
+export const registerPaymentOperation = (
+  id: string,
+  data: { operacao: import('./types').PaymentOperation; motivo: string; referencia?: string },
+) => request<Pedido>(`/pagamentos/pedidos/${id}/operacoes`, {
+  method: 'POST',
+  body: JSON.stringify(data),
+}, true);
 
 // Opinioes
 export const listOpinioes = () => request<Opiniao[]>('/opinioes');

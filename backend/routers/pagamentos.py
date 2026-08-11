@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -10,13 +11,16 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from pymongo import ReturnDocument
 from pydantic import BaseModel, Field
 
+from audit import registrar_auditoria
 from catalog_cache import invalidate_catalog_cache
 from config import INFINITEPAY_HANDLE
 from database import get_db
 from locks import stock_lock
+from payment_status import validar_operacao_pagamento
 from payments.infinitepay import (InfinitePayError, token_webhook_valido,
                                   valor_em_centavos, verificar_pagamento)
 from rate_limit import payment_rate_limit
+from security import require_atelie_auth
 from stock import pedido_tem_reserva_ativa, validar_estoque
 from utils import pagamento_publico, serialize
 
@@ -44,6 +48,18 @@ class InfinitePayConfirmacaoIn(BaseModel):
     orderNsu: str = Field(min_length=1, max_length=80)
     transactionNsu: str = Field(min_length=1, max_length=300)
     slug: str = Field(min_length=1, max_length=300)
+
+
+class OperacaoFinanceiraIn(BaseModel):
+    operacao: Literal[
+        "solicitar_estorno",
+        "confirmar_estorno",
+        "registrar_contestacao",
+        "resolver_contestacao_favoravel",
+        "resolver_chargeback",
+    ]
+    motivo: str = Field(min_length=5, max_length=500)
+    referencia: str = Field(default="", max_length=160)
 
 
 def _webhook_event_id(order_nsu: str, transaction_nsu: str) -> str:
@@ -435,3 +451,113 @@ async def confirmar_retorno_infinitepay(payload: InfinitePayConfirmacaoIn):
         slug=payload.slug,
     )
     return {"pago": True, "pedido": _pedido_publico(pedido)}
+
+
+@router.post("/pedidos/{pedido_id}/operacoes")
+async def registrar_operacao_financeira(
+    pedido_id: str,
+    payload: OperacaoFinanceiraIn,
+    usuario: str = Depends(require_atelie_auth),
+):
+    """Registra a conciliação feita no provedor sem simular movimentação bancária."""
+    try:
+        oid = ObjectId(pedido_id)
+    except InvalidId as exc:
+        raise HTTPException(status_code=400, detail="Id de pedido inválido.") from exc
+
+    referencia = payload.referencia.strip()
+    if payload.operacao in {
+        "confirmar_estorno",
+        "resolver_contestacao_favoravel",
+        "resolver_chargeback",
+    } and len(referencia) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "REFERENCIA_FINANCEIRA_OBRIGATORIA",
+                "message": "Informe o protocolo, NSU ou referência exibida pelo provedor.",
+            },
+        )
+
+    db = get_db()
+    async with stock_lock(db):
+        pedido = await db.pedidos.find_one({"_id": oid})
+        if not pedido:
+            raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+        pagamento = dict(pedido.get("pagamento") or {})
+        status_anterior = str(pagamento.get("status") or "")
+
+        # Repetir exatamente a mesma confirmação é seguro e não duplica o histórico.
+        ultimo = (pagamento.get("historico") or [{}])[-1]
+        if (
+            ultimo.get("operacao") == payload.operacao
+            and str(ultimo.get("referencia") or "") == referencia
+        ):
+            return serialize(pedido)
+
+        novo_status = validar_operacao_pagamento(status_anterior, payload.operacao)
+        agora = datetime.now(timezone.utc)
+        evento = {
+            "operacao": payload.operacao,
+            "statusAnterior": status_anterior,
+            "status": novo_status,
+            "motivo": payload.motivo.strip(),
+            "referencia": referencia,
+            "ator": usuario,
+            "data": agora,
+        }
+        pagamento["status"] = novo_status
+        pagamento["historico"] = [*(pagamento.get("historico") or []), evento]
+        pagamento["observacao"] = payload.motivo.strip()
+        if novo_status == "estornado":
+            pagamento["estornadoEm"] = agora
+        elif novo_status == "chargeback_confirmado":
+            pagamento["chargebackEm"] = agora
+
+        requer_revisao = novo_status in {"estorno_solicitado", "contestado"}
+        motivo_revisao = {
+            "estorno_solicitado": "estorno_aguardando_confirmacao",
+            "contestado": "pagamento_contestado",
+        }.get(novo_status)
+        campos = {
+            "pagamento": pagamento,
+            "pagamentoRequerRevisao": requer_revisao,
+        }
+        if motivo_revisao:
+            campos["motivoRevisaoPagamento"] = motivo_revisao
+        resultado = await db.pedidos.update_one(
+            {"_id": oid, "pagamento.status": status_anterior},
+            {
+                "$set": campos,
+                **({"$unset": {"motivoRevisaoPagamento": ""}} if not motivo_revisao else {}),
+            },
+        )
+        if resultado.matched_count == 0:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "PAGAMENTO_ATUALIZADO_EM_OUTRA_SESSAO",
+                    "message": "O pagamento mudou em outra sessão. Atualize o painel.",
+                },
+            )
+        await registrar_auditoria(
+            db,
+            acao=payload.operacao,
+            recurso="pagamento",
+            recurso_id=pedido_id,
+            titulo="Situação financeira atualizada",
+            detalhes=(
+                f"Pedido Nº {pedido.get('seq', 0)}: "
+                f"{status_anterior} → {novo_status}."
+            ),
+            metadados={
+                "pedidoSeq": pedido.get("seq"),
+                "statusAnterior": status_anterior,
+                "status": novo_status,
+                "referencia": referencia,
+                "ator": usuario,
+            },
+        )
+        atualizado = await db.pedidos.find_one({"_id": oid})
+        invalidate_catalog_cache()
+        return serialize(atualizado)
