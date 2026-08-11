@@ -29,6 +29,27 @@ async function mockAdminApi(page: Page) {
       { id: 'perfume-a', seq: 1, nome: 'Âmbar Noturno', prontaEntrega: true, precos: [] },
       { id: 'perfume-b', seq: 2, nome: 'Brisa Dourada', prontaEntrega: false, precos: [] },
     ]);
+    if (path === '/api/pedidos' && request.method() === 'GET') return json([{
+      id: 'pedido-e2e',
+      seq: 42,
+      cliente: 'Cliente Kanban',
+      contato: '11999999999',
+      status: 'pendente',
+      observacoes: '',
+      itens: [{ perfumeId: 'perfume-a', nome: 'Âmbar Noturno', ml: 30, quantidade: 1, precoUnitario: 50 }],
+      subtotalTabela: 50,
+      ajusteManual: 0,
+      total: 50,
+      criadoEm: '2026-08-11T12:00:00Z',
+    }]);
+    if (path === '/api/pedidos/pedido-e2e' && request.method() === 'PUT') {
+      return json({
+        id: 'pedido-e2e',
+        seq: 42,
+        criadoEm: '2026-08-11T12:00:00Z',
+        ...request.postDataJSON(),
+      });
+    }
     if (path === '/api/admin/catalogo-estoque/disponibilidade' && request.method() === 'PUT') {
       return json({
         prontaEntrega: 2,
@@ -133,4 +154,21 @@ test('gerencia a disponibilidade e revisa antes de salvar', async ({ page }) => 
   const request = await saveRequest;
   expect(request.postDataJSON()).toEqual({ ids: ['perfume-a', 'perfume-b'] });
   await expect(page.getByText(/Disponibilidade salva: 2 em pronta entrega/)).toBeVisible();
+});
+
+
+test('move pedido pelo Kanban mantendo a transição esperada', async ({ page }) => {
+  await mockAdminApi(page);
+  await openAdminSystem(page);
+
+  await page.getByTestId('tab-pedidos').click();
+  await expect(page.getByTestId('kanban-pedido-pedido-e2e')).toBeVisible();
+
+  const moveRequest = page.waitForRequest((request) => (
+    request.url().endsWith('/api/pedidos/pedido-e2e')
+    && request.method() === 'PUT'
+  ));
+  await page.getByTestId('kanban-pedido-pedido-e2e-avancar').click();
+  const request = await moveRequest;
+  expect(request.postDataJSON().status).toBe('pagamento_confirmado');
 });
