@@ -222,6 +222,45 @@ def test_confirmacao_rejeita_valor_diferente(monkeypatch):
     assert not db.pedidos.updates
 
 
+def test_confirmacao_rejeita_segunda_transacao_paga(monkeypatch):
+    oid = ObjectId()
+    pedido = {
+        "_id": oid,
+        "status": "pagamento_confirmado",
+        "total": 25.0,
+        "totalCentavos": 2500,
+        "pagamento": {
+            "provedor": "infinitepay",
+            "status": "pago",
+            "transactionNsu": "transaction-original",
+        },
+    }
+    db = FakeDb(pedido)
+
+    async def fake_verificar(**_kwargs):
+        return {
+            "success": True,
+            "paid": True,
+            "amount": 2500,
+            "capture_method": "credit_card",
+        }
+
+    monkeypatch.setattr(pagamentos, "get_db", lambda: db)
+    monkeypatch.setattr(pagamentos, "verificar_pagamento", fake_verificar)
+    with pytest.raises(HTTPException) as erro:
+        asyncio.run(
+            pagamentos._confirmar_pagamento(
+                order_nsu=str(oid),
+                transaction_nsu="transaction-adicional",
+                slug="invoice-adicional",
+            )
+        )
+
+    assert erro.value.status_code == 409
+    assert erro.value.detail["code"] == "PAGAMENTO_DUPLICADO"
+    assert pedido["pagamento"]["transactionNsu"] == "transaction-original"
+
+
 def test_confirmacao_publica_oculta_nsu_e_slug():
     resposta = pagamentos._pedido_publico({
         "_id": ObjectId(),

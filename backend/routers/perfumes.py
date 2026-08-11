@@ -236,7 +236,7 @@ async def apagar_perfume(perfume_id: str, _: str = Depends(require_atelie_auth))
     perfume = await db.perfumes.find_one({"_id": oid})
     if not perfume:
         raise HTTPException(status_code=404, detail="Perfume não encontrado.")
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     await db.perfumes.update_one(
         {"_id": oid, "arquivadoEm": None},
         {"$set": {
@@ -371,7 +371,7 @@ async def definir_pronta_entrega(
         ),
         "perfumesAfetados": result["prontaEntrega"] + result["sobEncomenda"],
         "quantidadeMl": 0,
-        "data": datetime.now(timezone.utc).isoformat(),
+        "data": datetime.now(timezone.utc),
     })
     await marcar_vitrine_pendente(db)
     return result
@@ -406,7 +406,7 @@ async def aplicar_precos(payload: AplicarPrecosPayload, _: str = Depends(require
         await db.perfumes.bulk_write(operacoes, ordered=False)
 
     publicacao = await publicar_snapshot(db, registrar_operacao=False)
-    atualizado_em = datetime.now(timezone.utc).isoformat()
+    atualizado_em = datetime.now(timezone.utc)
     await db.operacoes_sistema.insert_one({
         "tipo": "aplicar_precos",
         "titulo": "Preços do catálogo atualizados",

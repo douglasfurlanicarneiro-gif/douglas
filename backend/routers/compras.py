@@ -22,8 +22,12 @@ from rate_limit import checkout_rate_limit
 from routers.pedidos import _persistir_pedido_e_estoque, _validar_status_estoque
 from security import require_atelie_auth
 from shipping.melhor_envio import MelhorEnvioError, cotar_frete
-from stock import RESERVATION_TTL_MINUTES, validar_estoque
-from utils import next_seq, serialize
+from stock import (
+    RESERVATION_TTL_MINUTES,
+    pedido_tem_reserva_ativa,
+    validar_estoque,
+)
+from utils import next_seq, pagamento_publico, serialize
 
 router = APIRouter(prefix="/api/compras", tags=["compras"])
 PRAZO_ENCOMENDA_DIAS = 14
@@ -143,6 +147,130 @@ def _validar_reuso_idempotente(pedido: dict, payload_hash: str) -> None:
         )
 
 
+def _compra_publica(pedido: dict) -> dict:
+    """Mantém o checkout retomável sem expor identificadores do provedor."""
+    resposta = serialize(pedido) or {}
+    if resposta.get("pagamento"):
+        resposta["pagamento"] = pagamento_publico(resposta["pagamento"])
+    return resposta
+
+
+def _configuracao_pagamento_do_pedido(pedido: dict, config_loja: dict) -> dict:
+    """Reconstrói o checkout somente com o snapshot persistido no pedido."""
+    endereco = pedido.get("endereco") or {}
+    return {
+        "pix": config_loja.get("pix", ""),
+        "nomeLoja": config_loja.get("nomeLoja", "L’Essence Furlani"),
+        "infinitePayHandle": config_loja.get("infinitePayHandle", ""),
+        "itens": list(pedido.get("itens") or []),
+        "frete": pedido.get("frete", 0),
+        "cliente": {
+            "nome": pedido.get("nomeCompleto") or pedido.get("cliente", ""),
+            "email": str(pedido.get("email") or ""),
+            "telefone": (
+                pedido.get("whatsapp")
+                or pedido.get("telefone")
+                or pedido.get("contato", "")
+            ),
+        },
+        "endereco": dict(endereco) if isinstance(endereco, dict) else {},
+    }
+
+
+async def _assegurar_pagamento_checkout(db, pedido: dict) -> dict:
+    """Cria ou retoma o pagamento idempotente de um pedido persistido."""
+    forma_pagamento = pedido.get("formaPagamento")
+    pagamento_atual = pedido.get("pagamento") or {}
+    if not forma_pagamento or pagamento_atual.get("status") in {
+        "aguardando_pagamento",
+        "pago",
+    }:
+        return pedido
+    if pedido.get("status") != "pendente":
+        raise HTTPException(
+            status_code=409,
+            detail="Somente pedidos aguardando pagamento podem retomar o checkout.",
+        )
+
+    oid = pedido["_id"]
+    # Antes de gerar outro link, uma reserva expirada volta a disputar o saldo.
+    # Isso evita cobrar por um item que já tenha sido vendido nesse intervalo.
+    if pedido.get("status") == "pendente" and not pedido_tem_reserva_ativa(pedido):
+        async with stock_lock(db):
+            atual = await db.pedidos.find_one({"_id": oid})
+            if not atual:
+                raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+            if not pedido_tem_reserva_ativa(atual):
+                await validar_estoque(
+                    db,
+                    atual.get("itens", []),
+                    excluir_pedido_id=oid,
+                    somente_reservaveis=True,
+                )
+                nova_expiracao = datetime.now(timezone.utc) + timedelta(
+                    minutes=RESERVATION_TTL_MINUTES
+                )
+                await db.pedidos.update_one(
+                    {"_id": oid, "status": "pendente"},
+                    {"$set": {"reservaExpiraEm": nova_expiracao}},
+                )
+                atual["reservaExpiraEm"] = nova_expiracao
+            pedido = atual
+
+    agora = datetime.now(timezone.utc)
+    await db.pedidos.update_one(
+        {"_id": oid},
+        {
+            "$set": {
+                "checkoutEstado": "processando_pagamento",
+                "checkoutUltimaTentativaEm": agora,
+            },
+            "$inc": {"checkoutTentativas": 1},
+            "$unset": {"checkoutUltimoErro": ""},
+        },
+    )
+    config_loja = await db.configuracoes.find_one({"_id": "loja"}) or {}
+    total_centavos = int(
+        pedido.get("totalCentavos") or valor_em_centavos(pedido.get("total", 0))
+    )
+    try:
+        pagamento = await iniciar_pagamento(
+            str(forma_pagamento),
+            str(oid),
+            centavos_em_valor(total_centavos),
+            _configuracao_pagamento_do_pedido(pedido, config_loja),
+        )
+    except PaymentProviderError as exc:
+        await db.pedidos.update_one(
+            {"_id": oid},
+            {
+                "$set": {
+                    "checkoutEstado": "pagamento_falhou",
+                    "checkoutUltimoErro": type(exc).__name__,
+                    "checkoutFalhouEm": datetime.now(timezone.utc),
+                }
+            },
+        )
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    pagamento["valorCentavos"] = total_centavos
+    await db.pedidos.update_one(
+        {"_id": oid},
+        {
+            "$set": {
+                "pagamento": pagamento,
+                "checkoutEstado": "concluido",
+                "checkoutConcluidoEm": datetime.now(timezone.utc),
+            },
+            "$unset": {"checkoutUltimoErro": "", "checkoutFalhouEm": ""},
+        },
+    )
+    return await db.pedidos.find_one({"_id": oid}) or {
+        **pedido,
+        "pagamento": pagamento,
+    }
+
+
 @router.get("")
 async def listar_compras(_: str = Depends(require_atelie_auth)):
     db = get_db()
@@ -181,7 +309,8 @@ async def criar_compra(
         )
         if existente:
             _validar_reuso_idempotente(existente, payload_hash)
-            return serialize(existente)
+            existente = await _assegurar_pagamento_checkout(db, existente)
+            return _compra_publica(existente)
         return await _criar_compra(
             payload,
             idempotency_key=idempotency_key,
@@ -246,7 +375,9 @@ async def _criar_compra(
                 "ml": item.ml,
                 "quantidade": item.quantidade,
                 "precoUnitario": preco_unitario,
+                "precoUnitarioCentavos": preco_unitario_centavos,
                 "subtotal": subtotal,
+                "subtotalCentavos": subtotal_centavos_item,
                 "custoUnitarioEstimado": float(calculo_custo["custoTotal"]),
                 "lucroUnitarioEstimado": float(calculo_custo["lucro"]),
                 "prontaEntrega": perfume.get("prontaEntrega") is True,
@@ -275,7 +406,9 @@ async def _criar_compra(
     )
     doc["itens"] = itens_doc
     doc["subtotal"] = centavos_em_valor(subtotal_centavos)
+    doc["subtotalCentavos"] = subtotal_centavos
     doc["frete"] = 0.0
+    doc["freteCentavos"] = 0
     doc["entrega"] = None
     if payload.tipoEntrega == "entrega" and payload.freteEscolhido:
         if not payload.endereco:
@@ -309,11 +442,13 @@ async def _criar_compra(
         nome_exibicao = escolha.get("nomeExibicao", "Entrega Padrão")
         frete_centavos = valor_em_centavos(escolha["preco"])
         doc["frete"] = centavos_em_valor(frete_centavos)
+        doc["freteCentavos"] = frete_centavos
         doc["entrega"] = {
             **escolha,
             "tipo": "entrega",
             "nomeExibicao": nome_exibicao,
             "preco": doc["frete"],
+            "precoCentavos": frete_centavos,
         }
     elif payload.tipoEntrega == "retirada":
         doc["endereco"] = None
@@ -331,14 +466,15 @@ async def _criar_compra(
     doc["total"] = centavos_em_valor(
         subtotal_centavos + valor_em_centavos(doc["frete"])
     )
-    agora = datetime.now(timezone.utc).isoformat()
+    doc["totalCentavos"] = subtotal_centavos + int(doc["freteCentavos"])
+    agora = datetime.now(timezone.utc)
     doc["data"] = agora
     doc["criadoEm"] = agora
     doc["status"] = "pendente"
     doc["origem"] = "vitrine"
-    doc["reservaExpiraEm"] = (
-        datetime.now(timezone.utc) + timedelta(minutes=RESERVATION_TTL_MINUTES)
-    ).isoformat()
+    doc["reservaExpiraEm"] = datetime.now(timezone.utc) + timedelta(
+        minutes=RESERVATION_TTL_MINUTES
+    )
     doc["codigoAcompanhamento"] = secrets.token_urlsafe(12)
     doc["historicoStatus"] = [{"status": "pendente", "data": agora}]
     if payload.aceitePoliticaPrivacidade:
@@ -430,50 +566,18 @@ async def _criar_compra(
         doc["seq"] = await next_seq(db, "pedidos")
         resultado = await db.pedidos.insert_one(doc)
         invalidate_catalog_cache()
-    pedido_id = str(resultado.inserted_id)
-
     # O pedido pendente reserva a quantidade no resumo, sem alterar o saldo
     # físico. A saída será lançada quando o status mudar para "preparando".
 
     if payload.formaPagamento:
-        try:
-            pagamento = await iniciar_pagamento(
-                payload.formaPagamento,
-                pedido_id,
-                doc["total"],
-                {
-                    "pix": config_loja.get("pix", ""),
-                    "nomeLoja": config_loja.get("nomeLoja", "L’Essence Furlani"),
-                    "infinitePayHandle": config_loja.get("infinitePayHandle", ""),
-                    "itens": itens_doc,
-                    "frete": doc["frete"],
-                    "cliente": {
-                        "nome": payload.nomeCompleto or payload.cliente,
-                        "email": str(payload.email or ""),
-                        "telefone": payload.whatsapp
-                        or payload.telefone
-                        or payload.contato,
-                    },
-                    "endereco": (
-                        payload.endereco.model_dump() if payload.endereco else {}
-                    ),
-                },
-            )
-        except PaymentProviderError as exc:
-            # Não deixa pedido pendente ou reserva fantasma quando o gateway
-            # falha antes de apresentar o checkout ao cliente.
-            async with stock_lock(db):
-                await db.pedidos.delete_one({"_id": resultado.inserted_id})
-                invalidate_catalog_cache()
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
-        await db.pedidos.update_one(
-            {"_id": resultado.inserted_id},
-            {"$set": {"pagamento": pagamento, "checkoutEstado": "concluido"}},
+        doc = await _assegurar_pagamento_checkout(
+            db,
+            await db.pedidos.find_one({"_id": resultado.inserted_id}) or doc,
         )
 
-    nova = await db.pedidos.find_one({"_id": resultado.inserted_id})
+    nova = await db.pedidos.find_one({"_id": resultado.inserted_id}) or doc
     invalidate_catalog_cache()
-    return serialize(nova)
+    return _compra_publica(nova)
 
 
 class CompraStatusIn(BaseModel):
@@ -542,7 +646,7 @@ async def apagar_compra(compra_id: str, _: str = Depends(require_atelie_auth)):
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de compra inválido.")
     async with stock_lock(db):
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         resultado = await db.compras.update_one(
             {"_id": oid, "arquivadoEm": None},
             {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},

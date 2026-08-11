@@ -25,6 +25,7 @@ from backup_service import (
 from catalog_cache import invalidate_catalog_cache
 from config import BACKUP_ENCRYPTION_KEY, INFINITEPAY_HANDLE
 from database import get_db
+from database_integrity import DATABASE_SCHEMA_VERSION
 from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
 from payments.pix import PIX_KEY
@@ -350,6 +351,7 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
     db = get_db()
     (
         falhos,
+        revisao_manual,
         em_espera,
         processando,
         eventos,
@@ -358,9 +360,10 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
         esquema_banco,
     ) = await asyncio.gather(
         db.eventos_pagamento.count_documents({"status": "falhou"}),
+        db.eventos_pagamento.count_documents({"status": "revisao_manual"}),
         db.eventos_pagamento.count_documents({"status": {"$in": ["pendente", "repetir"]}}),
         db.eventos_pagamento.count_documents({"status": "processando"}),
-        db.eventos_pagamento.find({"status": "falhou"})
+        db.eventos_pagamento.find({"status": {"$in": ["falhou", "revisao_manual"]}})
         .sort("ultimaTentativaEm", -1)
         .limit(10)
         .to_list(10),
@@ -376,11 +379,12 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
     )
     banco_pronto = (
         (esquema_banco or {}).get("status") == "pronto"
-        and int((esquema_banco or {}).get("versao", 0)) >= 1
+        and int((esquema_banco or {}).get("versao", 0)) >= DATABASE_SCHEMA_VERSION
     )
     return {
-        "status": "atencao" if falhos or not banco_pronto else "ok",
+        "status": "atencao" if falhos or revisao_manual or not banco_pronto else "ok",
         "pagamentosFalhos": falhos,
+        "pagamentosRevisaoManual": revisao_manual,
         "pagamentosEmEspera": em_espera,
         "pagamentosProcessando": processando,
         "ultimoBackupEm": (ultimo_backup or {}).get("data"),
@@ -454,15 +458,15 @@ async def obter_metricas(
     agora = datetime.now(timezone.utc)
     filtro: dict = {"excluirMetricas": {"$ne": True}}
     if periodo == "7d":
-        filtro["criadoEm"] = {"$gte": (agora - timedelta(days=7)).isoformat()}
+        filtro["criadoEm"] = {"$gte": agora - timedelta(days=7)}
     elif periodo == "30d":
-        filtro["criadoEm"] = {"$gte": (agora - timedelta(days=30)).isoformat()}
+        filtro["criadoEm"] = {"$gte": agora - timedelta(days=30)}
     elif periodo == "mes":
         inicio_mes = agora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        filtro["criadoEm"] = {"$gte": inicio_mes.isoformat()}
+        filtro["criadoEm"] = {"$gte": inicio_mes}
     elif periodo != "todos":
         periodo = "30d"
-        filtro["criadoEm"] = {"$gte": (agora - timedelta(days=30)).isoformat()}
+        filtro["criadoEm"] = {"$gte": agora - timedelta(days=30)}
 
     status_pagos = {
         "pagamento_confirmado",
@@ -744,7 +748,7 @@ async def salvar_configuracoes(
     )
     # Permite desativar a contingencia manual sem manter uma chave antiga.
     dados["pix"] = str(enviados.get("pix", "")).strip()
-    dados["atualizadoEm"] = datetime.now(timezone.utc).isoformat()
+    dados["atualizadoEm"] = datetime.now(timezone.utc)
     await db.configuracoes.update_one(
         {"_id": "loja"},
         {"$set": dados},
@@ -756,7 +760,7 @@ async def salvar_configuracoes(
 @router.post("/dados/{recurso}/limpar")
 async def limpar_dados(recurso: str, _: str = Depends(require_atelie_auth)):
     db = get_db()
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     if recurso == "opinioes":
         marcador = {"arquivadoEm": agora, "arquivadoPor": "limpeza_administrativa"}
         opinioes = await db.opinioes.update_many(
@@ -887,7 +891,7 @@ async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
     """Arquiva pedidos de teste e invalida os códigos salvos nos aparelhos."""
     db = get_db()
     async with stock_lock(db):
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         pedidos = await db.pedidos.count_documents({"arquivadoEm": None})
         compras_legadas = await db.compras.count_documents({"arquivadoEm": None})
 
@@ -955,7 +959,7 @@ async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
             {"_id": PEDIDOS_RESET_ID},
             {
                 "$inc": {"version": 1},
-                "$set": {"atualizadoEm": datetime.now(timezone.utc).isoformat()},
+                "$set": {"atualizadoEm": datetime.now(timezone.utc)},
             },
             return_document=ReturnDocument.AFTER,
         )

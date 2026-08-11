@@ -27,7 +27,7 @@ async def criar_sugestao(payload: SugestaoIn):
     db = get_db()
     doc = payload.model_dump()
     doc = {chave: valor.strip() for chave, valor in doc.items()}
-    doc["data"] = datetime.now(timezone.utc).isoformat()
+    doc["data"] = datetime.now(timezone.utc)
     doc["lida"] = False
     resultado = await db.sugestoes.insert_one(doc)
     nova = await db.sugestoes.find_one({"_id": resultado.inserted_id})
@@ -50,7 +50,7 @@ async def apagar_sugestao(sugestao_id: str, _: str = Depends(require_atelie_auth
         oid = ObjectId(sugestao_id)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de sugestão inválido.")
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     resultado = await db.sugestoes.update_one(
         {"_id": oid, "arquivadoEm": None},
         {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},

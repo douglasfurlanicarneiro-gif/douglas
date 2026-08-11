@@ -1996,10 +1996,11 @@ export function Atelie({
       const result = await getOperationalSummary();
       setOperationalSummary(result);
       if (showResult) {
+        const pagamentosComAtencao = result.pagamentosFalhos + result.pagamentosRevisaoManual;
         setSheet({
           type: 'info',
-          label: result.pagamentosFalhos
-            ? `Atenção: existem ${result.pagamentosFalhos} confirmação(ões) de pagamento que esgotaram as tentativas automáticas. Consulte o número do pedido exibido na Saúde operacional.`
+          label: pagamentosComAtencao
+            ? `Atenção: existem ${result.pagamentosFalhos} confirmação(ões) com falha e ${result.pagamentosRevisaoManual} em revisão manual. Consulte os pedidos exibidos na Saúde operacional.`
             : `Operação saudável. Há ${result.pagamentosEmEspera} confirmação(ões) aguardando nova tentativa e ${result.pagamentosProcessando} em processamento.`,
         });
       }
@@ -3057,6 +3058,12 @@ export function Atelie({
                 <Text style={styles.operationHealthLabel}>Falhas</Text>
               </View>
               <View style={styles.operationHealthItem}>
+                <Text style={[styles.operationHealthValue, operationalSummary?.pagamentosRevisaoManual ? { color: COLORS.rust } : null]}>
+                  {operationalSummary?.pagamentosRevisaoManual ?? '—'}
+                </Text>
+                <Text style={styles.operationHealthLabel}>Revisão manual</Text>
+              </View>
+              <View style={styles.operationHealthItem}>
                 <Text style={styles.operationHealthValue}>{operationalSummary?.pagamentosEmEspera ?? '—'}</Text>
                 <Text style={styles.operationHealthLabel}>Em espera</Text>
               </View>
@@ -3073,6 +3080,14 @@ export function Atelie({
                 <Feather name="alert-triangle" size={15} color={COLORS.rust} />
                 <Text style={styles.operationWarningText}>
                   Pedido {operationalSummary.falhasRecentes[0].orderNsu || 'não identificado'} · {operationalSummary.falhasRecentes[0].tentativas} tentativa(s)
+                </Text>
+              </View>
+            )}
+            {!!operationalSummary?.pagamentosRevisaoManual && (
+              <View style={styles.operationWarning}>
+                <Feather name="shield" size={15} color={COLORS.rust} />
+                <Text style={styles.operationWarningText}>
+                  Há pagamento(s) que exigem conferência humana para evitar cobrança ou confirmação duplicada.
                 </Text>
               </View>
             )}

@@ -5,6 +5,8 @@ import pytest
 from database_integrity import (
     DATABASE_SCHEMA_VERSION,
     INDEX_SPECS,
+    MIGRATIONS,
+    _migrate_dates_and_money_v2,
     ensure_database_schema,
 )
 
@@ -14,6 +16,9 @@ class _Collection:
         self.indexes = {"_id_": {"key": [("_id", 1)]}}
         self.fail_once = fail_once
         self.updates = []
+        self.bulk_updates = []
+        self.documents = {}
+        self.aggregate_results = []
 
     async def create_index(self, keys, *, name, **options):
         if self.fail_once:
@@ -26,8 +31,39 @@ class _Collection:
     async def index_information(self):
         return dict(self.indexes)
 
+    async def drop_index(self, name):
+        self.indexes.pop(name, None)
+
     async def update_one(self, query, update, *, upsert=False):
         self.updates.append((query, update, upsert))
+        document_id = query.get("_id")
+        document = self.documents.setdefault(document_id, {"_id": document_id})
+        document.update(update.get("$set", {}))
+        for key in update.get("$unset", {}):
+            document.pop(key, None)
+
+    async def find_one(self, query):
+        document = self.documents.get(query.get("_id"))
+        return dict(document) if document else None
+
+    async def update_many(self, query, update):
+        self.bulk_updates.append((query, update))
+        return type("UpdateResult", (), {"modified_count": 0})()
+
+    async def count_documents(self, _query):
+        return 0
+
+    def aggregate(self, pipeline):
+        self.bulk_updates.append(({"aggregate": True}, pipeline))
+        return _AggregationCursor(self.aggregate_results)
+
+
+class _AggregationCursor:
+    def __init__(self, values):
+        self.values = values
+
+    async def to_list(self, limit):
+        return list(self.values[:limit])
 
 
 class _Database:
@@ -55,6 +91,8 @@ def test_schema_e_idempotente_e_confirma_todos_os_indices():
 
     assert first["status"] == second["status"] == "pronto"
     assert first["versao"] == DATABASE_SCHEMA_VERSION
+    assert first["migracoesAplicadas"] == [2]
+    assert second["migracoesAplicadas"] == []
     assert first["indicesConfirmados"] == len(INDEX_SPECS)
     for spec in INDEX_SPECS:
         assert spec.name in db[spec.collection].indexes
@@ -86,5 +124,39 @@ def test_indices_criticos_preservam_unicidade():
     assert ("perfumes", "perfumes_seq_unico") in unique
     assert ("pedidos", "pedidos_seq_unico") in unique
     assert ("pedidos", "checkoutIdempotencyKey_1") in unique
+    assert ("pedidos", "pagamento_transaction_nsu_unico") in unique
     assert ("pedidos", "codigoAcompanhamento_1") in unique
     assert ("solicitacoes_privacidade", "protocolo_1") in unique
+
+
+def test_migracao_v2_converte_datas_e_valores_sem_processar_documentos_em_memoria():
+    db = _Database()
+
+    result = asyncio.run(ensure_database_schema(db))
+
+    assert DATABASE_SCHEMA_VERSION == 2
+    assert [migration.version for migration in MIGRATIONS] == [2]
+    assert result["migracoesAplicadas"] == [2]
+    assert db.pedidos.bulk_updates
+    assert any(
+        "totalCentavos" in str(pipeline)
+        for _query, pipeline in db.pedidos.bulk_updates
+    )
+    migration = db.database_migrations.documents[2]
+    assert migration["status"] == "concluida"
+    assert migration["nome"] == "datas_bson_e_valores_em_centavos"
+    assert "pedidos.valoresCentavos" in migration["plano"]
+
+
+def test_migracao_interrompe_antes_do_indice_se_houver_transacao_duplicada():
+    db = _Database()
+    db.pedidos.aggregate_results = [{"_id": "transaction-duplicada", "quantidade": 2}]
+
+    with pytest.raises(RuntimeError, match="transaction-duplicada"):
+        asyncio.run(_migrate_dates_and_money_v2(db))
+
+    assert not any(
+        query.get("$or")
+        for query, _pipeline in db.pedidos.bulk_updates
+        if isinstance(query, dict)
+    )

@@ -87,7 +87,7 @@ async def criar_movimento(payload: MovimentoIn, _: str = Depends(require_atelie_
             reservado = int(reservas.get(payload.perfumeId, 0))
             validar_saida_disponivel(payload.quantidadeMl, saldo, reservado)
         doc = payload.model_dump()
-        doc["data"] = datetime.now(timezone.utc).isoformat()
+        doc["data"] = datetime.now(timezone.utc)
         doc["origem"] = "manual"
         resultado = await db.movimentos.insert_one(doc)
         novo = await db.movimentos.find_one({"_id": resultado.inserted_id})
@@ -106,7 +106,7 @@ async def completar_estoque(payload: CompletarEstoqueIn, _: str = Depends(requir
         perfumes = await db.perfumes.find(filtro, {"_id": 1}).to_list(5000)
         estoque_atual = await mapa_saldo_fisico(db)
 
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         movimentos = []
         for perfume in perfumes:
             perfume_id = str(perfume["_id"])
@@ -171,7 +171,7 @@ async def conferir_estoque(payload: ConferenciaEstoqueIn, _: str = Depends(requi
             }
 
         tipo, quantidade = ajuste
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         motivo = payload.motivo.strip() or "Conferência física"
         doc = {
             "perfumeId": payload.perfumeId,
@@ -224,7 +224,7 @@ async def apagar_movimento(movimento_id: str, _: str = Depends(require_atelie_au
                 detail="Um estorno não pode ser excluído; faça uma nova movimentação de ajuste.",
             )
 
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         estorno = {
             "perfumeId": movimento.get("perfumeId"),
             "tipo": "saida" if movimento.get("tipo") == "entrada" else "entrada",

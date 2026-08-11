@@ -81,7 +81,7 @@ async def cancelar_pedido_cliente(codigo: str):
                 ),
             )
 
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         historico = list(pedido.get("historicoStatus", []))
         historico.append({"status": "cancelado", "data": agora})
 

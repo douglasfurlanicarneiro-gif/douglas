@@ -13,6 +13,7 @@ from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
 from label_service import gerar_etiquetas_producao
 from order_status import validar_transicao_status
+from money import centavos_em_valor, subtotal_em_centavos, valor_em_centavos
 from security import require_atelie_auth
 from stock import quantidades_por_perfume, validar_estoque
 from utils import next_seq, serialize
@@ -117,6 +118,16 @@ async def _itens_com_atendimento(db, itens: List[ItemPedido]) -> list[dict[str, 
                 None,
             )
             preco = float((opcao or {}).get("preco", 0) or 0)
+        preco_centavos = valor_em_centavos(preco or 0)
+        data["precoUnitario"] = centavos_em_valor(preco_centavos)
+        data["precoUnitarioCentavos"] = preco_centavos
+        subtotal_centavos = (
+            valor_em_centavos(data["subtotal"])
+            if data.get("subtotal") is not None
+            else subtotal_em_centavos(data["precoUnitario"], item.quantidade)
+        )
+        data["subtotal"] = centavos_em_valor(subtotal_centavos)
+        data["subtotalCentavos"] = subtotal_centavos
         if data.get("custoUnitarioEstimado") is None:
             calculo = estimar_custo_unitario(perfume, item.ml, float(preco or 0), config_custos)
             data["custoUnitarioEstimado"] = float(calculo["custoTotal"])
@@ -176,7 +187,7 @@ async def _sincronizar_movimentos_do_pedido(
         if _status_consume_estoque(status)
         else {}
     )
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     ajustes = []
     for perfume_id in set(consumo_atual) | set(desejado):
         diferenca = desejado.get(perfume_id, 0) - consumo_atual.get(perfume_id, 0)
@@ -224,7 +235,7 @@ async def _persistir_pedido_e_estoque(
         operacao["$push"] = {
             "historicoStatus": {
                 "status": novo_status,
-                "data": datetime.now(timezone.utc).isoformat(),
+                "data": datetime.now(timezone.utc),
             }
         }
 
@@ -308,8 +319,11 @@ async def criar_pedido(payload: PedidoIn, _: str = Depends(require_atelie_auth))
         await _validar_status_estoque(db, itens=itens, status=payload.status)
         doc = payload.model_dump()
         doc["itens"] = itens
+        doc["subtotalTabelaCentavos"] = valor_em_centavos(doc.get("subtotalTabela"))
+        doc["ajusteManualCentavos"] = valor_em_centavos(doc.get("ajusteManual"))
+        doc["totalCentavos"] = valor_em_centavos(doc.get("total"))
         doc["seq"] = await next_seq(db, "pedidos")
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         doc["criadoEm"] = agora
         doc["historicoStatus"] = [{"status": payload.status, "data": agora}]
         resultado = await db.pedidos.insert_one(doc)
@@ -346,6 +360,16 @@ async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(r
         # antigos) não devem ser apagados durante uma simples troca de status.
         atualizacao = payload.model_dump(exclude_unset=True)
         atualizacao["itens"] = itens
+        if "subtotalTabela" in atualizacao:
+            atualizacao["subtotalTabelaCentavos"] = valor_em_centavos(
+                atualizacao.get("subtotalTabela")
+            )
+        if "ajusteManual" in atualizacao:
+            atualizacao["ajusteManualCentavos"] = valor_em_centavos(
+                atualizacao.get("ajusteManual")
+            )
+        if "total" in atualizacao:
+            atualizacao["totalCentavos"] = valor_em_centavos(atualizacao.get("total"))
         await _persistir_pedido_e_estoque(
             db,
             pedido_id=pedido_id,
@@ -375,7 +399,7 @@ async def apagar_pedido(pedido_id: str, _: str = Depends(require_atelie_auth)):
                     "Conclua o fluxo antes de arquivar."
                 ),
             )
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         await db.pedidos.update_one(
             {"_id": oid, "arquivadoEm": None},
             {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},

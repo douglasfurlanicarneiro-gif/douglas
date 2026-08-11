@@ -21,7 +21,7 @@ from availability import ensure_initial_ready_delivery
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS, IS_RENDER
 from database import close_client, get_db
 from database_integrity import ensure_database_schema
-from locks import stock_lock
+from locks import distributed_lock, stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
                      clientes, compras, custos, fornecedores, frete, insumos,
                      movimentos, opinioes, pagamentos, pedidos, perfumes,
@@ -104,9 +104,16 @@ async def _bootstrap_database_once() -> dict:
         sequencias_reparadas = await reparar_sequencias(db, "perfumes")
         pedidos_reparados = await reparar_sequencias(db, "pedidos")
         disponibilidade = await ensure_initial_ready_delivery(db)
-    # Criar/verificar indices não altera saldo e pode levar mais tempo em um
-    # banco restaurado. Portanto, não mantém o checkout preso à trava de estoque.
-    esquema = await _criar_indices()
+    # Migrações e índices usam uma trava própria: não bloqueiam o checkout e
+    # também não são executados simultaneamente por duas instâncias no deploy.
+    async with distributed_lock(
+        db,
+        "database-schema",
+        wait_seconds=15,
+        lease_seconds=_BOOTSTRAP_TIMEOUT_SECONDS + 30,
+        busy_detail="O esquema do banco está sendo atualizado por outra instância.",
+    ):
+        esquema = await _criar_indices()
     if sequencias_reparadas:
         await vitrine.marcar_vitrine_pendente(db)
     return {

@@ -89,7 +89,7 @@ class PixProvider(PaymentProvider):
             "pixCopiaECola": copia_e_cola,
             "recebedor": recebedor,
             "instituicao": "PicPay",
-            "criadoEm": datetime.now(timezone.utc).isoformat(),
+            "criadoEm": datetime.now(timezone.utc),
             "observacao": (
                 "Aguardando pagamento via Pix. Confirme o recebimento "
                 "manualmente no painel de Pedidos."

@@ -34,6 +34,8 @@ BACKUP_COLLECTIONS = (
     "vitrine",
     "solicitacoes_privacidade",
     "eventos_pagamento",
+    "database_migrations",
+    "integracoes",
 )
 
 # Limites deliberadamente conservadores para o plano gratuito do Render. O
@@ -48,13 +50,30 @@ def _json_seguro(valor):
     from bson import ObjectId
 
     if isinstance(valor, ObjectId):
-        return str(valor)
+        return {"$oid": str(valor)}
     if isinstance(valor, datetime):
-        return valor.isoformat()
+        return {"$date": valor.isoformat()}
     if isinstance(valor, dict):
         return {chave: _json_seguro(item) for chave, item in valor.items()}
     if isinstance(valor, list):
         return [_json_seguro(item) for item in valor]
+    return valor
+
+
+def _restaurar_tipos_bson(valor):
+    """Restaura os tipos que JSON puro não consegue representar."""
+    if isinstance(valor, dict):
+        if set(valor) == {"$oid"} and ObjectId.is_valid(str(valor["$oid"])):
+            return ObjectId(str(valor["$oid"]))
+        if set(valor) == {"$date"}:
+            try:
+                data = datetime.fromisoformat(str(valor["$date"]).replace("Z", "+00:00"))
+            except (TypeError, ValueError):
+                return valor
+            return data if data.tzinfo else data.replace(tzinfo=timezone.utc)
+        return {chave: _restaurar_tipos_bson(item) for chave, item in valor.items()}
+    if isinstance(valor, list):
+        return [_restaurar_tipos_bson(item) for item in valor]
     return valor
 
 
@@ -251,7 +270,7 @@ def carregar_documentos_backup(zip_path: Path, colecao: str) -> list[dict]:
     with zipfile.ZipFile(zip_path, "r") as archive:
         with archive.open(f"dados/{colecao}.ndjson") as origem:
             for linha in origem:
-                documento = json.loads(linha)
+                documento = _restaurar_tipos_bson(json.loads(linha))
                 identificador = documento.get("_id")
                 if isinstance(identificador, str) and ObjectId.is_valid(identificador):
                     documento["_id"] = ObjectId(identificador)

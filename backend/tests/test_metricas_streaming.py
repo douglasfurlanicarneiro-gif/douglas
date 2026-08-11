@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 
 from bson import ObjectId
 
@@ -108,3 +109,18 @@ def test_metricas_processam_cursores_sem_limite_em_memoria(monkeypatch):
     assert resultado["lucroEstimado"] == 65
     assert resultado["mlVendidos"] == 50
     assert banco.pedidos.ultimo_filtro == {"excluirMetricas": {"$ne": True}}
+
+
+def test_metricas_filtram_periodo_com_data_bson(monkeypatch):
+    banco = BancoFalso()
+    monkeypatch.setattr(admin, "get_db", lambda: banco)
+
+    async def config_custos(_db):
+        return {}
+
+    monkeypatch.setattr(admin, "obter_config_custos", config_custos)
+    asyncio.run(admin.obter_metricas(periodo="7d", _="admin"))
+
+    limite = banco.pedidos.ultimo_filtro["criadoEm"]["$gte"]
+    assert isinstance(limite, datetime)
+    assert limite.tzinfo is not None

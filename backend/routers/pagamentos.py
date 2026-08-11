@@ -147,7 +147,9 @@ async def _confirmar_pagamento(
             detail="O pagamento ainda não foi confirmado pela InfinitePay.",
         )
 
-    esperado = valor_em_centavos(pedido.get("total", 0))
+    esperado = int(
+        pedido.get("totalCentavos") or valor_em_centavos(pedido.get("total", 0))
+    )
     try:
         recebido = int(verificacao.get("amount", -1))
     except (TypeError, ValueError):
@@ -158,7 +160,7 @@ async def _confirmar_pagamento(
             detail="O valor confirmado não corresponde ao total do pedido.",
         )
 
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     captura = str(
         verificacao.get("capture_method") or capture_method or "credit_card"
     ).strip()
@@ -173,6 +175,7 @@ async def _confirmar_pagamento(
         "invoiceSlug": slug,
         "captureMethod": captura,
         "parcelas": int(parcelas),
+        "valorCentavos": esperado,
         "pagoEm": pagamento_atual.get("pagoEm") or agora,
     }
 
@@ -182,6 +185,26 @@ async def _confirmar_pagamento(
         atual = await db.pedidos.find_one({"_id": oid})
         if not atual:
             raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+        pagamento_mais_recente = atual.get("pagamento") or {}
+        if pagamento_mais_recente.get("status") == "pago":
+            if pagamento_mais_recente.get("transactionNsu") == transaction_nsu:
+                return atual
+            logger.error(
+                "duplicate_paid_transaction order_nsu=%s current=%s received=%s",
+                order_nsu,
+                pagamento_mais_recente.get("transactionNsu"),
+                transaction_nsu,
+            )
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "PAGAMENTO_DUPLICADO",
+                    "message": (
+                        "O pedido já possui outro pagamento confirmado. "
+                        "A transação adicional precisa de conferência e eventual estorno."
+                    ),
+                },
+            )
         if atual.get("status") == "cancelado":
             pagamento_confirmado["observacao"] = (
                 "Pagamento recebido após o cancelamento. Confira a transação e "
@@ -208,21 +231,23 @@ async def _confirmar_pagamento(
                     "É necessário repor o estoque antes de iniciar a preparação."
                 )
 
-        await db.pedidos.update_one(
-            {"_id": oid},
-            {
-                "$set": {
-                    "pagamento": pagamento_confirmado,
-                    "formaPagamento": forma_pagamento,
-                    "estoquePendente": estoque_pendente,
-                },
-            },
-        )
+        campos_confirmados = {
+            "pagamento": pagamento_confirmado,
+            "formaPagamento": forma_pagamento,
+            "estoquePendente": estoque_pendente,
+        }
+        if atual.get("status") == "cancelado":
+            campos_confirmados.update(
+                {
+                    "pagamentoRequerRevisao": True,
+                    "motivoRevisaoPagamento": "pago_apos_cancelamento",
+                }
+            )
         if atual.get("status") == "pendente":
             await db.pedidos.update_one(
                 {"_id": oid, "status": "pendente"},
                 {
-                    "$set": {"status": "pagamento_confirmado"},
+                    "$set": {**campos_confirmados, "status": "pagamento_confirmado"},
                     "$push": {
                         "historicoStatus": {
                             "status": "pagamento_confirmado",
@@ -230,6 +255,11 @@ async def _confirmar_pagamento(
                         }
                     },
                 },
+            )
+        else:
+            await db.pedidos.update_one(
+                {"_id": oid, "status": atual.get("status")},
+                {"$set": campos_confirmados},
             )
 
         atualizado = await db.pedidos.find_one({"_id": oid})
@@ -276,12 +306,19 @@ async def processar_evento_pagamento(event_id: str) -> bool:
         )
     except HTTPException as exc:
         tentativas = int(evento.get("tentativas", 1))
+        codigo = exc.detail.get("code") if isinstance(exc.detail, dict) else None
+        requer_revisao = codigo == "PAGAMENTO_DUPLICADO"
         deve_repetir = (
-            exc.status_code in {409, 502}
+            not requer_revisao
+            and exc.status_code in {409, 502}
             and tentativas < _RECONCILIATION_MAX_ATTEMPTS
         )
         atualizacao = {
-            "status": "repetir" if deve_repetir else "falhou",
+            "status": (
+                "revisao_manual"
+                if requer_revisao
+                else ("repetir" if deve_repetir else "falhou")
+            ),
             "ultimoErro": str(exc.detail)[:500],
             "ultimaTentativaEm": datetime.now(timezone.utc),
         }

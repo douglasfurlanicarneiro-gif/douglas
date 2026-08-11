@@ -66,7 +66,7 @@ async def _registrar_operacao(
         "detalhes": detalhes,
         "perfumesAfetados": perfumes_afetados,
         "quantidadeMl": quantidade_ml,
-        "data": datetime.now(timezone.utc).isoformat(),
+        "data": datetime.now(timezone.utc),
     }
     await db.operacoes_sistema.insert_one(doc)
     return serialize(doc)
@@ -175,7 +175,7 @@ async def zerar_sob_encomenda(_: str = Depends(require_atelie_auth)):
         ).to_list(5000)
         ids = {str(perfume["_id"]) for perfume in perfumes}
         estoque = await _estoque_atual(db)
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         movimentos = _movimentos_para_zerar(ids, estoque, agora)
         if movimentos:
             await db.movimentos.insert_many(movimentos)
@@ -209,7 +209,7 @@ async def completar_pronta_entrega(
         ).to_list(5000)
         ids = {str(perfume["_id"]) for perfume in perfumes}
         estoque = await _estoque_atual(db)
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         movimentos = _movimentos_para_completar(
             ids,
             estoque,

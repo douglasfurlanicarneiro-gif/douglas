@@ -155,7 +155,7 @@ async def _publicar_snapshot_sem_trava(db, *, registrar_operacao: bool = True) -
         itens.append(item)
 
     itens.sort(key=_alphabetical_name)
-    atualizado_em = datetime.now(timezone.utc).isoformat()
+    atualizado_em = datetime.now(timezone.utc)
     await db.vitrine.update_one(
         {"_id": "snapshot"},
         {"$set": {"atualizadoEm": atualizado_em, "itens": itens}},

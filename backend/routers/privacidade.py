@@ -45,7 +45,7 @@ def _protocolo() -> str:
 @router.post("/solicitacoes", dependencies=[Depends(feedback_rate_limit)])
 async def criar_solicitacao(payload: SolicitacaoPrivacidadeIn):
     db = get_db()
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     doc = {
         **payload.model_dump(mode="json"),
         "nome": payload.nome.strip(),
@@ -111,7 +111,7 @@ async def atualizar_solicitacao(
     except InvalidId as exc:
         raise HTTPException(status_code=400, detail="Solicitação inválida.") from exc
     db = get_db()
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     resultado = await db.solicitacoes_privacidade.update_one(
         {"_id": oid},
         {"$set": {

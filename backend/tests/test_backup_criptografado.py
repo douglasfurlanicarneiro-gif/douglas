@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import zipfile
+from datetime import datetime, timezone
 
 import pytest
 from bson import ObjectId
@@ -50,6 +51,7 @@ class BancoFalso:
                 "_id": self.cliente_id,
                 "nome": "Cliente Sigiloso",
                 "email": "privado@example.com",
+                "atualizadoEm": datetime(2026, 8, 11, 12, 30, tzinfo=timezone.utc),
             },
         ])
 
@@ -181,6 +183,10 @@ def test_restauracao_substitui_colecoes_e_reconstroi_object_id():
         cliente = destino.colecoes["clientes"].documentos[0]
         assert cliente["_id"] == origem.cliente_id
         assert isinstance(cliente["_id"], ObjectId)
+        assert cliente["atualizadoEm"] == datetime(
+            2026, 8, 11, 12, 30, tzinfo=timezone.utc
+        )
+        assert isinstance(cliente["atualizadoEm"], datetime)
         assert destino.colecoes["perfumes"].documentos == []
     finally:
         caminho.unlink(missing_ok=True)

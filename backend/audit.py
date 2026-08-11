@@ -14,7 +14,7 @@ async def registrar_auditoria(
     detalhes: str,
     metadados: dict[str, Any] | None = None,
 ) -> None:
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     await db.operacoes_sistema.insert_one({
         "tipo": f"auditoria:{acao}",
         "acao": acao,

@@ -27,6 +27,7 @@ async function mockAdminApi(page: Page) {
     if (path === '/api/admin/operacao/resumo') return json({
       status: 'atencao',
       pagamentosFalhos: 1,
+      pagamentosRevisaoManual: 1,
       pagamentosEmEspera: 2,
       pagamentosProcessando: 0,
       ultimoBackupEm: '2026-08-10T10:00:00Z',

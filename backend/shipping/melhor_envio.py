@@ -112,7 +112,7 @@ async def salvar_configuracao_frete(
                 "ajustePrioritarioValor": round(ajuste_prioritario_valor, 2),
                 "prazoPrioritarioDias": prazo_prioritario_dias,
                 "diferencaMinimaPrioritario": round(diferenca_minima_prioritario, 2),
-                "atualizadoEm": datetime.now(timezone.utc).isoformat(),
+                "atualizadoEm": datetime.now(timezone.utc),
             }
         },
         upsert=True,
@@ -197,7 +197,7 @@ async def _salvar_tokens(db, payload: dict[str, Any]) -> None:
                 "tokenType": payload.get("token_type", "Bearer"),
                 "expiraEm": datetime.now(timezone.utc)
                 + timedelta(seconds=max(60, expires_in)),
-                "atualizadoEm": datetime.now(timezone.utc).isoformat(),
+                "atualizadoEm": datetime.now(timezone.utc),
             }
         },
         upsert=True,

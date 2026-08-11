@@ -171,7 +171,7 @@ async def zero_made_to_order_stock(db) -> dict:
 
     movimentos = []
     quantidade_zerada_ml = 0
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     async for linha in await db.movimentos.aggregate(_STOCK_PIPELINE):
         perfume_id = str(linha.get("_id", ""))
         saldo_atual = int(linha.get("total", 0))

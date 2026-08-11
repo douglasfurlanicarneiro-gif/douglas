@@ -71,7 +71,7 @@ async def listar_fornecedores(_: str = Depends(require_atelie_auth)):
 @router.post("")
 async def criar_fornecedor(payload: FornecedorIn, _: str = Depends(require_atelie_auth)):
     db = get_db()
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     doc = {**payload.model_dump(), "criadoEm": agora, "atualizadoEm": agora}
     resultado = await db.fornecedores.insert_one(doc)
     return serialize(await db.fornecedores.find_one({"_id": resultado.inserted_id}))
@@ -85,7 +85,7 @@ async def atualizar_fornecedor(
 ):
     db = get_db()
     oid = _oid(fornecedor_id, "Fornecedor")
-    dados = {**payload.model_dump(), "atualizadoEm": datetime.now(timezone.utc).isoformat()}
+    dados = {**payload.model_dump(), "atualizadoEm": datetime.now(timezone.utc)}
     resultado = await db.fornecedores.update_one({"_id": oid}, {"$set": dados})
     if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado.")
@@ -98,7 +98,7 @@ async def arquivar_fornecedor(fornecedor_id: str, _: str = Depends(require_ateli
     oid = _oid(fornecedor_id, "Fornecedor")
     resultado = await db.fornecedores.update_one(
         {"_id": oid},
-        {"$set": {"ativo": False, "atualizadoEm": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {"ativo": False, "atualizadoEm": datetime.now(timezone.utc)}},
     )
     if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Fornecedor não encontrado.")
@@ -156,7 +156,7 @@ async def criar_cotacao(
 
     custo_total = float(payload.precoTotal) + float(payload.frete)
     custo_unitario = custo_total / float(payload.quantidade)
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     doc = {
         **payload.model_dump(exclude={"aplicarAoPerfume"}),
         "fornecedorId": fornecedor_id,
@@ -194,7 +194,7 @@ async def criar_cotacao(
 @router.delete("/cotacoes/{cotacao_id}")
 async def apagar_cotacao(cotacao_id: str, _: str = Depends(require_atelie_auth)):
     db = get_db()
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     resultado = await db.cotacoes_fornecedores.update_one(
         {"_id": _oid(cotacao_id, "Cotação"), "arquivadoEm": None},
         {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},

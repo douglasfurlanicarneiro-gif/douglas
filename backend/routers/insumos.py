@@ -234,7 +234,7 @@ async def listar_insumos(_: str = Depends(require_atelie_auth)):
 @router.post("")
 async def criar_insumo(payload: InsumoIn, _: str = Depends(require_atelie_auth)):
     db = get_db()
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     dados = payload.model_dump(exclude={"estoqueInicial"})
     dados.update({"criadoEm": agora, "atualizadoEm": agora})
     resultado = await db.insumos.insert_one(dados)
@@ -256,7 +256,7 @@ async def criar_insumo(payload: InsumoIn, _: str = Depends(require_atelie_auth))
 async def atualizar_insumo(insumo_id: str, payload: InsumoUpdateIn, _: str = Depends(require_atelie_auth)):
     db = get_db()
     oid = _oid(insumo_id, "Insumo")
-    dados = {**payload.model_dump(), "atualizadoEm": datetime.now(timezone.utc).isoformat()}
+    dados = {**payload.model_dump(), "atualizadoEm": datetime.now(timezone.utc)}
     resultado = await db.insumos.update_one({"_id": oid}, {"$set": dados})
     await _sincronizar_custo_operacional(db, dados)
     if resultado.matched_count == 0:
@@ -270,7 +270,7 @@ async def arquivar_insumo(insumo_id: str, _: str = Depends(require_atelie_auth))
     oid = _oid(insumo_id, "Insumo")
     resultado = await db.insumos.update_one(
         {"_id": oid},
-        {"$set": {"ativo": False, "atualizadoEm": datetime.now(timezone.utc).isoformat()}},
+        {"$set": {"ativo": False, "atualizadoEm": datetime.now(timezone.utc)}},
     )
     if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Insumo não encontrado.")
@@ -299,7 +299,7 @@ async def movimentar_insumo(
             "insumoId": insumo_id,
             **payload.model_dump(),
             "origem": "manual",
-            "data": datetime.now(timezone.utc).isoformat(),
+            "data": datetime.now(timezone.utc),
         }
         resultado = await db.movimentos_insumos.insert_one(doc)
     return serialize(await db.movimentos_insumos.find_one({"_id": resultado.inserted_id}))
@@ -321,7 +321,7 @@ async def registrar_producao(payload: ProducaoIn, _: str = Depends(require_ateli
         if plano["faltantesEstoque"]:
             raise HTTPException(status_code=409, detail="Há matéria-prima insuficiente para essa produção.")
 
-        agora = datetime.now(timezone.utc).isoformat()
+        agora = datetime.now(timezone.utc)
         producao_doc = {
             "perfumeId": payload.perfumeId,
             "perfumeNome": plano["perfumeNome"],

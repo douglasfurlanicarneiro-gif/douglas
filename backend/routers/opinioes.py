@@ -78,7 +78,7 @@ async def criar_opiniao(payload: OpiniaoIn):
     doc = payload.model_dump()
     doc["cliente"] = doc["cliente"].strip()
     doc["comentario"] = doc["comentario"].strip()
-    doc["data"] = datetime.now(timezone.utc).isoformat()
+    doc["data"] = datetime.now(timezone.utc)
     doc["aprovada"] = False
     doc["moderadaEm"] = None
     resultado = await db.opinioes.insert_one(doc)
@@ -97,7 +97,7 @@ async def moderar_opiniao(
         oid = ObjectId(opiniao_id)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de opinião inválido.")
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     resultado = await db.opinioes.update_one(
         {"_id": oid, "arquivadoEm": None},
         {"$set": {"aprovada": payload.aprovada, "moderadaEm": agora}},
@@ -127,7 +127,7 @@ async def apagar_opiniao(opiniao_id: str, _: str = Depends(require_atelie_auth))
         oid = ObjectId(opiniao_id)
     except InvalidId:
         raise HTTPException(status_code=400, detail="Id de opinião inválido.")
-    agora = datetime.now(timezone.utc).isoformat()
+    agora = datetime.now(timezone.utc)
     resultado = await db.opinioes.update_one(
         {"_id": oid, "arquivadoEm": None},
         {"$set": {"arquivadoEm": agora, "arquivadoPor": "administrador"}},

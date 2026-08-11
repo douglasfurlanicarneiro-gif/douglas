@@ -498,6 +498,7 @@ export type BackupValidation = {
 export type OperationalSummary = {
   status: 'ok' | 'atencao';
   pagamentosFalhos: number;
+  pagamentosRevisaoManual: number;
   pagamentosEmEspera: number;
   pagamentosProcessando: number;
   ultimoBackupEm: string | null;
