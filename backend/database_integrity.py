@@ -220,7 +220,9 @@ def _money_to_cents_expression(reference: Any) -> dict:
 async def _migrate_dates_and_money_v2(db) -> dict[str, int]:
     """Converte datas ISO e cria a representação monetária em centavos."""
     modified: dict[str, int] = {}
-    duplicate_cursor = db.pedidos.aggregate(
+    # O projeto usa ``pymongo.AsyncMongoClient`` (não Motor). Neste driver,
+    # ``aggregate`` é assíncrono e precisa ser aguardado antes de ``to_list``.
+    duplicate_cursor = await db.pedidos.aggregate(
         [
             {"$match": {"pagamento.transactionNsu": {"$type": "string"}}},
             {

@@ -53,7 +53,7 @@ class _Collection:
     async def count_documents(self, _query):
         return 0
 
-    def aggregate(self, pipeline):
+    async def aggregate(self, pipeline):
         self.bulk_updates.append(({"aggregate": True}, pipeline))
         return _AggregationCursor(self.aggregate_results)
 
