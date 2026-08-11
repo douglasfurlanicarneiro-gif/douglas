@@ -66,3 +66,22 @@ def test_login_possui_limite_global_por_origem():
         dependencia.call is login_rate_limit
         for dependencia in login.dependant.dependencies
     )
+
+
+def test_operacoes_destrutivas_exigem_reautenticacao_recente():
+    rotas_criticas = {
+        ("POST", "/api/admin/backup/restaurar"),
+        ("POST", "/api/admin/dados/{recurso}/limpar"),
+        ("POST", "/api/admin/pedidos/reset"),
+    }
+    encontradas = set()
+    for route in _rotas(app.routes):
+        for method in route.methods or set():
+            chave = (method, route.path)
+            if chave not in rotas_criticas:
+                continue
+            encontradas.add(chave)
+            assert "require_step_up_auth" in _dependencias(route)
+            assert "require_atelie_auth" in _dependencias(route)
+
+    assert encontradas == rotas_criticas

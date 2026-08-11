@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 from audit import registrar_auditoria
 from client_identity import anonymous_client_key
 from database import get_db
-from rate_limit import login_rate_limit
+from rate_limit import login_rate_limit, step_up_rate_limit
 from security import (
     create_token,
+    create_step_up_token,
     decode_token_claims,
     require_atelie_auth,
     verify_password,
@@ -28,6 +29,10 @@ _DUMMY_PASSWORD_HASH = "$2b$12$3Y5/o15n9qBg4OLhlXB7VevIdB53DByS3aenCb7NUPIl8jm6W
 
 class LoginPayload(BaseModel):
     usuario: str = Field(min_length=1, max_length=120)
+    senha: str = Field(min_length=1, max_length=300)
+
+
+class StepUpPayload(BaseModel):
     senha: str = Field(min_length=1, max_length=300)
 
 
@@ -92,6 +97,27 @@ async def login(payload: LoginPayload, request: Request):
         detalhes="Uma nova sessão segura foi iniciada no painel.",
     )
     return {"ok": True, "token": token}
+
+
+@router.post("/step-up", dependencies=[Depends(step_up_rate_limit)])
+async def step_up(
+    payload: StepUpPayload,
+    usuario: str = Depends(require_atelie_auth),
+):
+    db = get_db()
+    admin = await db.admins.find_one({"usuario": usuario})
+    if not admin or not verify_password(payload.senha, str(admin.get("senhaHash") or "")):
+        raise HTTPException(status_code=403, detail="Senha incorreta.")
+    token = create_step_up_token(usuario, int(admin.get("authVersion", 1)))
+    await registrar_auditoria(
+        db,
+        acao="reautenticar",
+        recurso="sessao_administrativa",
+        recurso_id=usuario,
+        titulo="Identidade confirmada para operação crítica",
+        detalhes="Autorização temporária de cinco minutos emitida.",
+    )
+    return {"ok": True, "token": token, "expiresInSeconds": 300}
 
 
 @router.post("/logout")

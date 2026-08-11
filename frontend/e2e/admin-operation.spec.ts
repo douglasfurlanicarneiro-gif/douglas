@@ -24,6 +24,7 @@ async function mockAdminApi(page: Page) {
     });
     if (path === '/api/admin/pedidos/reset-version') return json({ version: 1 });
     if (path === '/api/auth/login') return json({ ok: true, token: 'sessao-e2e' });
+    if (path === '/api/auth/step-up') return json({ ok: true, token: 'stepup-e2e', expiresInSeconds: 300 });
     if (path === '/api/admin/operacao/resumo') return json({
       status: 'atencao',
       pagamentosFalhos: 1,
@@ -48,6 +49,12 @@ async function mockAdminApi(page: Page) {
         colecoes: { clientes: 2 },
         totalRegistros: 2,
       });
+    }
+    if (path === '/api/admin/backup/restaurar' && request.method() === 'POST') {
+      if (request.headers()['x-atelie-step-up'] !== 'stepup-e2e') {
+        return json({ detail: 'Reautenticação ausente.' }, 403);
+      }
+      return json({ status: 'Backup restaurado.', colecoes: { clientes: 2 }, totalRegistros: 2 });
     }
     if (path === '/api/admin/operacao/pagamentos/reprocessar-falhos') {
       return json({ status: 'Eventos reenfileirados.', reprocessados: 1 });
@@ -85,5 +92,8 @@ test('painel mostra saúde, recuperação e valida o backup antes de restaurar',
   await expect(page.getByText(/Backup válido, gerado em/)).toBeVisible();
   await expect(page.getByText(/2 registro\(s\)/)).toBeVisible();
   await expect(page.getByText('Restaurar agora')).toBeVisible();
-  await page.getByText('Cancelar', { exact: true }).click();
+  await expect(page.getByTestId('critical-password')).toBeVisible();
+  await page.getByTestId('critical-password').fill('senha-local');
+  await page.getByText('Restaurar agora').click();
+  await expect(page.getByText(/Backup restaurado com segurança: 2 registro/)).toBeVisible();
 });

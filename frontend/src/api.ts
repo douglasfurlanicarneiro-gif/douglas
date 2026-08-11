@@ -33,6 +33,8 @@ const REQUEST_TIMEOUT_MS = 15000;
 const READ_REQUEST_TIMEOUT_MS = 65000;
 const COLD_START_TIMEOUT_MS = 65000;
 let sessionExpiredHandler: (() => void) | null = null;
+let stepUpToken: string | null = null;
+let stepUpExpiresAt = 0;
 
 type VitrineResponse = {
   atualizadoEm: string | null;
@@ -129,8 +131,28 @@ export async function logout(): Promise<void> {
   try {
     await request<{ ok: boolean }>('/auth/logout', { method: 'POST' }, true);
   } finally {
+    stepUpToken = null;
+    stepUpExpiresAt = 0;
     await clearToken();
   }
+}
+export async function reauthenticateCriticalAction(senha: string): Promise<void> {
+  const result = await request<{ ok: boolean; token: string; expiresInSeconds: number }>(
+    '/auth/step-up',
+    { method: 'POST', body: JSON.stringify({ senha }) },
+    true,
+  );
+  stepUpToken = result.token;
+  stepUpExpiresAt = Date.now() + result.expiresInSeconds * 1000;
+}
+
+function criticalHeaders(): HeadersInit {
+  if (!stepUpToken || Date.now() >= stepUpExpiresAt) {
+    stepUpToken = null;
+    stepUpExpiresAt = 0;
+    return {};
+  }
+  return { 'x-atelie-step-up': stepUpToken };
 }
 
 // Perfumes
@@ -397,7 +419,7 @@ export const resetAllOrders = () => request<{
   comprasLegadasApagadas: number;
   movimentosEstornados: number;
   resetVersion: number;
-}>('/admin/pedidos/reset', { method: 'POST' }, true);
+}>('/admin/pedidos/reset', { method: 'POST', headers: criticalHeaders() }, true);
 export const getConfiguracoesLoja = () =>
   request<ConfiguracoesLoja>('/admin/configuracoes', {}, true);
 export const getConfiguracoesPublicas = () =>
@@ -410,6 +432,7 @@ export const updateConfiguracoesLoja = (data: ConfiguracoesLoja) =>
 export const limparDados = (recurso: 'opinioes' | 'estoque' | 'catalogo') =>
   request<{ status: string; removidos: number }>(`/admin/dados/${recurso}/limpar`, {
     method: 'POST',
+    headers: criticalHeaders(),
   }, true);
 
 // Custos e rentabilidade
@@ -519,7 +542,7 @@ export type OperationalSummary = {
   }[];
 };
 
-async function uploadBackup<T>(path: string, file: Blob): Promise<T> {
+async function uploadBackup<T>(path: string, file: Blob, critical = false): Promise<T> {
   const token = await getToken();
   if (!token) throw new ApiError('Sua sessão expirou. Entre novamente.', 401);
   const controller = new AbortController();
@@ -530,6 +553,7 @@ async function uploadBackup<T>(path: string, file: Blob): Promise<T> {
       headers: {
         'Content-Type': 'application/x-lessence-backup',
         'x-atelie-token': token,
+        ...(critical ? criticalHeaders() : {}),
       },
       body: file,
       signal: controller.signal,
@@ -564,6 +588,7 @@ export const restoreBackup = (file: Blob) =>
   uploadBackup<{ status: string; colecoes: Record<string, number>; totalRegistros: number }>(
     '/admin/backup/restaurar?confirmacao=RESTAURAR',
     file,
+    true,
   );
 
 export const getOperationalSummary = () =>

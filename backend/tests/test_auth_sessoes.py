@@ -88,3 +88,38 @@ def test_token_excessivamente_longo_e_rejeitado_antes_da_decodificacao(monkeypat
         asyncio.run(security.require_atelie_auth("x" * 4_097))
 
     assert erro.value.status_code == 401
+
+
+def test_step_up_tem_escopo_curto_e_nao_aceita_token_comum(monkeypatch):
+    monkeypatch.setattr(security, "JWT_SECRET", "segredo-de-teste-com-mais-de-trinta-e-dois-caracteres")
+    token = security.create_step_up_token("admin", auth_version=3)
+    claims = security.decode_step_up_token_claims(token)
+
+    assert claims is not None
+    assert claims["typ"] == "atelie-step-up"
+    assert claims["scope"] == "critical:write"
+    assert claims["av"] == 3
+    assert claims["exp"] - claims["iat"] == 300
+    assert security.decode_step_up_token_claims(
+        security.create_token("admin", auth_version=3)
+    ) is None
+
+
+def test_step_up_exige_mesmo_usuario_e_versao_atual(monkeypatch):
+    monkeypatch.setattr(security, "JWT_SECRET", "segredo-de-teste-com-mais-de-trinta-e-dois-caracteres")
+    monkeypatch.setattr(
+        security,
+        "get_db",
+        lambda: BancoFalso(auth_version=4, revogado=False),
+    )
+    token = security.create_step_up_token("admin", auth_version=4)
+    assert asyncio.run(security.require_step_up_auth("admin", token)) == "admin"
+
+    with pytest.raises(HTTPException) as usuario_incorreto:
+        asyncio.run(security.require_step_up_auth("outra-conta", token))
+    assert usuario_incorreto.value.status_code == 403
+
+    token_antigo = security.create_step_up_token("admin", auth_version=3)
+    with pytest.raises(HTTPException) as versao_antiga:
+        asyncio.run(security.require_step_up_auth("admin", token_antigo))
+    assert versao_antiga.value.status_code == 403

@@ -11,7 +11,7 @@ from typing import Any, Optional
 
 import bcrypt
 import jwt
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 
 from config import JWT_ALGORITHM, JWT_EXPIRE_HOURS, JWT_SECRET
 from database import get_db
@@ -44,6 +44,39 @@ def create_token(subject: str, auth_version: int = 1) -> str:
         "typ": "atelie-admin",
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def create_step_up_token(subject: str, auth_version: int = 1) -> str:
+    """Credencial curta e limitada a operações administrativas destrutivas."""
+    if not JWT_SECRET:
+        raise RuntimeError("JWT_SECRET não configurado.")
+    agora = datetime.now(timezone.utc)
+    payload = {
+        "sub": subject,
+        "iat": agora,
+        "exp": agora + timedelta(minutes=5),
+        "jti": secrets.token_urlsafe(24),
+        "av": auth_version,
+        "typ": "atelie-step-up",
+        "scope": "critical:write",
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
+def decode_step_up_token_claims(token: str) -> Optional[dict[str, Any]]:
+    if not JWT_SECRET:
+        return None
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("typ") != "atelie-step-up":
+            return None
+        if payload.get("scope") != "critical:write":
+            return None
+        if not payload.get("sub") or not payload.get("jti"):
+            return None
+        return payload
+    except jwt.InvalidTokenError:
+        return None
 
 
 def decode_token_claims(token: str) -> Optional[dict[str, Any]]:
@@ -84,4 +117,39 @@ async def require_atelie_auth(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessão revogada. Entre novamente.")
     if await db.auth_revoked_tokens.find_one({"_id": claims["jti"]}, {"_id": 1}):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sessão encerrada. Entre novamente.")
+    return usuario
+
+
+async def require_step_up_auth(
+    usuario: str = Depends(require_atelie_auth),
+    x_atelie_step_up: Optional[str] = Header(default=None),
+) -> str:
+    """Exige sessão válida e reautenticação recente para escrita crítica."""
+    if not x_atelie_step_up or len(x_atelie_step_up) > 4_096:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "REAUTENTICACAO_NECESSARIA",
+                "message": "Confirme sua senha novamente para realizar esta ação.",
+            },
+        )
+    claims = decode_step_up_token_claims(x_atelie_step_up)
+    if not claims or str(claims.get("sub")) != usuario:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "REAUTENTICACAO_EXPIRADA",
+                "message": "A confirmação de segurança expirou. Informe sua senha novamente.",
+            },
+        )
+    db = get_db()
+    admin = await db.admins.find_one({"usuario": usuario}, {"authVersion": 1})
+    if not admin or int(admin.get("authVersion", 1)) != int(claims.get("av", 0)):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "code": "REAUTENTICACAO_EXPIRADA",
+                "message": "A confirmação de segurança não é mais válida.",
+            },
+        )
     return usuario

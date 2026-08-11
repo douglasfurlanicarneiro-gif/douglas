@@ -25,6 +25,7 @@ import {
   aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
   listArquivados, restoreArquivado,
   listSolicitacoesPrivacidade, updateSolicitacaoPrivacidade,
+  reauthenticateCriticalAction,
 } from '../api';
 import type { OperationalSummary, RegistroArquivado, SolicitacaoPrivacidade } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
@@ -53,7 +54,7 @@ type PedidoEndereco = NonNullable<Pedido['endereco']>;
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'payment-operation'; data: Pedido }
   | { type: 'availability' }
-  | { type: 'confirm'; title?: string; label: string; onConfirm: () => void; confirmLabel?: string; danger?: boolean; safetyText?: string }
+  | { type: 'confirm'; title?: string; label: string; onConfirm: () => void | Promise<void>; confirmLabel?: string; danger?: boolean; safetyText?: string; requiresReauth?: boolean }
   | { type: 'whatsapp'; phone: string; message: string; statusLabel: string }
   | { type: 'info'; label: string };
 
@@ -401,6 +402,9 @@ function ConfirmSheetContent({
   onCancel: () => void;
 }) {
   const [ready, setReady] = useState(!sheet.danger);
+  const [password, setPassword] = useState('');
+  const [securityError, setSecurityError] = useState('');
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     if (!sheet.danger) {
@@ -411,6 +415,20 @@ function ConfirmSheetContent({
     const timer = setTimeout(() => setReady(true), 700);
     return () => clearTimeout(timer);
   }, [sheet]);
+
+  const confirm = async () => {
+    if (!ready || confirming || (sheet.requiresReauth && !password)) return;
+    setConfirming(true);
+    setSecurityError('');
+    try {
+      if (sheet.requiresReauth) await reauthenticateCriticalAction(password);
+      await sheet.onConfirm();
+    } catch (error) {
+      setSecurityError(error instanceof ApiError ? error.message : 'Não foi possível confirmar sua identidade.');
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   return (
     <View>
@@ -423,20 +441,38 @@ function ConfirmSheetContent({
           </Text>
         </View>
       )}
+      {sheet.requiresReauth && (
+        <View style={styles.stepUpCard}>
+          <View style={styles.stepUpHeading}>
+            <Feather name="lock" size={16} color={COLORS.gold} />
+            <Text style={styles.stepUpTitle}>Confirmação de identidade</Text>
+          </View>
+          <Text style={styles.stepUpHint}>Digite novamente a senha do painel. Ela não será salva.</Text>
+          <TInput
+            value={password}
+            onChangeText={(value) => { setPassword(value); setSecurityError(''); }}
+            placeholder="Senha administrativa"
+            secureTextEntry
+            autoCapitalize="none"
+            testID="critical-password"
+          />
+          {!!securityError && <Text style={styles.stepUpError}>{securityError}</Text>}
+        </View>
+      )}
       <View style={{ flexDirection: 'row', gap: 8 }}>
         <SecondaryButton label="Cancelar" onPress={onCancel} />
         <Pressable
-          onPress={sheet.onConfirm}
-          disabled={!ready}
+          onPress={confirm}
+          disabled={!ready || confirming || Boolean(sheet.requiresReauth && !password)}
           testID="confirm-ok"
           style={[
             styles.confirmAction,
             { backgroundColor: sheet.danger ? COLORS.rust : COLORS.gold },
-            !ready && styles.confirmActionDisabled,
+            (!ready || confirming || Boolean(sheet.requiresReauth && !password)) && styles.confirmActionDisabled,
           ]}
         >
           <Text style={{ color: sheet.danger ? COLORS.inverse : COLORS.ink, fontWeight: '600' }}>
-            {!ready ? 'Aguarde…' : (sheet.confirmLabel || (sheet.danger ? 'Sim, excluir' : 'Confirmar'))}
+            {!ready ? 'Aguarde…' : confirming ? 'Confirmando…' : (sheet.confirmLabel || (sheet.danger ? 'Sim, excluir' : 'Confirmar'))}
           </Text>
         </Pressable>
       </View>
@@ -2222,6 +2258,7 @@ export function Atelie({
           label: `Backup válido, gerado em ${generatedAt}, com ${validation.totalRegistros} registro(s). Deseja substituir os dados atuais por esse conteúdo?`,
           confirmLabel: 'Restaurar agora',
           danger: true,
+          requiresReauth: true,
           safetyText: 'A restauração é transacional: ou todas as coleções são substituídas, ou nenhuma alteração será aplicada. Exporte um backup atual antes de continuar.',
           onConfirm: async () => {
             try {
@@ -3288,7 +3325,7 @@ export function Atelie({
             />
           </SystemCard>
 
-          <SystemCard icon="database" title="Base de dados" subtitle="Backup e limpezas protegidas por confirmação.">
+          <SystemCard icon="database" title="Base de dados" subtitle="Backup e limpezas protegidas por confirmação de senha.">
             <SystemAction icon="download" title="Exportar backup criptografado" subtitle="Baixe uma cópia protegida e compactada dos dados atuais." onPress={doBackup} />
             <SystemAction
               icon="archive"
@@ -3321,6 +3358,7 @@ export function Atelie({
                 onConfirm: doResetPedidos,
                 confirmLabel: 'Zerar pedidos',
                 danger: true,
+                requiresReauth: true,
               })}
             />
             <SystemAction
@@ -3334,6 +3372,7 @@ export function Atelie({
                 onConfirm: () => clearSystemData('opinioes'),
                 confirmLabel: 'Limpar avaliações',
                 danger: true,
+                requiresReauth: true,
               })}
             />
             <SystemAction
@@ -3347,6 +3386,7 @@ export function Atelie({
                 onConfirm: () => clearSystemData('estoque'),
                 confirmLabel: 'Limpar estoque',
                 danger: true,
+                requiresReauth: true,
               })}
             />
             <SystemAction
@@ -3360,6 +3400,7 @@ export function Atelie({
                 onConfirm: () => clearSystemData('catalogo'),
                 confirmLabel: 'Resetar catálogo',
                 danger: true,
+                requiresReauth: true,
               })}
             />
           </SystemCard>
@@ -3843,6 +3884,11 @@ const styles = StyleSheet.create({
   swipeOrderFront: { backgroundColor: COLORS.surface },
   swipeOrderCard: { padding: SPACING.md, minHeight: 88, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, justifyContent: 'center' },
   deleteSafetyNotice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
+  stepUpCard: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold, backgroundColor: COLORS.surfaceRaised },
+  stepUpHeading: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 5 },
+  stepUpTitle: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
+  stepUpHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginBottom: SPACING.sm },
+  stepUpError: { color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 6 },
   deleteSafetyText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 16, flex: 1 },
   confirmAction: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   confirmActionDisabled: { opacity: 0.45 },

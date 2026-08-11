@@ -30,7 +30,7 @@ from finance import estimar_custo_unitario, obter_config_custos
 from locks import stock_lock
 from payments.pix import PIX_KEY
 from routers.vitrine import marcar_vitrine_pendente
-from security import require_atelie_auth
+from security import require_atelie_auth, require_step_up_auth
 from stock import mapa_saldo_fisico
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -293,7 +293,7 @@ async def validar_backup_recebido(
 async def restaurar_backup_recebido(
     request: Request,
     confirmacao: str = Query(default="", max_length=20),
-    _: str = Depends(require_atelie_auth),
+    _: str = Depends(require_step_up_auth),
 ):
     if confirmacao != "RESTAURAR":
         raise HTTPException(
@@ -779,7 +779,7 @@ async def salvar_configuracoes(
 
 
 @router.post("/dados/{recurso}/limpar")
-async def limpar_dados(recurso: str, _: str = Depends(require_atelie_auth)):
+async def limpar_dados(recurso: str, _: str = Depends(require_step_up_auth)):
     db = get_db()
     agora = datetime.now(timezone.utc)
     if recurso == "opinioes":
@@ -908,7 +908,7 @@ async def obter_versao_reset_pedidos():
 
 
 @router.post("/pedidos/reset")
-async def resetar_base_pedidos(_: str = Depends(require_atelie_auth)):
+async def resetar_base_pedidos(_: str = Depends(require_step_up_auth)):
     """Arquiva pedidos de teste e invalida os códigos salvos nos aparelhos."""
     db = get_db()
     async with stock_lock(db):
