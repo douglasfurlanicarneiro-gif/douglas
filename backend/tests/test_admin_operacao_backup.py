@@ -74,11 +74,31 @@ class ConfiguracoesFalsas:
         }
 
 
+class FrontendErrorsFalsos:
+    async def count_documents(self, _filtro):
+        return 2
+
+    def find(self, _filtro):
+        return CursorFalhas([
+            {
+                "_id": "erro-ui-1",
+                "tipo": "react_boundary",
+                "mensagem": "Falha visual recuperada",
+                "plataforma": "web",
+                "caminho": "/",
+                "ocorrencias": 3,
+                "ultimaOcorrenciaEm": datetime(2026, 8, 10, tzinfo=timezone.utc),
+                "ultimoRequestId": "request-12345678",
+            }
+        ])
+
+
 class BancoOperacionalFalso:
     def __init__(self):
         self.eventos_pagamento = EventosPagamentoFalsos()
         self.operacoes_sistema = OperacoesFalsas()
         self.configuracoes = ConfiguracoesFalsas()
+        self.frontend_errors = FrontendErrorsFalsos()
 
 
 def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
@@ -96,6 +116,9 @@ def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
     assert resumo["bancoDados"]["versaoEsquema"] == admin.DATABASE_SCHEMA_VERSION
     assert resumo["falhasRecentes"][0]["orderNsu"] == "pedido-42"
     assert "customer_name" not in resumo["falhasRecentes"][0]
+    assert resumo["errosFrontend24h"] == 2
+    assert resumo["errosFrontendRecentes"][0]["mensagem"] == "Falha visual recuperada"
+    assert resumo["errosFrontendRecentes"][0]["requestId"] == "request-12345678"
 
 
 def test_reprocessamento_reenfileira_falhas_e_registra_auditoria(monkeypatch):

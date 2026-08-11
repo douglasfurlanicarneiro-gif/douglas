@@ -4,6 +4,7 @@ import Feather from '@expo/vector-icons/Feather';
 
 import { COLORS, RADIUS, SPACING, TYPOGRAPHY } from '../theme';
 import { AppText as Text } from './Typography';
+import { reportFrontendError } from '../api';
 
 type Props = { children: React.ReactNode };
 type State = { failed: boolean };
@@ -17,6 +18,14 @@ export class AppErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     if (__DEV__) console.error('Erro de interface recuperado', error, info.componentStack);
+    void reportFrontendError({
+      tipo: 'react_boundary',
+      mensagem: error.message || error.name || 'Falha de renderização',
+      componentStack: `${info.componentStack || ''}\n${error.stack || ''}`.slice(0, 3000),
+      plataforma: Platform.OS,
+      caminho: Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.pathname : '/',
+      versao: '1.0.0',
+    });
   }
 
   private retry = () => {

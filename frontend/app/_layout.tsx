@@ -5,6 +5,7 @@ import { Platform } from "react-native";
 
 import { useAppFonts } from "@/src/hooks/use-app-fonts";
 import { AppErrorBoundary } from "@/src/components/AppErrorBoundary";
+import { reportFrontendError } from "@/src/api";
 
 
 // Keep the native splash visible from cold start until icon fonts register.
@@ -21,6 +22,39 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [loaded, error]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const reportPath = () => window.location.pathname;
+    const onError = (event: ErrorEvent) => {
+      if (!event.message) return;
+      void reportFrontendError({
+        tipo: "window_error",
+        mensagem: event.message,
+        componentStack: event.error instanceof Error ? event.error.stack || "" : "",
+        plataforma: "web",
+        caminho: reportPath(),
+        versao: "1.0.0",
+      });
+    };
+    const onUnhandled = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      void reportFrontendError({
+        tipo: "unhandled_rejection",
+        mensagem: reason instanceof Error ? reason.message : String(reason || "Promise rejeitada"),
+        componentStack: reason instanceof Error ? reason.stack || "" : "",
+        plataforma: "web",
+        caminho: reportPath(),
+        versao: "1.0.0",
+      });
+    };
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onUnhandled);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onUnhandled);
+    };
+  }, []);
 
   // If the CDN is unreachable we fall through on error rather than wedging
   // the app — icons will tofu, but the app still boots.

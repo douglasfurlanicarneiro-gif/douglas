@@ -45,6 +45,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    readonly requestId?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -91,6 +92,10 @@ async function request<T>(
   timeoutMs?: number,
 ): Promise<T> {
   const headers = new Headers(opts.headers);
+  const clientRequestId = typeof globalThis.crypto?.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
+    : `app-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  if (!headers.has('X-Request-ID')) headers.set('X-Request-ID', clientRequestId);
   if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (needsAuth) {
     const t = await getToken();
@@ -103,6 +108,7 @@ async function request<T>(
   const timeout = setTimeout(() => controller.abort(), effectiveTimeout);
   try {
     const response = await fetch(`${API}${path}`, { ...opts, headers, signal: controller.signal });
+    const responseRequestId = response.headers.get('X-Request-ID') || clientRequestId;
     const body = await response.json().catch(() => null);
     if (!response.ok) {
       if (needsAuth && response.status === 401) {
@@ -110,15 +116,15 @@ async function request<T>(
         sessionExpiredHandler?.();
       }
       const detail = apiErrorMessage(body);
-      throw new ApiError(detail || 'Não foi possível concluir a solicitação.', response.status);
+      throw new ApiError(detail || 'Não foi possível concluir a solicitação.', response.status, responseRequestId);
     }
     return body as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiError('A conexão demorou demais. Tente novamente.', 408);
+      throw new ApiError('A conexão demorou demais. Tente novamente.', 408, clientRequestId);
     }
-    throw new ApiError('Não foi possível conectar ao servidor.', 0);
+    throw new ApiError('Não foi possível conectar ao servidor.', 0, clientRequestId);
   } finally {
     clearTimeout(timeout);
   }
@@ -533,6 +539,17 @@ export type OperationalSummary = {
   pagamentosProcessando: number;
   ultimoBackupEm: string | null;
   ultimaRestauracaoEm: string | null;
+  errosFrontend24h: number;
+  errosFrontendRecentes: {
+    id: string;
+    tipo: string;
+    mensagem: string;
+    plataforma: string;
+    caminho: string;
+    ocorrencias: number;
+    ultimaOcorrenciaEm: string | null;
+    requestId: string;
+  }[];
   falhasRecentes: {
     id: string;
     orderNsu: string;
@@ -545,6 +562,9 @@ export type OperationalSummary = {
 async function uploadBackup<T>(path: string, file: Blob, critical = false): Promise<T> {
   const token = await getToken();
   if (!token) throw new ApiError('Sua sessão expirou. Entre novamente.', 401);
+  const requestId = typeof globalThis.crypto?.randomUUID === 'function'
+    ? globalThis.crypto.randomUUID()
+    : `backup-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
   try {
@@ -553,6 +573,7 @@ async function uploadBackup<T>(path: string, file: Blob, critical = false): Prom
       headers: {
         'Content-Type': 'application/x-lessence-backup',
         'x-atelie-token': token,
+        'x-request-id': requestId,
         ...(critical ? criticalHeaders() : {}),
       },
       body: file,
@@ -567,6 +588,7 @@ async function uploadBackup<T>(path: string, file: Blob, critical = false): Prom
       throw new ApiError(
         apiErrorMessage(body) || 'Não foi possível processar o backup.',
         response.status,
+        response.headers.get('X-Request-ID') || requestId,
       );
     }
     return body as T;
@@ -575,9 +597,29 @@ async function uploadBackup<T>(path: string, file: Blob, critical = false): Prom
     if (error instanceof Error && error.name === 'AbortError') {
       throw new ApiError('A restauração demorou demais. Tente novamente.', 408);
     }
-    throw new ApiError('Não foi possível conectar ao servidor.', 0);
+    throw new ApiError('Não foi possível conectar ao servidor.', 0, requestId);
   } finally {
     clearTimeout(timeout);
+  }
+}
+
+export type FrontendErrorReport = {
+  tipo: 'react_boundary' | 'window_error' | 'unhandled_rejection';
+  mensagem: string;
+  componentStack?: string;
+  plataforma: string;
+  caminho: string;
+  versao?: string;
+};
+
+export async function reportFrontendError(report: FrontendErrorReport): Promise<void> {
+  try {
+    await request<{ recebido: boolean; requestId: string }>('/observabilidade/frontend', {
+      method: 'POST',
+      body: JSON.stringify(report),
+    });
+  } catch {
+    // Telemetria nunca pode impedir a recuperação da interface.
   }
 }
 

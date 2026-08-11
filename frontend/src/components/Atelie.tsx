@@ -3285,6 +3285,12 @@ export function Atelie({
                 <Text style={styles.operationHealthValue}>{operationalSummary?.pagamentosProcessando ?? '—'}</Text>
                 <Text style={styles.operationHealthLabel}>Processando</Text>
               </View>
+              <View style={styles.operationHealthItem}>
+                <Text style={[styles.operationHealthValue, operationalSummary?.errosFrontend24h ? { color: COLORS.rust } : null]}>
+                  {operationalSummary?.errosFrontend24h ?? '—'}
+                </Text>
+                <Text style={styles.operationHealthLabel}>Falhas no app · 24h</Text>
+              </View>
             </View>
             <Text style={styles.operationHealthHint}>
               Último backup exportado: {operationalSummary?.ultimoBackupEm ? fmtDate(operationalSummary.ultimoBackupEm) : 'ainda não registrado'}
@@ -3314,6 +3320,22 @@ export function Atelie({
                 disabled={loadingOperation}
                 danger
               />
+            )}
+            {!!operationalSummary?.errosFrontendRecentes?.[0] && (
+              <View style={styles.operationWarning}>
+                <Feather name="smartphone" size={15} color={COLORS.rust} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.operationWarningText}>
+                    {operationalSummary.errosFrontendRecentes[0].mensagem}
+                  </Text>
+                  <Text style={styles.operationHealthHint}>
+                    {operationalSummary.errosFrontendRecentes[0].plataforma || 'app'} · {operationalSummary.errosFrontendRecentes[0].ocorrencias} ocorrência(s)
+                    {operationalSummary.errosFrontendRecentes[0].requestId
+                      ? ` · código ${operationalSummary.errosFrontendRecentes[0].requestId}`
+                      : ''}
+                  </Text>
+                </View>
+              </View>
             )}
             <SystemAction
               icon="refresh-cw"

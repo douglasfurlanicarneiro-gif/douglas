@@ -358,6 +358,8 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
         ultimo_backup,
         ultima_restauracao,
         esquema_banco,
+        erros_frontend_24h,
+        erros_frontend_recentes,
     ) = await asyncio.gather(
         db.eventos_pagamento.count_documents({"status": "falhou"}),
         db.eventos_pagamento.count_documents({"status": "revisao_manual"}),
@@ -376,13 +378,20 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
             sort=[("data", -1)],
         ),
         db.configuracoes.find_one({"_id": "database_schema"}),
+        db.frontend_errors.count_documents(
+            {"ultimaOcorrenciaEm": {"$gte": datetime.now(timezone.utc) - timedelta(hours=24)}}
+        ),
+        db.frontend_errors.find({})
+        .sort("ultimaOcorrenciaEm", -1)
+        .limit(5)
+        .to_list(5),
     )
     banco_pronto = (
         (esquema_banco or {}).get("status") == "pronto"
         and int((esquema_banco or {}).get("versao", 0)) >= DATABASE_SCHEMA_VERSION
     )
     return {
-        "status": "atencao" if falhos or revisao_manual or not banco_pronto else "ok",
+        "status": "atencao" if falhos or revisao_manual or erros_frontend_24h or not banco_pronto else "ok",
         "pagamentosFalhos": falhos,
         "pagamentosRevisaoManual": revisao_manual,
         "pagamentosEmEspera": em_espera,
@@ -397,6 +406,20 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
             ),
             "verificadoEm": (esquema_banco or {}).get("concluidoEm"),
         },
+        "errosFrontend24h": int(erros_frontend_24h),
+        "errosFrontendRecentes": [
+            {
+                "id": str(erro.get("_id", "")),
+                "tipo": str(erro.get("tipo", "")),
+                "mensagem": str(erro.get("mensagem", ""))[:300],
+                "plataforma": str(erro.get("plataforma", ""))[:40],
+                "caminho": str(erro.get("caminho", ""))[:300],
+                "ocorrencias": int(erro.get("ocorrencias", 0)),
+                "ultimaOcorrenciaEm": erro.get("ultimaOcorrenciaEm"),
+                "requestId": str(erro.get("ultimoRequestId", ""))[:80],
+            }
+            for erro in erros_frontend_recentes
+        ],
         "falhasRecentes": [
             {
                 "id": str(evento.get("_id", "")),

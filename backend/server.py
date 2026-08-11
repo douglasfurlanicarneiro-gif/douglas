@@ -9,6 +9,7 @@ Variáveis de ambiente necessárias (ver config.py):
 """
 import asyncio
 import logging
+import re
 import time
 from uuid import uuid4
 from contextlib import asynccontextmanager, suppress
@@ -24,7 +25,7 @@ from database_integrity import ensure_database_schema
 from locks import distributed_lock, stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
                      clientes, compras, custos, fornecedores, frete, insumos,
-                     movimentos, opinioes, pagamentos, pedidos, perfumes,
+                     movimentos, observabilidade, opinioes, pagamentos, pedidos, perfumes,
                      privacidade, sugestoes, vitrine)
 from security import hash_password, verify_password
 from utils import reparar_sequencias
@@ -223,6 +224,7 @@ app.add_middleware(
         "Content-Type",
         "Idempotency-Key",
         "X-Atelie-Token",
+        "X-Atelie-Step-Up",
         "X-Request-ID",
     ],
     expose_headers=["X-Request-ID"],
@@ -232,7 +234,13 @@ app.add_middleware(
 
 @app.middleware("http")
 async def security_headers(request, call_next):
-    request_id = uuid4().hex[:16]
+    recebido = str(request.headers.get("x-request-id") or "")
+    request_id = (
+        recebido[:80]
+        if re.fullmatch(r"[A-Za-z0-9._-]{8,80}", recebido)
+        else uuid4().hex[:16]
+    )
+    request.state.request_id = request_id
     started_at = time.perf_counter()
     try:
         response = await call_next(request)
@@ -283,6 +291,7 @@ app.include_router(perfumes.router)
 app.include_router(movimentos.router)
 app.include_router(pedidos.router)
 app.include_router(opinioes.router)
+app.include_router(observabilidade.router)
 app.include_router(pagamentos.router)
 app.include_router(sugestoes.router)
 app.include_router(compras.router)

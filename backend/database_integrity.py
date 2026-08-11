@@ -13,7 +13,7 @@ from typing import Any
 from pymongo.errors import OperationFailure
 
 
-DATABASE_SCHEMA_VERSION = 2
+DATABASE_SCHEMA_VERSION = 3
 DATABASE_SCHEMA_DOCUMENT_ID = "database_schema"
 
 
@@ -98,6 +98,8 @@ INDEX_SPECS = (
     IndexSpec("movimentos", [("perfumeId", 1), ("data", -1)], "perfumeId_1_data_-1"),
     IndexSpec("movimentos", "origem", "origem_1"),
     IndexSpec("operacoes_sistema", "data", "data_1"),
+    IndexSpec("frontend_errors", "expireAt", "expireAt_1", {"expireAfterSeconds": 0}),
+    IndexSpec("frontend_errors", "ultimaOcorrenciaEm", "ultimaOcorrenciaEm_-1"),
     IndexSpec("opinioes", [("arquivadoEm", 1), ("data", -1)], "arquivadoEm_1_data_-1"),
     IndexSpec(
         "opinioes",

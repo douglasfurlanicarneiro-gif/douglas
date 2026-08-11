@@ -21,6 +21,7 @@ PUBLIC_ROUTES = {
     ("GET", "/api/privacidade/solicitacoes/status/{protocolo}"),
     ("GET", "/api/admin/configuracoes/publicas"),
     ("GET", "/api/admin/pedidos/reset-version"),
+    ("POST", "/api/observabilidade/frontend"),
 }
 
 

@@ -134,7 +134,7 @@ def test_migracao_v2_converte_datas_e_valores_sem_processar_documentos_em_memori
 
     result = asyncio.run(ensure_database_schema(db))
 
-    assert DATABASE_SCHEMA_VERSION == 2
+    assert DATABASE_SCHEMA_VERSION == 3
     assert [migration.version for migration in MIGRATIONS] == [2]
     assert result["migracoesAplicadas"] == [2]
     assert db.pedidos.bulk_updates
@@ -146,6 +146,16 @@ def test_migracao_v2_converte_datas_e_valores_sem_processar_documentos_em_memori
     assert migration["status"] == "concluida"
     assert migration["nome"] == "datas_bson_e_valores_em_centavos"
     assert "pedidos.valoresCentavos" in migration["plano"]
+
+
+def test_telemetria_tem_retencao_automatica_e_indice_de_consulta():
+    indices = {
+        (spec.collection, spec.name): spec
+        for spec in INDEX_SPECS
+    }
+    ttl = indices[("frontend_errors", "expireAt_1")]
+    assert ttl.options["expireAfterSeconds"] == 0
+    assert ("frontend_errors", "ultimaOcorrenciaEm_-1") in indices
 
 
 def test_migracao_interrompe_antes_do_indice_se_houver_transacao_duplicada():
