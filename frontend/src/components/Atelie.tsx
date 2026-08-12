@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import {
-  COLORS, SPACING, RADIUS, STATUS, FAMILIAS, CONCENTRACOES, OCASIOES, FONT_SIZES,
+  COLORS, SPACING, RADIUS, STATUS, FONT_SIZES,
   statusPermitidosNoPainel,
   brl, familiasDoPerfume, fmtDate, nomeConcentracao, padSeq,
 } from '../theme';
@@ -28,7 +28,7 @@ import {
 } from '../api';
 import type { OperationalSummary, RegistroArquivado, SolicitacaoPrivacidade } from '../api';
 import { PRESET_FORNECEDOR } from '../data/preset-fornecedor';
-import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, PaymentOperation, Pedido, PedidoItem, Perfume, PriceOption, Sugestao } from '../types';
+import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoja, EstoqueResumo, Metricas, Movimento, Opiniao, OrderStatus, PaymentOperation, Pedido, PedidoItem, Perfume, Sugestao } from '../types';
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
 import { CustosView, FornecedoresView, InsumosView } from './GestaoOperacional';
 import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
@@ -45,15 +45,15 @@ import {
   SwipeablePedidoCard,
   type AdminPedido as PedidoPainel,
 } from './AdminOrderCards';
+import {
+  MovimentoForm,
+  PerfumeForm,
+  StockCountForm,
+  type MovimentoDraft,
+  type PerfumeSaveData,
+} from './AdminInventoryForms';
 
 type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
-type PerfumeFormState = Omit<Perfume, 'id' | 'seq' | 'inspiracao'> & {
-  id?: string;
-  seq?: number;
-  inspiracao?: string;
-};
-type PerfumeSaveData = PerfumeFormState & { inspiracao: string };
-type MovimentoDraft = Omit<Movimento, 'id' | 'origem' | 'data'>;
 type PedidoFormState = Partial<Pedido> & Pick<Pedido, 'cliente' | 'contato' | 'status' | 'observacoes' | 'itens'>;
 type PedidoSaveData = PedidoFormState & {
   itens: PedidoItem[];
@@ -132,331 +132,6 @@ function StatCard({ label, value, icon, alert }: { label: string; value: string 
       <Feather name={icon} size={16} color={alert ? COLORS.rust : COLORS.gold} />
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
-function PerfumeForm({
-  initial,
-  onSave,
-  onCancel,
-}: {
-  initial?: Perfume;
-  onSave: (data: PerfumeSaveData) => void;
-  onCancel: () => void;
-}) {
-  const [f, setF] = useState<PerfumeFormState>(initial ? {
-    ...initial,
-    familias: familiasDoPerfume(initial),
-    concentracao: nomeConcentracao(initial.concentracao),
-  } : {
-    nome: '', imagemUrl: '', ocasioes: [], familia: FAMILIAS[0], familias: [FAMILIAS[0]], concentracao: CONCENTRACOES[0],
-    notasSaida: '', notasCoracao: '', notasFundo: '',
-    precos: [{ ml: 30, preco: 0 }], estoqueMinimoMl: 100, publicavel: false, prontaEntrega: false,
-    custoEssenciaPorMl: 0, concentracaoPercentual: 25, fornecedorId: '', fornecedorCodigo: '',
-  });
-  const set = <K extends keyof PerfumeFormState>(k: K, v: PerfumeFormState[K]) => setF((s) => ({ ...s, [k]: v }));
-  const toggleOcasiao = (value: string) => setF((s) => {
-    const atuais = Array.isArray(s.ocasioes) ? s.ocasioes : [];
-    return { ...s, ocasioes: atuais.includes(value) ? atuais.filter((item: string) => item !== value) : [...atuais, value] };
-  });
-  const toggleFamilia = (value: string) => setF((s) => {
-    const atuais = familiasDoPerfume(s);
-    const familias = atuais.includes(value) ? atuais.filter((item: string) => item !== value) : [...atuais, value];
-    return { ...s, familias, familia: familias[0] || '' };
-  });
-  const setPreco = <K extends keyof PriceOption>(i: number, k: K, v: PriceOption[K]) => setF((s) => ({
-    ...s,
-    precos: s.precos.map((price, idx) => idx === i ? { ...price, [k]: v } : price),
-  }));
-  const addPreco = () => setF((s) => ({ ...s, precos: [...s.precos, { ml: 10, preco: 0 }] }));
-  const rmPreco = (i: number) => setF((s) => ({ ...s, precos: s.precos.filter((_, idx) => idx !== i) }));
-  return (
-    <View>
-      <Field label="Nome do contratipo"><TInput value={f.nome} onChangeText={(v) => set('nome', v)} placeholder="Ex: Âmbar Noturno" testID="perfume-nome" /></Field>
-      <Field label="Foto do perfume (link da imagem)">
-        <TInput
-          value={f.imagemUrl || ''}
-          onChangeText={(v) => set('imagemUrl', v)}
-          placeholder="https://.../foto-do-perfume.jpg"
-          autoCapitalize="none"
-          keyboardType="url"
-          testID="perfume-imagem"
-        />
-      </Field>
-      {!!f.imagemUrl && (
-        <View style={styles.imagePreview}>
-          <Image source={{ uri: f.imagemUrl }} style={styles.imagePreviewPhoto} contentFit="contain" transition={180} />
-          <Text style={styles.imagePreviewText}>Prévia da foto</Text>
-        </View>
-      )}
-      <Field label="Clima & Ocasião">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {OCASIOES.map((item) => {
-            const selected = (f.ocasioes || []).includes(item);
-            return (
-              <Pressable key={item} onPress={() => toggleOcasiao(item)} style={[styles.miniChip, selected && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                <Text style={{ color: selected ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{item}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Field>
-      <Field label="Família Olfativa">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {FAMILIAS.map((fam) => {
-            const selected = familiasDoPerfume(f).includes(fam);
-            return (
-              <Pressable key={fam} onPress={() => toggleFamilia(fam)} style={[styles.miniChip, selected && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                <Text style={{ color: selected ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{fam}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Field>
-      <Field label="Concentração">
-        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-          {CONCENTRACOES.map((c) => (
-            <Pressable key={c} onPress={() => set('concentracao', c)} style={[styles.miniChip, f.concentracao === c && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-              <Text style={{ color: f.concentracao === c ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{c}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </Field>
-      <View style={{ padding: SPACING.md, backgroundColor: COLORS.surface, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
-        <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginBottom: 8 }}>PIRÂMIDE OLFATIVA</Text>
-        {([
-          { c: COLORS.topNote, label: 'Saída', k: 'notasSaida' },
-          { c: COLORS.heartNote, label: 'Coração', k: 'notasCoracao' },
-          { c: COLORS.baseNote, label: 'Fundo', k: 'notasFundo' },
-        ] as const).map((row) => (
-          <View key={row.k} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: row.c }} />
-            <TInput style={{ flex: 1 }} value={f[row.k]} onChangeText={(v) => set(row.k, v)} placeholder={`Notas de ${row.label.toLowerCase()}`} />
-          </View>
-        ))}
-      </View>
-      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label, marginBottom: 6 }}>Tamanhos e preços</Text>
-      {f.precos.map((p, i) => (
-        <View key={i} style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-          <TInput style={{ width: 70 }} keyboardType="numeric" value={String(p.ml)} onChangeText={(v) => setPreco(i, 'ml', Number(v) || 0)} placeholder="ml" />
-          <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>ml</Text>
-          <TInput style={{ flex: 1 }} keyboardType="decimal-pad" value={String(p.preco)} onChangeText={(v) => setPreco(i, 'preco', Number(v) || 0)} placeholder="Preço" />
-          {f.precos.length > 1 && (
-            <Pressable onPress={() => rmPreco(i)} hitSlop={8} accessibilityLabel={`Remover tamanho ${f.precos[i]?.ml || ''} mililitros`}><Feather name="x" size={16} color={COLORS.rust} /></Pressable>
-          )}
-        </View>
-      ))}
-      <Pressable onPress={addPreco}><Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label, marginBottom: SPACING.md }}>+ adicionar tamanho</Text></Pressable>
-      <Field label="Estoque mínimo de alerta (ml)">
-        <TInput keyboardType="numeric" value={String(f.estoqueMinimoMl)} onChangeText={(v) => set('estoqueMinimoMl', Number(v) || 0)} />
-      </Field>
-      <View style={{ padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
-        <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700', marginBottom: 8 }}>CUSTO & PRODUÇÃO · ADMINISTRATIVO</Text>
-        <Field label="Custo da essência por ml (R$)">
-          <TInput
-            keyboardType="decimal-pad"
-            value={String(f.custoEssenciaPorMl ?? 0).replace('.', ',')}
-            onChangeText={(v) => set('custoEssenciaPorMl', Number(v.replace(',', '.')) || 0)}
-            placeholder="0,00"
-          />
-        </Field>
-        <Field label="Concentração real da fórmula (%)">
-          <TInput
-            keyboardType="decimal-pad"
-            value={String(f.concentracaoPercentual ?? 25).replace('.', ',')}
-            onChangeText={(v) => set('concentracaoPercentual', Math.min(100, Math.max(0, Number(v.replace(',', '.')) || 0)))}
-            placeholder="25"
-          />
-        </Field>
-        <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>Esses dados não aparecem na vitrine. Eles alimentam lucro, margem e ordens de produção.</Text>
-      </View>
-      <Pressable onPress={() => set('prontaEntrega', !f.prontaEntrega)} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, marginBottom: SPACING.md }}>
-        <View style={{ flex: 1, paddingRight: SPACING.md }}>
-          <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body }}>Pronta entrega</Text>
-          <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 }}>
-            Desative para mostrar este perfume como Sob encomenda.
-          </Text>
-        </View>
-        <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: f.prontaEntrega ? COLORS.gold : COLORS.border, justifyContent: 'center', paddingHorizontal: 2, alignItems: f.prontaEntrega ? 'flex-end' : 'flex-start' }}>
-          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.bone }} />
-        </View>
-      </Pressable>
-      <Pressable onPress={() => set('publicavel', !f.publicavel)} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, marginBottom: SPACING.md }}>
-        <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body }}>Mostrar na vitrine pública</Text>
-        <View style={{ width: 44, height: 24, borderRadius: 12, backgroundColor: f.publicavel ? COLORS.gold : COLORS.border, justifyContent: 'center', paddingHorizontal: 2, alignItems: f.publicavel ? 'flex-end' : 'flex-start' }}>
-          <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.bone }} />
-        </View>
-      </Pressable>
-      <View style={{ flexDirection: 'row', gap: 8 }}>
-        <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <PrimaryButton
-          label="Salvar"
-          onPress={() => f.nome.trim() && familiasDoPerfume(f).length && onSave({
-            ...f,
-            inspiracao: '',
-            familia: familiasDoPerfume(f)[0],
-            familias: familiasDoPerfume(f),
-          })}
-          disabled={!f.nome.trim() || !familiasDoPerfume(f).length || (f.publicavel && !f.precos.some((price: { preco: number }) => price.preco > 0))}
-          testID="perfume-save"
-        />
-      </View>
-    </View>
-  );
-}
-
-function MovimentoForm({
-  perfumes,
-  onSave,
-  onCancel,
-}: {
-  perfumes: Perfume[];
-  onSave: (data: MovimentoDraft) => void;
-  onCancel: () => void;
-}) {
-  const opcoes = [
-    { id: 'entrada', label: 'Entrada', tipo: 'entrada', motivo: 'Entrada de estoque' },
-    { id: 'perda', label: 'Perda', tipo: 'saida', motivo: 'Perda ou vazamento' },
-    { id: 'ajuste-positivo', label: 'Ajuste +', tipo: 'entrada', motivo: 'Ajuste positivo de inventário' },
-    { id: 'ajuste-negativo', label: 'Ajuste −', tipo: 'saida', motivo: 'Ajuste negativo de inventário' },
-    { id: 'devolucao', label: 'Devolução', tipo: 'entrada', motivo: 'Devolução ao estoque' },
-  ] as const;
-  const [f, setF] = useState<MovimentoDraft>({
-    perfumeId: perfumes[0]?.id || '',
-    tipo: 'entrada',
-    quantidadeMl: 100,
-    motivo: 'Entrada de estoque',
-    categoria: 'entrada',
-  });
-  const selecionarMovimento = (opcao: typeof opcoes[number]) => {
-    setF({
-      ...f,
-      tipo: opcao.tipo,
-      motivo: opcao.motivo,
-      categoria: opcao.id,
-    });
-  };
-  return (
-    <View>
-      <Field label="Perfume">
-        <ScrollView style={{ maxHeight: 200 }}>
-          {perfumes.map((p) => (
-            <Pressable key={p.id} onPress={() => setF({ ...f, perfumeId: p.id })} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border }}>
-              <Text style={{ color: f.perfumeId === p.id ? COLORS.gold : COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>Nº{padSeq(p.seq)} · {p.nome}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </Field>
-      <Field label="Movimentação">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {opcoes.map((opcao) => (
-            <Pressable
-              key={opcao.id}
-              onPress={() => selecionarMovimento(opcao)}
-              style={[styles.miniChip, f.categoria === opcao.id && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}
-            >
-              <Text style={{ color: f.categoria === opcao.id ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{opcao.label}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </Field>
-      <Field label="Quantidade (ml)"><TInput keyboardType="numeric" value={String(f.quantidadeMl)} onChangeText={(v) => setF({ ...f, quantidadeMl: Number(v) || 0 })} testID="mov-qtd" /></Field>
-      <Field label="Observação">
-        <TInput value={f.motivo} onChangeText={(v) => setF({ ...f, motivo: v })} placeholder="Descreva o motivo desta movimentação" />
-      </Field>
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
-        <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <PrimaryButton label="Lançar" onPress={() => f.perfumeId && f.quantidadeMl > 0 && onSave(f)} testID="mov-save" />
-      </View>
-    </View>
-  );
-}
-
-function StockCountForm({ perfumes, resumo, initial, onSave, onCancel }: {
-  perfumes: Perfume[];
-  resumo: EstoqueResumo;
-  initial?: Perfume;
-  onSave: (data: { perfumeId: string; quantidadeFisicaMl: number; saldoEsperadoMl: number; motivo: string }) => void;
-  onCancel: () => void;
-}) {
-  const [search, setSearch] = useState(initial?.nome || '');
-  const [perfumeId, setPerfumeId] = useState(initial?.id || perfumes[0]?.id || '');
-  const selected = perfumes.find((perfume) => perfume.id === perfumeId);
-  const current = resumo[perfumeId] || { saldoAtualMl: 0, reservadoMl: 0, disponivelMl: 0 };
-  const [quantity, setQuantity] = useState(String(current.saldoAtualMl));
-  const [reason, setReason] = useState('Conferência física');
-  const found = Number(quantity);
-  const valid = Number.isInteger(found) && found >= 0;
-  const difference = valid ? found - current.saldoAtualMl : 0;
-  const availableAfter = valid ? found - current.reservadoMl : current.disponivelMl;
-  const filtered = perfumes
-    .filter((perfume) => perfume.nome.toLowerCase().includes(search.trim().toLowerCase()))
-    .slice(0, 20);
-
-  const selectPerfume = (perfume: Perfume) => {
-    const item = resumo[perfume.id] || { saldoAtualMl: 0, reservadoMl: 0, disponivelMl: 0 };
-    setPerfumeId(perfume.id);
-    setSearch(perfume.nome);
-    setQuantity(String(item.saldoAtualMl));
-  };
-
-  return (
-    <View>
-      <Field label="Buscar essência">
-        <TInput value={search} onChangeText={setSearch} placeholder="Digite o nome do perfume" testID="stock-count-search" />
-      </Field>
-      {(!selected || search.trim().toLowerCase() !== selected.nome.toLowerCase()) && (
-        <ScrollView style={styles.stockCountResults} keyboardShouldPersistTaps="handled">
-          {filtered.map((perfume) => (
-            <Pressable key={perfume.id} onPress={() => selectPerfume(perfume)} style={styles.stockCountResultRow}>
-              <Text style={styles.stockCountResultName}>Nº{padSeq(perfume.seq)} · {perfume.nome}</Text>
-              <Text style={styles.stockCountResultBalance}>{(resumo[perfume.id]?.saldoAtualMl || 0)}ml</Text>
-            </Pressable>
-          ))}
-          {filtered.length === 0 && <Text style={styles.stockCountEmpty}>Nenhuma essência encontrada.</Text>}
-        </ScrollView>
-      )}
-
-      {!!selected && (
-        <>
-          <View style={styles.stockCountSelected}>
-            <Text style={styles.stockCountEyebrow}>ESSÊNCIA SELECIONADA</Text>
-            <Text style={styles.stockCountTitle}>{selected.nome}</Text>
-            <View style={styles.stockCountSummaryRow}>
-              <View style={styles.stockCountSummaryItem}><Text style={styles.stockCountValue}>{current.saldoAtualMl}ml</Text><Text style={styles.stockCountLabel}>Físico registrado</Text></View>
-              <View style={styles.stockCountSummaryItem}><Text style={styles.stockCountValue}>{current.reservadoMl}ml</Text><Text style={styles.stockCountLabel}>Reservado</Text></View>
-              <View style={styles.stockCountSummaryItem}><Text style={styles.stockCountValue}>{current.disponivelMl}ml</Text><Text style={styles.stockCountLabel}>Disponível</Text></View>
-            </View>
-          </View>
-          <Field label="Quantidade física encontrada (ml)">
-            <TInput keyboardType="numeric" value={quantity} onChangeText={setQuantity} placeholder="0" testID="stock-count-quantity" />
-          </Field>
-          <View style={[styles.stockCountPreview, availableAfter < 0 && { borderColor: COLORS.rust + '88' }]}>
-            <Feather name={difference >= 0 ? 'arrow-up-circle' : 'arrow-down-circle'} size={19} color={difference === 0 ? COLORS.muted : difference > 0 ? COLORS.sage : COLORS.rust} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.stockCountPreviewTitle}>
-                {!valid ? 'Informe uma quantidade válida' : difference === 0 ? 'Nenhum ajuste necessário' : `${difference > 0 ? 'Entrada' : 'Saída'} automática de ${Math.abs(difference)}ml`}
-              </Text>
-              <Text style={[styles.stockCountPreviewHint, availableAfter < 0 && { color: COLORS.rust }]}>
-                Após a conferência: {availableAfter}ml disponíveis{availableAfter < 0 ? ' · saldo insuficiente para as reservas' : ''}
-              </Text>
-            </View>
-          </View>
-          <Field label="Motivo ou observação">
-            <TInput value={reason} onChangeText={setReason} placeholder="Ex.: contagem mensal" />
-          </Field>
-        </>
-      )}
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: SPACING.sm }}>
-        <SecondaryButton label="Cancelar" onPress={onCancel} />
-        <PrimaryButton
-          label="Confirmar contagem"
-          disabled={!selected || !valid}
-          onPress={() => selected && valid && onSave({ perfumeId: selected.id, quantidadeFisicaMl: found, saldoEsperadoMl: current.saldoAtualMl, motivo: reason })}
-          testID="stock-count-save"
-        />
-      </View>
     </View>
   );
 }
@@ -3356,21 +3031,6 @@ const styles = StyleSheet.create({
   stockAlertText: { color: COLORS.rust, fontSize: FONT_SIZES.caption, flex: 1 },
   stockCountButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 9, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surfaceRaised },
   stockCountButtonText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
-  stockCountResults: { maxHeight: 210, marginTop: -8, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
-  stockCountResultRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  stockCountResultName: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.caption },
-  stockCountResultBalance: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
-  stockCountEmpty: { color: COLORS.muted, fontSize: FONT_SIZES.caption, padding: SPACING.md, textAlign: 'center' },
-  stockCountSelected: { padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surfaceRaised },
-  stockCountEyebrow: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1 },
-  stockCountTitle: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700', marginTop: 3, marginBottom: 10 },
-  stockCountSummaryRow: { flexDirection: 'row', gap: 7 },
-  stockCountSummaryItem: { flex: 1, padding: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  stockCountValue: { color: COLORS.gold, fontSize: FONT_SIZES.bodySmall, fontWeight: '700' },
-  stockCountLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 11, marginTop: 2 },
-  stockCountPreview: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 11, marginTop: -6, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  stockCountPreviewTitle: { color: COLORS.bone, fontSize: FONT_SIZES.caption, fontWeight: '600' },
-  stockCountPreviewHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
   swipeOrderHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm, paddingHorizontal: 2 },
   swipeOrderHintText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, flex: 1 },
   ordersManagement: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
@@ -3405,9 +3065,6 @@ const styles = StyleSheet.create({
   perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
   catalogThumb: { width: 84, minHeight: 126, backgroundColor: COLORS.surface },
   catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
-  imagePreview: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginTop: -6, marginBottom: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  imagePreviewPhoto: { width: 64, height: 64, borderRadius: 8, backgroundColor: COLORS.surface },
-  imagePreviewText: { color: COLORS.muted, fontSize: FONT_SIZES.label },
   orderChoiceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: SPACING.md, paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border },
   orderChoiceLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.8, marginBottom: 3 },
   orderChoiceValue: { color: COLORS.gold, fontSize: FONT_SIZES.bodyLarge, fontWeight: '600' },

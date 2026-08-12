@@ -25,10 +25,23 @@ async function mockAdminApi(page: Page) {
     if (path === '/api/admin/pedidos/reset-version') return json({ version: 1 });
     if (path === '/api/auth/login') return json({ ok: true, token: 'sessao-e2e' });
     if (path === '/api/auth/step-up') return json({ ok: true, token: 'stepup-e2e', expiresInSeconds: 300 });
-    if (path === '/api/perfumes') return json([
+    if (path === '/api/perfumes' && request.method() === 'GET') return json([
       { id: 'perfume-a', seq: 1, nome: 'Âmbar Noturno', prontaEntrega: true, precos: [] },
       { id: 'perfume-b', seq: 2, nome: 'Brisa Dourada', prontaEntrega: false, precos: [] },
     ]);
+    if (path === '/api/perfumes' && request.method() === 'POST') {
+      return json({ id: 'perfume-novo', seq: 3, ...request.postDataJSON() }, 201);
+    }
+    if (path === '/api/estoque/resumo') return json({
+      'perfume-a': { saldoAtualMl: 150, reservadoMl: 30, disponivelMl: 120 },
+      'perfume-b': { saldoAtualMl: 0, reservadoMl: 0, disponivelMl: 0 },
+    });
+    if (path === '/api/movimentos' && request.method() === 'POST') {
+      return json({ id: 'movimento-novo', origem: 'manual', data: '2026-08-11T12:00:00Z', ...request.postDataJSON() }, 201);
+    }
+    if (path === '/api/estoque/conferir' && request.method() === 'POST') {
+      return json({ alterado: true, saldoAnteriorMl: 150, saldoAtualMl: 180, diferencaMl: 30, movimento: null });
+    }
     if (path === '/api/pedidos' && request.method() === 'GET') return json([{
       id: 'pedido-e2e',
       seq: 42,
@@ -171,4 +184,34 @@ test('move pedido pelo Kanban mantendo a transição esperada', async ({ page })
   await page.getByTestId('kanban-pedido-pedido-e2e-avancar').click();
   const request = await moveRequest;
   expect(request.postDataJSON().status).toBe('pagamento_confirmado');
+});
+
+
+test('mantém cadastro, movimentação e conferência de estoque funcionais', async ({ page }) => {
+  await mockAdminApi(page);
+  await openAdminSystem(page);
+
+  await page.getByTestId('tab-catalogo').click();
+  await page.getByTestId('fab-add').click();
+  await page.getByTestId('perfume-nome').fill('Novo Perfume E2E');
+  const createRequest = page.waitForRequest((request) => request.url().endsWith('/api/perfumes') && request.method() === 'POST');
+  await page.getByTestId('perfume-save').click();
+  expect((await createRequest).postDataJSON().nome).toBe('Novo Perfume E2E');
+
+  await page.getByTestId('tab-estoque').click();
+  await page.getByTestId('fab-add').click();
+  await page.getByTestId('mov-qtd').fill('125');
+  const movementRequest = page.waitForRequest((request) => request.url().endsWith('/api/movimentos') && request.method() === 'POST');
+  await page.getByTestId('mov-save').click();
+  expect((await movementRequest).postDataJSON().quantidadeMl).toBe(125);
+
+  await page.getByText('Conferir quantidade física').first().click();
+  await page.getByTestId('stock-count-quantity').fill('180');
+  const countRequest = page.waitForRequest((request) => request.url().endsWith('/api/estoque/conferir') && request.method() === 'POST');
+  await page.getByTestId('stock-count-save').click();
+  expect((await countRequest).postDataJSON()).toMatchObject({
+    perfumeId: 'perfume-a',
+    quantidadeFisicaMl: 180,
+    saldoEsperadoMl: 150,
+  });
 });
