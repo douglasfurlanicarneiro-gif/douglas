@@ -53,6 +53,13 @@ async function mockAdminApi(page: Page) {
       subtotalTabela: 50,
       ajusteManual: 0,
       total: 50,
+      pagamento: {
+        status: 'pago',
+        metodo: 'cartao',
+        provedor: 'infinitepay',
+        transactionNsu: 'e2e-42',
+        historico: [],
+      },
       criadoEm: '2026-08-11T12:00:00Z',
     }]);
     if (path === '/api/pedidos/pedido-e2e' && request.method() === 'PUT') {
@@ -61,6 +68,27 @@ async function mockAdminApi(page: Page) {
         seq: 42,
         criadoEm: '2026-08-11T12:00:00Z',
         ...request.postDataJSON(),
+      });
+    }
+    if (path === '/api/pagamentos/pedidos/pedido-e2e/operacoes' && request.method() === 'POST') {
+      return json({
+        id: 'pedido-e2e',
+        seq: 42,
+        cliente: 'Cliente Kanban',
+        contato: '11999999999',
+        status: 'pendente',
+        observacoes: '',
+        itens: [{ perfumeId: 'perfume-a', nome: 'Âmbar Noturno', ml: 30, quantidade: 1, precoUnitario: 50 }],
+        subtotalTabela: 50,
+        ajusteManual: 0,
+        total: 50,
+        pagamento: {
+          status: 'estorno_solicitado',
+          metodo: 'cartao',
+          provedor: 'infinitepay',
+          historico: [{ ...request.postDataJSON(), criadoEm: '2026-08-11T12:10:00Z' }],
+        },
+        criadoEm: '2026-08-11T12:00:00Z',
       });
     }
     if (path === '/api/admin/catalogo-estoque/disponibilidade' && request.method() === 'PUT') {
@@ -184,6 +212,56 @@ test('move pedido pelo Kanban mantendo a transição esperada', async ({ page })
   await page.getByTestId('kanban-pedido-pedido-e2e-avancar').click();
   const request = await moveRequest;
   expect(request.postDataJSON().status).toBe('pagamento_confirmado');
+});
+
+
+test('edita pedido preservando cálculo e valor final negociado', async ({ page }) => {
+  await mockAdminApi(page);
+  await openAdminSystem(page);
+
+  await page.getByTestId('tab-pedidos').click();
+  await page.getByTestId('kanban-pedido-pedido-e2e').getByText('Detalhes').click();
+  await expect(page.getByTestId('pedido-cliente')).toHaveValue('Cliente Kanban');
+  await page.getByTestId('pedido-cliente').fill('Cliente Atualizado');
+  await page.getByTestId('pedido-valor-final').fill('45,00');
+
+  const saveRequest = page.waitForRequest((request) => (
+    request.url().endsWith('/api/pedidos/pedido-e2e')
+    && request.method() === 'PUT'
+  ));
+  await page.getByTestId('pedido-save').click();
+  const payload = (await saveRequest).postDataJSON();
+  expect(payload).toMatchObject({
+    cliente: 'Cliente Atualizado',
+    subtotalTabela: 50,
+    ajusteManual: -5,
+    total: 45,
+  });
+  expect(payload.itens[0]).toMatchObject({ precoUnitario: 50, subtotal: 50 });
+});
+
+
+test('registra solicitação de estorno com motivo auditável', async ({ page }) => {
+  await mockAdminApi(page);
+  await openAdminSystem(page);
+
+  await page.getByTestId('tab-pedidos').click();
+  await page.getByTestId('kanban-pedido-pedido-e2e').getByText('Detalhes').click();
+  await page.getByTestId('manage-payment').click();
+  await page.getByPlaceholder('Ex.: cliente solicitou cancelamento').fill('Cliente desistiu da compra');
+
+  const operationRequest = page.waitForRequest((request) => (
+    request.url().endsWith('/api/pagamentos/pedidos/pedido-e2e/operacoes')
+    && request.method() === 'POST'
+  ));
+  await page.getByTestId('payment-operation-save').click();
+  const payload = (await operationRequest).postDataJSON();
+  expect(payload).toEqual({
+    operacao: 'solicitar_estorno',
+    motivo: 'Cliente desistiu da compra',
+    referencia: '',
+  });
+  await expect(page.getByText(/Situação financeira registrada: Estorno solicitado/)).toBeVisible();
 });
 
 
