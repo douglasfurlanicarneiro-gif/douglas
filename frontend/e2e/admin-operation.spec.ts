@@ -99,6 +99,33 @@ async function mockAdminApi(page: Page) {
         naoEncontrados: [],
       });
     }
+    if (path === '/api/admin/metricas') return json({
+      periodo: url.searchParams.get('periodo') || '30d',
+      pedidosTotal: 1,
+      pedidosValidos: 1,
+      pedidosPagos: 1,
+      pedidosPendentes: 0,
+      pedidosCancelados: 0,
+      pedidosEstornados: 0,
+      chargebacks: 0,
+      pedidosPorStatus: { pendente: 1 },
+      faturamento: 50,
+      receitaConfirmada: 50,
+      receitaEntregue: 0,
+      aReceber: 0,
+      valorEstornado: 0,
+      valorChargeback: 0,
+      receitaEmRisco: 0,
+      ticketMedio: 50,
+      custoEstimado: 20,
+      lucroEstimado: 30,
+      margemEstimada: 60,
+      mlVendidos: 30,
+      tamanhoMaisVendido: { ml: 30, quantidade: 1, faturamento: 50 },
+      serieDiaria: [{ data: '2026-08-11', receita: 50, lucro: 30, pedidos: 1, ml: 30 }],
+      maisVendidos: [{ perfumeId: 'perfume-a', nome: 'Âmbar Noturno', quantidade: 1, ml: 30, faturamento: 50, lucroEstimado: 30 }],
+      maisLucrativos: [{ perfumeId: 'perfume-a', nome: 'Âmbar Noturno', quantidade: 1, ml: 30, faturamento: 50, lucroEstimado: 30 }],
+    });
     if (path === '/api/admin/operacao/resumo') return json({
       status: 'atencao',
       pagamentosFalhos: 1,
@@ -195,6 +222,28 @@ test('gerencia a disponibilidade e revisa antes de salvar', async ({ page }) => 
   const request = await saveRequest;
   expect(request.postDataJSON()).toEqual({ ids: ['perfume-a', 'perfume-b'] });
   await expect(page.getByText(/Disponibilidade salva: 2 em pronta entrega/)).toBeVisible();
+});
+
+
+test('mantém dashboard e catálogo navegáveis após a modularização', async ({ page }) => {
+  await mockAdminApi(page);
+  await openAdminSystem(page);
+
+  await page.getByTestId('tab-dashboard').click();
+  await expect(page.getByText('Receita confirmada')).toBeVisible();
+  await expect(page.getByText('R$ 50,00').first()).toBeVisible();
+  await expect(page.getByTestId('dashboard-order-pedido-e2e')).toBeVisible();
+
+  const periodRequest = page.waitForRequest((request) => request.url().includes('/api/admin/metricas?periodo=todos'));
+  await page.getByText('Tudo', { exact: true }).click();
+  await periodRequest;
+
+  await page.getByTestId('tab-catalogo').click();
+  await page.getByTestId('catalogo-search').fill('Brisa');
+  await expect(page.getByTestId('perfume-card-perfume-a')).toHaveCount(0);
+  await expect(page.getByTestId('perfume-card-perfume-b')).toBeVisible();
+  await page.getByTestId('edit-perfume-b').click();
+  await expect(page.getByTestId('perfume-nome')).toHaveValue('Brisa Dourada');
 });
 
 

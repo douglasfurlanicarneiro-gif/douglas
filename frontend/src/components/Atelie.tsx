@@ -5,7 +5,7 @@ import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import {
   COLORS, SPACING, RADIUS, STATUS, FONT_SIZES,
-  brl, familiasDoPerfume, fmtDate, nomeConcentracao, padSeq,
+  brl, fmtDate, padSeq,
 } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { AccessiblePressable as Pressable } from './AccessiblePressable';
@@ -57,8 +57,11 @@ import {
   PedidoForm,
   type PedidoSaveData,
 } from './AdminOrderForms';
-
-type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+import {
+  AdminCatalog,
+  AdminDashboard,
+  type MetricPeriod,
+} from './AdminDashboardCatalog';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'payment-operation'; data: Pedido }
@@ -123,16 +126,6 @@ function currentCatalogPrices(perfumes: Perfume[]) {
   return result;
 }
 
-function StatCard({ label, value, icon, alert }: { label: string; value: string | number; icon: FeatherIconName; alert?: boolean }) {
-  return (
-    <View style={[styles.statCard, alert && { borderColor: COLORS.rust }]}>
-      <Feather name={icon} size={16} color={alert ? COLORS.rust : COLORS.gold} />
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-
 export function Atelie({
   onSair,
   onStoreConfigChange,
@@ -164,7 +157,7 @@ export function Atelie({
   const [search, setSearch] = useState('');
   const [stockSearch, setStockSearch] = useState('');
   const [metricas, setMetricas] = useState<Metricas | null>(null);
-  const [metricPeriod, setMetricPeriod] = useState<'7d' | '30d' | 'mes' | 'todos'>('30d');
+  const [metricPeriod, setMetricPeriod] = useState<MetricPeriod>('30d');
   const [freteConfig, setFreteConfig] = useState<ConfiguracaoFrete | null>(null);
   const [freteFeeInput, setFreteFeeInput] = useState('0,00');
   const [freteCepInput, setFreteCepInput] = useState('');
@@ -911,7 +904,6 @@ export function Atelie({
     }
   };
 
-  const perfumesFiltrados = perfumes.filter((p) => p.nome.toLowerCase().includes(search.toLowerCase()));
   const perfumesEstoqueFiltrados = useMemo(() => {
     const termo = stockSearch.trim().toLocaleLowerCase('pt-BR');
     if (!termo) return perfumes;
@@ -945,213 +937,39 @@ export function Atelie({
 
     if (tab === 'dashboard') {
       return (
-        <View style={{ padding: SPACING.lg }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SPACING.lg }}>
-            <View style={{ width: '48%' }}><StatCard label="Contratipos" value={perfumes.length} icon="droplet" /></View>
-            <View style={{ width: '48%' }}><StatCard label="Estoque baixo" value={estoqueBaixo} icon="alert-triangle" /></View>
-            <View style={{ width: '48%' }}><StatCard label="Aguardando pagamento" value={pendentes} icon="clipboard" /></View>
-            <View style={{ width: '48%' }}><StatCard label="Nota média" value={notaMedia} icon="star" /></View>
-          </View>
-          {metricas && (
-            <View style={styles.metricsPanel}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.sm, flexWrap: 'wrap' }}>
-                <Text style={styles.sectionLabel}>VISÃO DO NEGÓCIO</Text>
-                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                  {([['7d', '7 dias'], ['30d', '30 dias'], ['mes', 'Este mês'], ['todos', 'Tudo']] as const).map(([id, label]) => (
-                    <Pressable key={id} onPress={() => void changeMetricPeriod(id)} style={[styles.miniChip, metricPeriod === id && { backgroundColor: COLORS.gold, borderColor: COLORS.gold }]}>
-                      <Text style={{ color: metricPeriod === id ? COLORS.ink : COLORS.muted, fontSize: FONT_SIZES.caption }}>{label}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              </View>
-              <View style={styles.metricsRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.metricLabel}>Receita confirmada</Text>
-                  <Text style={styles.metricValue}>{brl(metricas.receitaConfirmada)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.metricLabel}>Lucro estimado</Text>
-                  <Text style={[styles.metricValue, { color: metricas.lucroEstimado >= 0 ? COLORS.sage : COLORS.rust }]}>{brl(metricas.lucroEstimado)}</Text>
-                </View>
-              </View>
-              <View style={[styles.metricsRow, { marginTop: SPACING.md }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.metricLabel}>Ticket médio</Text>
-                  <Text style={styles.metricValue}>{brl(metricas.ticketMedio)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.metricLabel}>Margem estimada</Text>
-                  <Text style={styles.metricValue}>{metricas.margemEstimada.toFixed(1)}%</Text>
-                </View>
-              </View>
-              <View style={[styles.metricsRow, { marginTop: SPACING.md }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.metricLabel}>A receber</Text>
-                  <Text style={styles.metricValue}>{brl(metricas.aReceber)}</Text>
-                  <Text style={styles.metricSubtle}>{metricas.pedidosPendentes} pendente(s)</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.metricLabel}>Volume vendido</Text>
-                  <Text style={styles.metricValue}>{metricas.mlVendidos.toLocaleString('pt-BR')} ml</Text>
-                  <Text style={styles.metricSubtle}>{metricas.pedidosPagos} pedido(s) pago(s)</Text>
-                </View>
-              </View>
-              {(metricas.receitaEmRisco > 0 || metricas.valorEstornado > 0 || metricas.valorChargeback > 0) && (
-                <View style={styles.financialAttentionCard}>
-                  <Feather name="alert-circle" size={17} color={COLORS.rust} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.financialAttentionTitle}>Atenção financeira</Text>
-                    <Text style={styles.financialAttentionText}>
-                      Em análise {brl(metricas.receitaEmRisco)} · estornado {brl(metricas.valorEstornado)} · chargeback {brl(metricas.valorChargeback)}
-                    </Text>
-                  </View>
-                </View>
-              )}
-              {metricas.serieDiaria?.length > 0 && (() => {
-                const dias = metricas.serieDiaria.slice(-14);
-                const maxReceita = Math.max(1, ...dias.map((dia) => dia.receita));
-                return (
-                  <>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: SPACING.lg }}>
-                      <Text style={styles.metricLabel}>RECEITA DIÁRIA</Text>
-                      {!!metricas.tamanhoMaisVendido && (
-                        <Text style={styles.metricSubtle}>Tamanho líder: {metricas.tamanhoMaisVendido.ml}ml · {metricas.tamanhoMaisVendido.quantidade} un.</Text>
-                      )}
-                    </View>
-                    <View style={styles.metricChart}>
-                      {dias.map((dia, index) => (
-                        <View key={dia.data} style={styles.metricChartColumn}>
-                          <View style={[styles.metricChartBar, { height: Math.max(3, Math.round((dia.receita / maxReceita) * 72)) }]} />
-                          {(index === 0 || index === dias.length - 1) && (
-                            <Text style={styles.metricChartLabel}>{dia.data.slice(5).replace('-', '/')}</Text>
-                          )}
-                        </View>
-                      ))}
-                    </View>
-                  </>
-                );
-              })()}
-              {metricas.maisVendidos.length > 0 && (
-                <>
-                  <Text style={[styles.metricLabel, { marginTop: SPACING.lg }]}>MAIS VENDIDOS · POR VOLUME</Text>
-                  {metricas.maisVendidos.slice(0, 5).map((item, index) => (
-                    <View key={`${item.perfumeId}-${index}`} style={styles.rankingRow}>
-                      <Text style={styles.rankingNumber}>{index + 1}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.rankingName} numberOfLines={1}>{item.nome}</Text>
-                        <Text style={styles.metricSubtle}>{item.ml.toLocaleString('pt-BR')} ml · {brl(item.faturamento)}</Text>
-                      </View>
-                      <Text style={styles.rankingQty}>{item.quantidade} un.</Text>
-                    </View>
-                  ))}
-                </>
-              )}
-              {metricas.maisLucrativos?.length > 0 && (
-                <>
-                  <Text style={[styles.metricLabel, { marginTop: SPACING.lg }]}>MAIOR LUCRO ESTIMADO</Text>
-                  {metricas.maisLucrativos.slice(0, 3).map((item, index) => (
-                    <View key={`lucro-${item.perfumeId}-${index}`} style={styles.rankingRow}>
-                      <Text style={styles.rankingNumber}>{index + 1}</Text>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.rankingName} numberOfLines={1}>{item.nome}</Text>
-                        <Text style={styles.metricSubtle}>{brl(item.faturamento)} em vendas</Text>
-                      </View>
-                      <Text style={[styles.rankingQty, { color: item.lucroEstimado >= 0 ? COLORS.sage : COLORS.rust }]}>{brl(item.lucroEstimado)}</Text>
-                    </View>
-                  ))}
-                </>
-              )}
-            </View>
-          )}
-          <Text style={styles.sectionLabel}>ÚLTIMOS PEDIDOS</Text>
-          {pedidosUnificados.length === 0 && <EmptyState text="Nenhum pedido recebido ainda." />}
-          {[...pedidosUnificados].sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()).slice(0, 5).map((p) => {
-            const st = STATUS.find((s) => s.id === p.status) || STATUS[0];
-            return (
-              <Pressable key={`${p.fonte}-${p.id}`} onPress={() => abrirPedido(p)} style={styles.rowCard}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View>
-                    <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(p.seq)}</Text>
-                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p.cliente}</Text>
-                  </View>
-                  <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: FONT_SIZES.caption }}>{st.label}</Text></View>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                  <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
-                  <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>{brl(p.total)}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
+        <AdminDashboard
+          perfumeCount={perfumes.length}
+          estoqueBaixo={estoqueBaixo}
+          pendentes={pendentes}
+          notaMedia={notaMedia}
+          metricas={metricas}
+          metricPeriod={metricPeriod}
+          onMetricPeriodChange={changeMetricPeriod}
+          pedidos={pedidosUnificados}
+          onOpenPedido={abrirPedido}
+        />
       );
     }
 
     if (tab === 'catalogo') {
       return (
-        <View style={{ padding: SPACING.lg }}>
-          <View style={styles.searchBox}>
-            <Feather name="search" size={16} color={COLORS.muted} />
-            <TextInput value={search} onChangeText={setSearch} placeholder="Buscar" placeholderTextColor={COLORS.muted + 'BB'} style={styles.searchInput} testID="catalogo-search" />
-          </View>
-          {perfumesFiltrados.length === 0 && <EmptyState text="Nenhum contratipo. Toque em + para começar." />}
-          {perfumesFiltrados.map((p) => {
-            const resumo = resumoDe(p.id);
-            const baixo = resumo.disponivelMl <= (p.estoqueMinimoMl || 0);
-            return (
-              <View key={p.id} style={styles.perfumeCard} testID={`perfume-card-${p.id}`}>
-                {p.imagemUrl ? (
-                  <Image source={{ uri: p.imagemUrl }} style={styles.catalogThumb} contentFit="cover" transition={150} />
-                ) : (
-                  <View style={styles.catalogThumbPlaceholder}><Feather name="image" size={20} color={COLORS.muted} /></View>
-                )}
-                <View style={{ flex: 1, padding: SPACING.md }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(p.seq)}</Text>
-                      <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p.nome}</Text>
-                      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>
-                        {(p.ocasioes || []).length ? (p.ocasioes || []).join(' · ') : 'Clima & ocasião não informados'}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 12 }}>
-                      <Pressable onPress={() => setSheet({ type: 'perfume', data: p })} hitSlop={8} testID={`edit-${p.id}`} accessibilityLabel={`Editar ${p.nome}`}><Feather name="edit-2" size={16} color={COLORS.muted} /></Pressable>
-                      <Pressable onPress={() => setSheet({ type: 'confirm', label: `Arquivar "${p.nome}"? Ele sairá da vitrine, mas o histórico será preservado.`, onConfirm: () => doDeletePerfume(p.id), danger: true, confirmLabel: 'Arquivar perfume', safetyText: 'O perfume poderá ser restaurado e seus pedidos e movimentos de estoque não serão apagados.' })} hitSlop={8} testID={`archive-${p.id}`} accessibilityLabel={`Arquivar ${p.nome}`}><Feather name="archive" size={16} color={COLORS.muted} /></Pressable>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
-                    <View style={styles.tag}><Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>{familiasDoPerfume(p).join(' · ')}</Text></View>
-                    <View style={styles.tag}><Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>{nomeConcentracao(p.concentracao)}</Text></View>
-                    <View style={styles.tag}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.prontaEntrega ? COLORS.sage : COLORS.gold }} />
-                        <Text style={{ color: p.prontaEntrega ? COLORS.sage : COLORS.gold, fontSize: FONT_SIZES.caption }}>
-                          {p.prontaEntrega ? 'Pronta entrega' : 'Sob encomenda'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
-                    {p.precos.map((pr, i) => (
-                      <Text key={i} style={{ color: COLORS.bone, fontSize: FONT_SIZES.caption }}>{pr.ml}ml · {brl(pr.preco)}</Text>
-                    ))}
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-                    {baixo && <Feather name="alert-triangle" size={11} color={COLORS.rust} />}
-                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: FONT_SIZES.caption }}>
-                      {resumo.disponivelMl}ml disponíveis
-                      {resumo.reservadoMl > 0 ? ` · ${resumo.reservadoMl}ml reservados` : ''}
-                      {baixo ? ' · baixo' : ''}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            );
+        <AdminCatalog
+          perfumes={perfumes}
+          search={search}
+          onSearchChange={setSearch}
+          estoqueDe={resumoDe}
+          onEdit={(perfume) => setSheet({ type: 'perfume', data: perfume })}
+          onArchive={(perfume) => setSheet({
+            type: 'confirm',
+            label: `Arquivar "${perfume.nome}"? Ele sairá da vitrine, mas o histórico será preservado.`,
+            onConfirm: () => doDeletePerfume(perfume.id),
+            danger: true,
+            confirmLabel: 'Arquivar perfume',
+            safetyText: 'O perfume poderá ser restaurado e seus pedidos e movimentos de estoque não serão apagados.',
           })}
-        </View>
+        />
       );
     }
-
     if (tab === 'estoque') {
       return (
         <View style={{ padding: SPACING.lg }}>
@@ -2283,22 +2101,6 @@ const styles = StyleSheet.create({
   pullRefreshText: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
   topbar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.lg, paddingTop: SPACING.md, paddingBottom: SPACING.md },
   topBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 999, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  statCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg },
-  statValue: { color: COLORS.bone, fontSize: FONT_SIZES.display, fontWeight: '500', marginTop: 6 },
-  statLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
-  metricsPanel: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
-  metricsRow: { flexDirection: 'row', gap: 12 },
-  metricLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.6 },
-  metricValue: { color: COLORS.bone, fontSize: FONT_SIZES.heading, fontWeight: '600', marginTop: 3 },
-  metricSubtle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
-  metricChart: { height: 96, flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginTop: SPACING.sm, paddingTop: SPACING.xs, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  metricChartColumn: { flex: 1, minWidth: 4, height: 92, justifyContent: 'flex-end', alignItems: 'center' },
-  metricChartBar: { width: '72%', minWidth: 3, maxWidth: 18, borderTopLeftRadius: 3, borderTopRightRadius: 3, backgroundColor: COLORS.gold },
-  metricChartLabel: { color: COLORS.muted, fontSize: FONT_SIZES.micro, marginTop: 3, position: 'absolute', bottom: -13, width: 42, textAlign: 'center' },
-  rankingRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  rankingNumber: { color: COLORS.gold, width: 22, fontSize: FONT_SIZES.label, fontWeight: '700' },
-  rankingName: { color: COLORS.bone, flex: 1, fontSize: FONT_SIZES.label },
-  rankingQty: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
   shippingPanel: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.lg },
   shippingHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   shippingTitle: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '600', marginTop: -4 },
@@ -2431,14 +2233,7 @@ const styles = StyleSheet.create({
   cancelledOrders: { marginTop: SPACING.lg },
   cancelledOrderCard: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, marginBottom: 7, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '55', backgroundColor: COLORS.surface },
   cancelledOrderCustomer: { color: COLORS.muted, fontSize: FONT_SIZES.label, marginTop: 3 },
-  perfumeCard: { flexDirection: 'row', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm, overflow: 'hidden' },
-  catalogThumb: { width: 84, minHeight: 126, backgroundColor: COLORS.surface },
-  catalogThumbPlaceholder: { width: 84, minHeight: 126, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center' },
-  financialAttentionCard: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SPACING.md, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surfaceRaised },
-  financialAttentionTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
-  financialAttentionText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.surface },
-  tag: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, marginBottom: SPACING.sm },
   searchInput: { flex: 1, color: COLORS.bone, paddingVertical: 10, fontSize: FONT_SIZES.body },
