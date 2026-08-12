@@ -5,11 +5,11 @@ import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
 import {
   COLORS, SPACING, RADIUS, STATUS, FONT_SIZES,
-  brl, fmtDate, padSeq,
+  fmtDate, padSeq,
 } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { AccessiblePressable as Pressable } from './AccessiblePressable';
-import { AppText as Text, AppTextInput as TextInput } from './Typography';
+import { AppText as Text } from './Typography';
 import { Field, TInput, PrimaryButton, SecondaryButton, EmptyState, Stars } from './atoms';
 import {
   listPerfumes, createPerfume, updatePerfume, deletePerfume, bulkImport, padronizarTamanhos,
@@ -39,9 +39,6 @@ import {
 } from './AdminSystemComponents';
 import { AdminAvailabilityManager } from './AdminAvailabilityManager';
 import {
-  ADMIN_KANBAN_FLOW as KANBAN_FLOW,
-  KanbanPedidoCard,
-  SwipeablePedidoCard,
   type AdminPedido as PedidoPainel,
 } from './AdminOrderCards';
 import {
@@ -63,6 +60,10 @@ import {
   type MetricPeriod,
 } from './AdminDashboardCatalog';
 import { AdminStockView } from './AdminStockView';
+import {
+  AdminOrdersView,
+  type AdminOrdersLayout,
+} from './AdminOrdersView';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'payment-operation'; data: Pedido }
@@ -185,7 +186,7 @@ export function Atelie({
     cnpj: '',
     margemLucro: 0,
   });
-  const [orderView, setOrderView] = useState<'kanban' | 'lista'>('kanban');
+  const [orderView, setOrderView] = useState<AdminOrdersLayout>('kanban');
   const [orderSearch, setOrderSearch] = useState('');
   const [movingOrderId, setMovingOrderId] = useState<string | null>(null);
   const kanbanColumnWidth = Math.min(310, Math.max(260, width - 56));
@@ -484,26 +485,6 @@ export function Atelie({
     }));
     return [...atuais, ...legados];
   }, [compras, pedidos]);
-
-  const pedidosFiltrados = useMemo(() => {
-    const termo = orderSearch.trim().toLocaleLowerCase('pt-BR');
-    const ordenados = [...pedidosUnificados].sort(
-      (a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime(),
-    );
-    if (!termo) return ordenados;
-    return ordenados.filter((pedido) => {
-      const nomesItens = (pedido.itens || [])
-        .map((item) => perfumes.find((perfume) => perfume.id === item.perfumeId)?.nome || item.perfumeNome || '')
-        .join(' ');
-      return [
-        pedido.cliente,
-        pedido.contato,
-        pedido.observacoes,
-        String(pedido.seq),
-        nomesItens,
-      ].some((valor) => valor.toLocaleLowerCase('pt-BR').includes(termo));
-    });
-  }, [orderSearch, pedidosUnificados, perfumes]);
 
   const resumoDe = (id: string) => estoqueResumo[id] || {
     saldoAtualMl: 0,
@@ -967,152 +948,26 @@ export function Atelie({
     }
     if (tab === 'pedidos') {
       return (
-        <View style={{ padding: SPACING.lg }}>
-          <View style={styles.orderToolbar}>
-            <View style={styles.orderViewToggle}>
-              {([
-                { id: 'kanban', label: 'Etapas', icon: 'columns' },
-                { id: 'lista', label: 'Lista', icon: 'list' },
-              ] as const).map((view) => {
-                const active = orderView === view.id;
-                return (
-                  <Pressable
-                    key={view.id}
-                    onPress={() => setOrderView(view.id)}
-                    style={[styles.orderViewButton, active && styles.orderViewButtonActive]}
-                    accessibilityRole="button"
-                    testID={`orders-view-${view.id}`}
-                  >
-                    <Feather name={view.icon} size={13} color={active ? COLORS.ink : COLORS.muted} />
-                    <Text style={[styles.orderViewText, active && { color: COLORS.ink }]}>{view.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <View style={styles.orderSearchBox}>
-              <Feather name="search" size={14} color={COLORS.muted} />
-              <TextInput
-                value={orderSearch}
-                onChangeText={setOrderSearch}
-                placeholder="Buscar pedido, cliente ou contato"
-                placeholderTextColor={COLORS.muted}
-                style={styles.orderSearchInput}
-                testID="orders-search"
-              />
-              {!!orderSearch && (
-                <Pressable onPress={() => setOrderSearch('')} hitSlop={8} accessibilityLabel="Limpar busca de pedidos">
-                  <Feather name="x" size={14} color={COLORS.muted} />
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          {pedidosFiltrados.length === 0 && (
-            <EmptyState text={orderSearch ? 'Nenhum pedido encontrado para esta busca.' : 'Nenhum pedido recebido ainda.'} />
-          )}
-
-          {pedidosFiltrados.length > 0 && orderView === 'kanban' && (
-            <>
-              <View style={styles.kanbanHint}>
-                <Feather name="move" size={14} color={COLORS.gold} />
-                <Text style={styles.kanbanHintText}>Arraste o cartão para os lados ou use as setas para mudar a etapa.</Text>
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled
-                contentContainerStyle={styles.kanbanBoard}
-              >
-                {KANBAN_FLOW.map((statusId) => {
-                  const status = STATUS.find((item) => item.id === statusId) || STATUS[0];
-                  const pedidosDaEtapa = pedidosFiltrados.filter((pedido) => pedido.status === statusId);
-                  return (
-                    <View key={statusId} style={[styles.kanbanColumn, { width: kanbanColumnWidth }]}>
-                      <View style={styles.kanbanColumnHeader}>
-                        <View style={styles.kanbanColumnTitleRow}>
-                          <View style={[styles.kanbanStatusDot, { backgroundColor: status.color }]} />
-                          <Text style={styles.kanbanColumnTitle}>{status.label}</Text>
-                        </View>
-                        <View style={styles.kanbanCount}>
-                          <Text style={styles.kanbanCountText}>{pedidosDaEtapa.length}</Text>
-                        </View>
-                      </View>
-                      {pedidosDaEtapa.length === 0 ? (
-                        <View style={styles.kanbanEmpty}>
-                          <Text style={styles.kanbanEmptyText}>Nenhum pedido nesta etapa</Text>
-                        </View>
-                      ) : pedidosDaEtapa.map((pedido) => (
-                        <KanbanPedidoCard
-                          key={`${pedido.fonte}-${pedido.id}`}
-                          pedido={pedido}
-                          onOpen={() => abrirPedido(pedido)}
-                          onMove={(novoStatus) => moverPedido(pedido, novoStatus)}
-                          moving={movingOrderId === pedido.id}
-                        />
-                      ))}
-                    </View>
-                  );
-                })}
-              </ScrollView>
-              {pedidosFiltrados.some((pedido) => pedido.status === 'cancelado') && (
-                <View style={styles.cancelledOrders}>
-                  <Text style={styles.sectionLabel}>CANCELADOS</Text>
-                  {pedidosFiltrados.filter((pedido) => pedido.status === 'cancelado').map((pedido) => (
-                    <Pressable
-                      key={`${pedido.fonte}-${pedido.id}`}
-                      onPress={() => abrirPedido(pedido)}
-                      style={styles.cancelledOrderCard}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.kanbanOrderNumber}>Nº {padSeq(pedido.seq)}</Text>
-                        <Text style={styles.cancelledOrderCustomer}>{pedido.cliente}</Text>
-                      </View>
-                      <Text style={styles.kanbanOrderDate}>{fmtDate(pedido.criadoEm)}</Text>
-                      <Feather name="chevron-right" size={15} color={COLORS.muted} />
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </>
-          )}
-
-          {pedidosFiltrados.length > 0 && orderView === 'lista' && (
-            <>
-              <View style={styles.swipeOrderHint}>
-                <Feather name="chevrons-left" size={15} color={COLORS.gold} />
-                <Text style={styles.swipeOrderHintText}>Deslize um pedido para a esquerda para editar; pedidos concluídos ou cancelados também podem ser arquivados.</Text>
-              </View>
-              {pedidosFiltrados.map((p) => {
-                const st = STATUS.find((s) => s.id === p.status) || STATUS[0];
-                return (
-                  <SwipeablePedidoCard
-                    key={`${p.fonte}-${p.id}`}
-                    onEdit={() => abrirPedido(p)}
-                    onDelete={(['cancelado', 'entregue'] as OrderStatus[]).includes(p.status) ? () => setSheet({
-                      type: 'confirm',
-                      label: `Arquivar pedido de ${p.cliente}? O histórico será preservado.`,
-                      onConfirm: () => p.compraLegada ? doDelCompra(p.compraLegada.id) : doDelPedido(p.id),
-                      confirmLabel: 'Arquivar pedido',
-                    }) : undefined}
-                    testID={`pedido-${p.id}`}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <View><Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº {padSeq(p.seq)}</Text><Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodyLarge, fontWeight: '500' }}>{p.cliente}</Text></View>
-                      <View style={[styles.pill, { borderColor: st.color }]}><Text style={{ color: st.color, fontSize: FONT_SIZES.caption }}>{st.label}</Text></View>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
-                      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label }}>{(p.itens || []).length} item(ns) · {fmtDate(p.criadoEm)}</Text>
-                      <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>{brl(p.total)}</Text>
-                    </View>
-                  </SwipeablePedidoCard>
-                );
-              })}
-            </>
-          )}
-        </View>
+        <AdminOrdersView
+          pedidos={pedidosUnificados}
+          perfumes={perfumes}
+          search={orderSearch}
+          onSearchChange={setOrderSearch}
+          layout={orderView}
+          onLayoutChange={setOrderView}
+          columnWidth={kanbanColumnWidth}
+          movingOrderId={movingOrderId}
+          onOpen={abrirPedido}
+          onMove={moverPedido}
+          onArchive={(pedido) => setSheet({
+            type: 'confirm',
+            label: `Arquivar pedido de ${pedido.cliente}? O histórico será preservado.`,
+            onConfirm: () => pedido.compraLegada ? doDelCompra(pedido.compraLegada.id) : doDelPedido(pedido.id),
+            confirmLabel: 'Arquivar pedido',
+          })}
+        />
       );
     }
-
     if (tab === 'opinioes') {
       return (
         <View style={{ padding: SPACING.lg }}>
@@ -2093,37 +1948,11 @@ const styles = StyleSheet.create({
   connectedPillText: { color: COLORS.sage, fontSize: FONT_SIZES.caption, fontWeight: '700', letterSpacing: 0.6 },
   sectionLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
-  swipeOrderHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm, paddingHorizontal: 2 },
-  swipeOrderHintText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, flex: 1 },
   ordersManagement: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
   ordersManagementTitle: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, marginBottom: 3 },
   ordersManagementText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15 },
   resetOrdersButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 38, paddingHorizontal: 11, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.rust + '88', backgroundColor: COLORS.surface },
   resetOrdersText: { color: COLORS.rust, fontSize: FONT_SIZES.caption, fontWeight: '700' },
-  orderToolbar: { marginBottom: SPACING.md, gap: SPACING.sm },
-  orderViewToggle: { flexDirection: 'row', alignSelf: 'flex-start', padding: 3, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  orderViewButton: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 34, paddingHorizontal: 13, borderRadius: RADIUS.pill },
-  orderViewButtonActive: { backgroundColor: COLORS.gold },
-  orderViewText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '600' },
-  orderSearchBox: { flexDirection: 'row', alignItems: 'center', gap: 9, minHeight: 44, paddingHorizontal: 13, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  orderSearchInput: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, paddingVertical: 11 },
-  kanbanHint: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: SPACING.sm, paddingHorizontal: 2 },
-  kanbanHintText: { flex: 1, color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15 },
-  kanbanBoard: { gap: SPACING.sm, paddingBottom: SPACING.sm, paddingRight: SPACING.lg },
-  kanbanColumn: { padding: 10, alignSelf: 'flex-start', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
-  kanbanColumnHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, paddingHorizontal: 2 },
-  kanbanColumnTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1 },
-  kanbanStatusDot: { width: 8, height: 8, borderRadius: 4 },
-  kanbanColumnTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700', letterSpacing: 0.2 },
-  kanbanCount: { minWidth: 24, height: 24, paddingHorizontal: 7, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  kanbanCountText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, fontWeight: '700' },
-  kanbanEmpty: { minHeight: 98, alignItems: 'center', justifyContent: 'center', padding: 12, borderRadius: RADIUS.md, borderWidth: 1, borderStyle: 'dashed', borderColor: COLORS.border, backgroundColor: COLORS.surface },
-  kanbanEmptyText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textAlign: 'center' },
-  kanbanOrderNumber: { color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 0.6, fontWeight: '700' },
-  kanbanOrderDate: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
-  cancelledOrders: { marginTop: SPACING.lg },
-  cancelledOrderCard: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 12, marginBottom: 7, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust + '55', backgroundColor: COLORS.surface },
-  cancelledOrderCustomer: { color: COLORS.muted, fontSize: FONT_SIZES.label, marginTop: 3 },
   pill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, backgroundColor: COLORS.surface },
   miniChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, flexShrink: 0 },
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: 12, marginBottom: SPACING.sm },

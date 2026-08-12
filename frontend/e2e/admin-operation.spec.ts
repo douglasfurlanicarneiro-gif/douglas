@@ -262,6 +262,14 @@ test('move pedido pelo Kanban mantendo a transição esperada', async ({ page })
 
   await page.getByTestId('tab-pedidos').click();
   await expect(page.getByTestId('kanban-pedido-pedido-e2e')).toBeVisible();
+  await page.getByTestId('orders-search').fill('Âmbar');
+  await expect(page.getByTestId('kanban-pedido-pedido-e2e')).toBeVisible();
+  await page.getByTestId('orders-search').fill('não existe');
+  await expect(page.getByText('Nenhum pedido encontrado para esta busca.')).toBeVisible();
+  await page.getByTestId('orders-search-clear').click();
+  await page.getByTestId('orders-view-lista').click();
+  await expect(page.getByTestId('pedido-pedido-e2e')).toBeVisible();
+  await page.getByTestId('orders-view-kanban').click();
 
   const moveRequest = page.waitForRequest((request) => (
     request.url().endsWith('/api/pedidos/pedido-e2e')
