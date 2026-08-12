@@ -36,6 +36,15 @@ async function mockAdminApi(page: Page) {
       'perfume-a': { saldoAtualMl: 150, reservadoMl: 30, disponivelMl: 120 },
       'perfume-b': { saldoAtualMl: 0, reservadoMl: 0, disponivelMl: 0 },
     });
+    if (path === '/api/movimentos' && request.method() === 'GET') return json([{
+      id: 'movimento-e2e',
+      perfumeId: 'perfume-a',
+      tipo: 'entrada',
+      quantidadeMl: 150,
+      motivo: 'Estoque inicial',
+      origem: 'manual',
+      data: '2026-08-11T11:00:00Z',
+    }]);
     if (path === '/api/movimentos' && request.method() === 'POST') {
       return json({ id: 'movimento-novo', origem: 'manual', data: '2026-08-11T12:00:00Z', ...request.postDataJSON() }, 201);
     }
@@ -326,13 +335,20 @@ test('mantém cadastro, movimentação e conferência de estoque funcionais', as
   expect((await createRequest).postDataJSON().nome).toBe('Novo Perfume E2E');
 
   await page.getByTestId('tab-estoque').click();
+  await expect(page.getByPlaceholder('Buscar perfume ou número')).toBeVisible();
+  await expect(page.getByTestId('stock-movement-movimento-e2e')).toBeVisible();
+  await page.getByTestId('estoque-search').fill('002');
+  await expect(page.getByTestId('stock-card-perfume-a')).toHaveCount(0);
+  await expect(page.getByTestId('stock-card-perfume-b')).toBeVisible();
+  await page.getByTestId('estoque-search').fill('Âmbar');
+  await expect(page.getByTestId('stock-card-perfume-a')).toBeVisible();
   await page.getByTestId('fab-add').click();
   await page.getByTestId('mov-qtd').fill('125');
   const movementRequest = page.waitForRequest((request) => request.url().endsWith('/api/movimentos') && request.method() === 'POST');
   await page.getByTestId('mov-save').click();
   expect((await movementRequest).postDataJSON().quantidadeMl).toBe(125);
 
-  await page.getByText('Conferir quantidade física').first().click();
+  await page.getByTestId('stock-count-perfume-a').click();
   await page.getByTestId('stock-count-quantity').fill('180');
   const countRequest = page.waitForRequest((request) => request.url().endsWith('/api/estoque/conferir') && request.method() === 'POST');
   await page.getByTestId('stock-count-save').click();

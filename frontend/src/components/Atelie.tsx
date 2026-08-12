@@ -62,6 +62,7 @@ import {
   AdminDashboard,
   type MetricPeriod,
 } from './AdminDashboardCatalog';
+import { AdminStockView } from './AdminStockView';
 
 type SheetType = null | { type: 'perfume'; data?: Perfume } | { type: 'movimento' } | { type: 'stock-count'; data?: Perfume } | { type: 'pedido'; data?: Pedido }
   | { type: 'payment-operation'; data: Pedido }
@@ -511,13 +512,6 @@ export function Atelie({
   };
   const disponivelDe = (id: string) => resumoDe(id).disponivelMl;
   const estoqueBaixo = perfumes.filter((p) => disponivelDe(p.id) <= (p.estoqueMinimoMl || 0)).length;
-  const totaisEstoque = perfumes.reduce((totais, perfume) => {
-    const resumo = resumoDe(perfume.id);
-    totais.saldo += resumo.saldoAtualMl;
-    totais.reservado += resumo.reservadoMl;
-    totais.disponivel += resumo.disponivelMl;
-    return totais;
-  }, { saldo: 0, reservado: 0, disponivel: 0 });
   const pendentes = pedidosUnificados.filter((p) => p.status === 'pendente').length;
   const opinioesAprovadas = opinioes.filter((opiniao) => opiniao.aprovada === true);
   const notaMedia = opinioesAprovadas.length
@@ -904,17 +898,6 @@ export function Atelie({
     }
   };
 
-  const perfumesEstoqueFiltrados = useMemo(() => {
-    const termo = stockSearch.trim().toLocaleLowerCase('pt-BR');
-    if (!termo) return perfumes;
-    const termoSemZeros = termo.replace(/^0+/, '');
-    return perfumes.filter((perfume) => (
-      perfume.nome.toLocaleLowerCase('pt-BR').includes(termo)
-      || String(perfume.seq).includes(termoSemZeros)
-      || padSeq(perfume.seq).includes(termo)
-    ));
-  }, [perfumes, stockSearch]);
-
   const sheetTitle = !sheet ? '' :
     sheet.type === 'perfume' ? (sheet.data ? 'Editar contratipo' : 'Novo contratipo') :
     sheet.type === 'movimento' ? 'Lançar estoque' :
@@ -972,96 +955,16 @@ export function Atelie({
     }
     if (tab === 'estoque') {
       return (
-        <View style={{ padding: SPACING.lg }}>
-          <View style={styles.stockSummary}>
-            <Text style={styles.sectionLabel}>RESUMO DO ESTOQUE</Text>
-            <View style={styles.stockSummaryGrid}>
-              <View style={styles.stockSummaryItem}>
-                <Text style={styles.stockSummaryValue}>{totaisEstoque.saldo.toLocaleString('pt-BR')}ml</Text>
-                <Text style={styles.stockSummaryLabel}>Saldo físico</Text>
-              </View>
-              <View style={styles.stockSummaryItem}>
-                <Text style={styles.stockSummaryValue}>{totaisEstoque.reservado.toLocaleString('pt-BR')}ml</Text>
-                <Text style={styles.stockSummaryLabel}>Reservado</Text>
-              </View>
-              <View style={styles.stockSummaryItem}>
-                <Text style={[styles.stockSummaryValue, totaisEstoque.disponivel < 0 && { color: COLORS.rust }]}>
-                  {totaisEstoque.disponivel.toLocaleString('pt-BR')}ml
-                </Text>
-                <Text style={styles.stockSummaryLabel}>Disponível</Text>
-              </View>
-            </View>
-            <Text style={styles.stockSummaryHint}>
-              Pedidos pendentes ou com pagamento confirmado ficam reservados. A baixa ocorre quando o pedido entra em preparação.
-            </Text>
-          </View>
-          <View style={styles.searchBox}>
-            <Feather name="search" size={16} color={COLORS.muted} />
-            <TextInput
-              value={stockSearch}
-              onChangeText={setStockSearch}
-              placeholder="Buscar perfume ou nÃºmero"
-              placeholderTextColor={COLORS.muted + 'BB'}
-              style={styles.searchInput}
-              testID="estoque-search"
-            />
-          </View>
-          {perfumes.length === 0 && <EmptyState text="Cadastre um contratipo antes." />}
-          {perfumes.length > 0 && perfumesEstoqueFiltrados.length === 0 && <EmptyState text="Nenhum perfume encontrado no estoque." />}
-          {perfumesEstoqueFiltrados.map((p) => {
-            const resumo = resumoDe(p.id);
-            const baixo = resumo.disponivelMl <= (p.estoqueMinimoMl || 0);
-            const precisaRepor = Math.max(0, -resumo.disponivelMl);
-            return (
-              <View key={p.id} style={styles.rowCard}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption }}>Nº{padSeq(p.seq)}</Text>
-                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }}>{p.nome}</Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ color: baixo ? COLORS.rust : COLORS.sage, fontSize: FONT_SIZES.bodyLarge }}>{resumo.disponivelMl}ml</Text>
-                    <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>disponíveis</Text>
-                  </View>
-                </View>
-                <View style={styles.stockBreakdown}>
-                  <Text style={styles.stockBreakdownText}>Físico: {resumo.saldoAtualMl}ml</Text>
-                  <Text style={styles.stockBreakdownText}>Reservado: {resumo.reservadoMl}ml</Text>
-                </View>
-                {baixo && (
-                  <View style={styles.stockAlertRow}>
-                    <Feather name="alert-triangle" size={12} color={COLORS.rust} />
-                    <Text style={styles.stockAlertText}>
-                      {precisaRepor > 0 ? `Repor ao menos ${precisaRepor}ml para atender as reservas.` : `Abaixo do alerta de ${p.estoqueMinimoMl || 0}ml.`}
-                    </Text>
-                  </View>
-                )}
-                <Pressable onPress={() => setSheet({ type: 'stock-count', data: p })} style={styles.stockCountButton}>
-                  <Feather name="check-square" size={14} color={COLORS.gold} />
-                  <Text style={styles.stockCountButtonText}>Conferir quantidade física</Text>
-                </Pressable>
-              </View>
-            );
-          })}
-          {perfumes.length > 0 && <Text style={[styles.sectionLabel, { marginTop: SPACING.lg }]}>ÚLTIMOS LANÇAMENTOS</Text>}
-          {perfumes.length > 0 && movimentos.length === 0 && <EmptyState text="Nenhum lançamento ainda." />}
-          {[...movimentos].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()).slice(0, 15).map((m) => {
-            const p = perfumes.find((pf) => pf.id === m.perfumeId);
-            return (
-              <View key={m.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: COLORS.border }}>
-                <Feather name={m.tipo === 'entrada' ? 'arrow-up-circle' : 'arrow-down-circle'} size={18} color={m.tipo === 'entrada' ? COLORS.sage : COLORS.rust} />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall }}>{p?.nome || 'Perfume removido'}</Text>
-                  <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption }}>{m.motivo || (m.tipo === 'entrada' ? 'Entrada' : 'Saída')} · {fmtDate(m.data)}</Text>
-                </View>
-                <Text style={{ color: m.tipo === 'entrada' ? COLORS.sage : COLORS.rust, fontSize: FONT_SIZES.bodySmall }}>{m.tipo === 'entrada' ? '+' : '-'}{m.quantidadeMl}ml</Text>
-              </View>
-            );
-          })}
-        </View>
+        <AdminStockView
+          perfumes={perfumes}
+          movimentos={movimentos}
+          estoqueResumo={estoqueResumo}
+          search={stockSearch}
+          onSearchChange={setStockSearch}
+          onCountStock={(perfume) => setSheet({ type: 'stock-count', data: perfume })}
+        />
       );
     }
-
     if (tab === 'pedidos') {
       return (
         <View style={{ padding: SPACING.lg }}>
@@ -2190,18 +2093,6 @@ const styles = StyleSheet.create({
   connectedPillText: { color: COLORS.sage, fontSize: FONT_SIZES.caption, fontWeight: '700', letterSpacing: 0.6 },
   sectionLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginBottom: SPACING.sm, letterSpacing: 1 },
   rowCard: { padding: SPACING.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.sm },
-  stockSummary: { padding: SPACING.md, backgroundColor: COLORS.surfaceRaised, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.lg, marginBottom: SPACING.md },
-  stockSummaryGrid: { flexDirection: 'row', gap: 8 },
-  stockSummaryItem: { flex: 1, padding: 10, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  stockSummaryValue: { color: COLORS.gold, fontSize: FONT_SIZES.bodyLarge, fontWeight: '600' },
-  stockSummaryLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
-  stockSummaryHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginTop: SPACING.sm },
-  stockBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
-  stockBreakdownText: { color: COLORS.muted, fontSize: FONT_SIZES.caption },
-  stockAlertRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7 },
-  stockAlertText: { color: COLORS.rust, fontSize: FONT_SIZES.caption, flex: 1 },
-  stockCountButton: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 9, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surfaceRaised },
-  stockCountButtonText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   swipeOrderHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: SPACING.sm, paddingHorizontal: 2 },
   swipeOrderHintText: { color: COLORS.muted, fontSize: FONT_SIZES.caption, flex: 1 },
   ordersManagement: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceRaised },
