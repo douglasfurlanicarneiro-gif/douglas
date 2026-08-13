@@ -13,6 +13,53 @@ class FakeResponse:
         return self._payload
 
 
+class IntegracoesFalsas:
+    def __init__(self, documento=None):
+        self.documento = documento
+        self.atualizacao = None
+
+    async def find_one(self, _filtro):
+        return self.documento
+
+    async def update_one(self, _filtro, atualizacao, upsert=False):
+        self.atualizacao = atualizacao
+
+
+class BancoIntegracaoFalso:
+    def __init__(self, documento=None):
+        self.integracoes = IntegracoesFalsas(documento)
+
+
+def test_token_persistido_so_conecta_no_mesmo_ambiente(monkeypatch):
+    monkeypatch.setattr(melhor_envio, "MELHOR_ENVIO_BASE_URL", "https://melhorenvio.com.br")
+    monkeypatch.setattr(melhor_envio, "MELHOR_ENVIO_ACCESS_TOKEN", "")
+
+    legado = asyncio.run(melhor_envio.status_integracao(
+        BancoIntegracaoFalso({"accessToken": "token-antigo"})
+    ))
+    producao = asyncio.run(melhor_envio.status_integracao(
+        BancoIntegracaoFalso({"accessToken": "token-novo", "ambiente": "producao"})
+    ))
+
+    assert legado["integrado"] is False
+    assert producao["integrado"] is True
+    assert producao["ambiente"] == "producao"
+
+
+def test_salvar_token_registra_ambiente_atual(monkeypatch):
+    monkeypatch.setattr(melhor_envio, "MELHOR_ENVIO_BASE_URL", "https://melhorenvio.com.br")
+    monkeypatch.setattr(melhor_envio, "encrypt_secret", lambda value, **_kwargs: f"enc:{value}")
+    banco = BancoIntegracaoFalso()
+
+    asyncio.run(melhor_envio._salvar_tokens(banco, {
+        "access_token": "access",
+        "refresh_token": "refresh",
+        "expires_in": 3600,
+    }))
+
+    assert banco.integracoes.atualizacao["$set"]["ambiente"] == "producao"
+
+
 def test_cotacao_exibe_preco_final_prazo_e_filtra_transportadora(monkeypatch):
     async def fake_config(_db):
         return {"cepOrigem": "03069000", "taxaEmbalagem": 5.0}

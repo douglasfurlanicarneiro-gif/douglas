@@ -195,6 +195,7 @@ async def _salvar_tokens(db, payload: dict[str, Any]) -> None:
                     context="melhor-envio-refresh-token",
                 ),
                 "tokenType": payload.get("token_type", "Bearer"),
+                "ambiente": _ambiente_atual(),
                 "expiraEm": datetime.now(timezone.utc)
                 + timedelta(seconds=max(60, expires_in)),
                 "atualizadoEm": datetime.now(timezone.utc),
@@ -233,6 +234,11 @@ async def obter_access_token(db) -> str:
     if not integration or not integration.get("accessToken"):
         raise MelhorEnvioError(
             "O cálculo de entrega está em configuração. Tente novamente em breve.",
+            503,
+        )
+    if integration.get("ambiente") != _ambiente_atual():
+        raise MelhorEnvioError(
+            "A integração do frete precisa ser autorizada novamente neste ambiente.",
             503,
         )
     expira_em = integration.get("expiraEm")
@@ -450,14 +456,19 @@ async def cotar_frete(
 
 async def status_integracao(db) -> dict[str, Any]:
     integration = await db.integracoes.find_one({"_id": INTEGRATION_ID})
+    ambiente = _ambiente_atual()
+    token_persistido_valido = bool(
+        (integration or {}).get("accessToken")
+        and (integration or {}).get("ambiente") == ambiente
+    )
     return {
-        "integrado": bool(MELHOR_ENVIO_ACCESS_TOKEN or (integration or {}).get("accessToken")),
+        "integrado": bool(MELHOR_ENVIO_ACCESS_TOKEN or token_persistido_valido),
         "aplicativoConfigurado": bool(
             MELHOR_ENVIO_CLIENT_ID and MELHOR_ENVIO_CLIENT_SECRET
         ),
-        "ambiente": (
-            "sandbox"
-            if "sandbox" in MELHOR_ENVIO_BASE_URL.lower()
-            else "producao"
-        ),
+        "ambiente": ambiente,
     }
+
+
+def _ambiente_atual() -> str:
+    return "sandbox" if "sandbox" in MELHOR_ENVIO_BASE_URL.lower() else "producao"
