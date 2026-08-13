@@ -23,16 +23,29 @@ const LOCAL_AVIF_SEQUENCES = new Set([
 ]);
 
 const PRODUCTION_ORIGIN = 'https://lessence-furlani-vitrine.onrender.com';
+const IMAGE_ASSET_VERSION = 'transparent-20260812';
 
 function imageOrigin(): string {
   if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin;
   return PRODUCTION_ORIGIN;
 }
 
+function versionedImageUrl(url: string): string {
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}v=${IMAGE_ASSET_VERSION}`;
+}
+
 export function resolvePerfumeImageUrl(perfume: Perfume): string {
   const sequence = Number(perfume.seq);
-  if (!LOCAL_AVIF_SEQUENCES.has(sequence)) return perfume.imagemUrl;
-  return `${imageOrigin()}/perfume-images/perfume-${String(sequence).padStart(3, '0')}.avif`;
+  if (LOCAL_AVIF_SEQUENCES.has(sequence)) {
+    return versionedImageUrl(
+      `${imageOrigin()}/perfume-images/perfume-${String(sequence).padStart(3, '0')}.avif`,
+    );
+  }
+  if (perfume.imagemUrl.includes('/perfume-images/')) {
+    return versionedImageUrl(perfume.imagemUrl);
+  }
+  return perfume.imagemUrl;
 }
 
 export function withOptimizedPerfumeImages(perfumes: Perfume[]): Perfume[] {
@@ -41,4 +54,3 @@ export function withOptimizedPerfumeImages(perfumes: Perfume[]): Perfume[] {
     imagemUrl: resolvePerfumeImageUrl(perfume),
   }));
 }
-
