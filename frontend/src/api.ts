@@ -39,6 +39,7 @@ let stepUpExpiresAt = 0;
 
 type VitrineResponse = {
   atualizadoEm: string | null;
+  sincronizacaoPendente?: boolean;
   itens: Perfume[];
 };
 

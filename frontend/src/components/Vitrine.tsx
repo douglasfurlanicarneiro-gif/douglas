@@ -192,7 +192,7 @@ function VitrineCard({
             <Image
               source={{ uri: item.imagemUrl }}
               style={styles.productImage}
-              contentFit="cover"
+              contentFit="contain"
               transition={180}
               accessible={false}
               accessibilityLabel=""
@@ -325,7 +325,7 @@ export function Vitrine({
   const [loading, setLoading] = useState(true);
   const [storeLogoFailed, setStoreLogoFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [snapshot, setSnapshot] = useState<{ atualizadoEm: string | null; itens: VitrineItem[] } | null>(null);
+  const [snapshot, setSnapshot] = useState<{ atualizadoEm: string | null; sincronizacaoPendente?: boolean; itens: VitrineItem[] } | null>(null);
   const [search, setSearch] = useState('');
   const [familiaAtiva, setFamiliaAtiva] = useState('Todas');
   const [ocasiaoAtiva, setOcasiaoAtiva] = useState('Todas');
@@ -356,7 +356,8 @@ export function Vitrine({
   const hasCatalogRef = useRef(false);
   const retryAttemptRef = useRef(0);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const loadRef = useRef<() => Promise<void>>(async () => undefined);
+  const pendingSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadRef = useRef<(forceRefresh?: boolean) => Promise<void>>(async () => undefined);
 
   const [sugForm, setSugForm] = useState({ cliente: '', contato: '', mensagem: '' });
   const [privacyForm, setPrivacyForm] = useState({
@@ -406,6 +407,16 @@ export function Vitrine({
       setSnapshot(r);
       setLoading(false);
       storage.setItem(VITRINE_CACHE_KEY, JSON.stringify(r));
+      if (pendingSyncTimerRef.current) {
+        clearTimeout(pendingSyncTimerRef.current);
+        pendingSyncTimerRef.current = null;
+      }
+      if (r.sincronizacaoPendente) {
+        pendingSyncTimerRef.current = setTimeout(() => {
+          pendingSyncTimerRef.current = null;
+          void loadRef.current(true);
+        }, 5500);
+      }
     } catch {
       // Com catálogo salvo, o cliente continua navegando normalmente. Sem
       // catálogo, a abertura permanece visível e a conexão é refeita sozinha.
@@ -428,7 +439,7 @@ export function Vitrine({
       const cached = await storage.getItem(VITRINE_CACHE_KEY, '');
       if (cached) {
         try {
-          const parsed = JSON.parse(cached) as { atualizadoEm: string | null; itens: VitrineItem[] };
+          const parsed = JSON.parse(cached) as { atualizadoEm: string | null; sincronizacaoPendente?: boolean; itens: VitrineItem[] };
           if (Array.isArray(parsed.itens) && parsed.itens.length > 0) {
             hasCatalogRef.current = true;
             setSnapshot(parsed);
@@ -444,6 +455,7 @@ export function Vitrine({
   }, [load]);
   useEffect(() => () => {
     if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    if (pendingSyncTimerRef.current) clearTimeout(pendingSyncTimerRef.current);
   }, []);
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined' || typeof document === 'undefined') return;

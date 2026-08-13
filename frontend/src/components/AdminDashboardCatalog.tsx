@@ -219,7 +219,7 @@ export function AdminCatalog({
         return (
           <View key={perfume.id} style={styles.perfumeCard} testID={`perfume-card-${perfume.id}`}>
             {perfume.imagemUrl ? (
-              <Image source={{ uri: perfume.imagemUrl }} style={styles.catalogThumb} contentFit="cover" transition={150} />
+              <Image source={{ uri: perfume.imagemUrl }} style={styles.catalogThumb} contentFit="contain" transition={150} />
             ) : (
               <View style={styles.catalogThumbPlaceholder}><Feather name="image" size={20} color={COLORS.muted} /></View>
             )}

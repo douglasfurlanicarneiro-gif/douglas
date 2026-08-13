@@ -305,7 +305,12 @@ async def _montar_vitrine(db, *, atualizar: bool) -> dict:
         )
 
     itens.sort(key=_alphabetical_name)
-    return {"atualizadoEm": snapshot.get("atualizadoEm"), "itens": itens}
+    estado = await _estado_publicacao(db)
+    return {
+        "atualizadoEm": snapshot.get("atualizadoEm"),
+        "sincronizacaoPendente": bool(estado.get("pendente")),
+        "itens": itens,
+    }
 
 
 @router.post("/publish")

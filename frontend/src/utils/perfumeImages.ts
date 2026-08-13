@@ -37,15 +37,22 @@ function versionedImageUrl(url: string): string {
 
 export function resolvePerfumeImageUrl(perfume: Perfume): string {
   const sequence = Number(perfume.seq);
+  const configuredImage = perfume.imagemUrl.trim();
+  // Uma foto AVIF escolhida no catálogo é a fonte oficial. Antes, a vitrine
+  // substituía silenciosamente essa URL por um arquivo local baseado apenas
+  // no número do perfume; por isso Nishane aparecia diferente no painel.
+  if (/\.avif(?:$|[?#])/i.test(configuredImage)) {
+    return configuredImage;
+  }
   if (LOCAL_AVIF_SEQUENCES.has(sequence)) {
     return versionedImageUrl(
       `${imageOrigin()}/perfume-images/perfume-${String(sequence).padStart(3, '0')}.avif`,
     );
   }
-  if (perfume.imagemUrl.includes('/perfume-images/')) {
-    return versionedImageUrl(perfume.imagemUrl);
+  if (configuredImage.includes('/perfume-images/')) {
+    return versionedImageUrl(configuredImage);
   }
-  return perfume.imagemUrl;
+  return configuredImage;
 }
 
 export function withOptimizedPerfumeImages(perfumes: Perfume[]): Perfume[] {
