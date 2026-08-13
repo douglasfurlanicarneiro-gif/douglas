@@ -218,6 +218,14 @@ export function PerfumeForm({
             placeholder="25"
           />
         </Field>
+        <Field label="Código no fornecedor">
+          <TInput
+            value={form.fornecedorCodigo || ''}
+            onChangeText={(value) => set('fornecedorCodigo', value.trim())}
+            placeholder="Ex: 400056"
+            autoCapitalize="none"
+          />
+        </Field>
         <Text style={styles.adminHint}>Esses dados não aparecem na vitrine. Eles alimentam lucro, margem e ordens de produção.</Text>
       </View>
 
