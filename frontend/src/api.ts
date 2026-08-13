@@ -543,6 +543,10 @@ export type OperationalSummary = {
   ultimoBackupEm: string | null;
   ultimaRestauracaoEm: string | null;
   errosFrontend24h: number;
+  integracoes: {
+    infinitePayWebhookSecretDedicado: boolean;
+    melhorEnvioAmbiente: 'sandbox' | 'producao';
+  };
   errosFrontendRecentes: {
     id: string;
     tipo: string;

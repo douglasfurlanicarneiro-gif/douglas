@@ -23,7 +23,12 @@ from backup_service import (
     transmitir_e_remover,
 )
 from catalog_cache import invalidate_catalog_cache
-from config import BACKUP_ENCRYPTION_KEY, INFINITEPAY_HANDLE
+from config import (
+    BACKUP_ENCRYPTION_KEY,
+    INFINITEPAY_HANDLE,
+    INFINITEPAY_WEBHOOK_SECRET_DEDICATED,
+    MELHOR_ENVIO_BASE_URL,
+)
 from database import get_db
 from database_integrity import DATABASE_SCHEMA_VERSION
 from finance import estimar_custo_unitario, obter_config_custos
@@ -390,8 +395,21 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
         (esquema_banco or {}).get("status") == "pronto"
         and int((esquema_banco or {}).get("versao", 0)) >= DATABASE_SCHEMA_VERSION
     )
+    melhor_envio_ambiente = (
+        "sandbox" if "sandbox" in MELHOR_ENVIO_BASE_URL.lower() else "producao"
+    )
+    integracoes_prontas = (
+        INFINITEPAY_WEBHOOK_SECRET_DEDICATED
+        and melhor_envio_ambiente == "producao"
+    )
     return {
-        "status": "atencao" if falhos or revisao_manual or erros_frontend_24h or not banco_pronto else "ok",
+        "status": "atencao" if (
+            falhos
+            or revisao_manual
+            or erros_frontend_24h
+            or not banco_pronto
+            or not integracoes_prontas
+        ) else "ok",
         "pagamentosFalhos": falhos,
         "pagamentosRevisaoManual": revisao_manual,
         "pagamentosEmEspera": em_espera,
@@ -405,6 +423,10 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
                 (esquema_banco or {}).get("indicesConfirmados", 0)
             ),
             "verificadoEm": (esquema_banco or {}).get("concluidoEm"),
+        },
+        "integracoes": {
+            "infinitePayWebhookSecretDedicado": INFINITEPAY_WEBHOOK_SECRET_DEDICATED,
+            "melhorEnvioAmbiente": melhor_envio_ambiente,
         },
         "errosFrontend24h": int(erros_frontend_24h),
         "errosFrontendRecentes": [

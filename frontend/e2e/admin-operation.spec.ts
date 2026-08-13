@@ -143,6 +143,10 @@ async function mockAdminApi(page: Page) {
       pagamentosProcessando: 0,
       ultimoBackupEm: '2026-08-10T10:00:00Z',
       ultimaRestauracaoEm: null,
+      integracoes: {
+        infinitePayWebhookSecretDedicado: true,
+        melhorEnvioAmbiente: 'producao',
+      },
       falhasRecentes: [{
         id: 'evento-1',
         orderNsu: 'pedido-42',

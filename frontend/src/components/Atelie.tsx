@@ -1367,7 +1367,9 @@ export function Atelie({
               <View style={[styles.shippingStatus, freteConfig?.integrado && { borderColor: COLORS.sage }]}>
                 <View style={[styles.shippingStatusDot, { backgroundColor: freteConfig?.integrado ? COLORS.sage : COLORS.rust }]} />
                 <Text style={{ color: freteConfig?.integrado ? COLORS.sage : COLORS.muted, fontSize: FONT_SIZES.caption }}>
-                  {freteConfig?.integrado ? 'Conectado' : 'Aguardando conexão'}
+                  {freteConfig?.integrado
+                    ? `Conectado · ${freteConfig.ambiente === 'producao' ? 'Produção' : 'Sandbox'}`
+                    : 'Aguardando conexão'}
                 </Text>
               </View>
             </View>
@@ -1483,6 +1485,22 @@ export function Atelie({
             <Text style={styles.operationHealthHint}>
               Último backup exportado: {operationalSummary?.ultimoBackupEm ? fmtDate(operationalSummary.ultimoBackupEm) : 'ainda não registrado'}
             </Text>
+            {operationalSummary?.integracoes && !operationalSummary.integracoes.infinitePayWebhookSecretDedicado && (
+              <View style={styles.operationWarning}>
+                <Feather name="shield" size={15} color={COLORS.rust} />
+                <Text style={styles.operationWarningText}>
+                  Configure INFINITEPAY_WEBHOOK_SECRET no Render com uma chave exclusiva para separar a proteção dos pagamentos da sessão administrativa.
+                </Text>
+              </View>
+            )}
+            {operationalSummary?.integracoes?.melhorEnvioAmbiente === 'sandbox' && (
+              <View style={styles.operationWarning}>
+                <Feather name="truck" size={15} color={COLORS.rust} />
+                <Text style={styles.operationWarningText}>
+                  O Melhor Envio está em Sandbox. Troque a URL e as credenciais para produção antes de operar entregas reais.
+                </Text>
+              </View>
+            )}
             {!!operationalSummary?.falhasRecentes[0] && (
               <View style={styles.operationWarning}>
                 <Feather name="alert-triangle" size={15} color={COLORS.rust} />

@@ -7,6 +7,7 @@ const catalog = {
       id: 'ready', seq: 1, nome: 'Perfume Pronta Entrega', genero: 'Masculino',
       familiaOlfativa: 'Aromático', familiasOlfativas: ['Aromático'], concentracao: 'Eau De Parfum',
       ocasioes: ['Noite', 'Festa'], notasSaida: 'Limão', notasCoracao: 'Lavanda', notasFundo: 'Âmbar',
+      imagemUrl: '/perfume-images/perfume-001.avif',
       prontaEntrega: true, tamanhosDisponiveisMl: [30, 50, 100],
       precos: [{ ml: 30, preco: 50 }, { ml: 50, preco: 85 }, { ml: 100, preco: 160 }],
     },
@@ -14,19 +15,33 @@ const catalog = {
       id: 'order', seq: 2, nome: 'Perfume Sob Encomenda', genero: 'Feminino',
       familiaOlfativa: 'Floral', familiasOlfativas: ['Floral'], concentracao: 'Eau De Parfum',
       ocasioes: ['Dia'], notasSaida: 'Pera', notasCoracao: 'Jasmim', notasFundo: 'Baunilha',
+      imagemUrl: '/perfume-images/perfume-002.avif',
       prontaEntrega: false, tamanhosDisponiveisMl: [30, 50, 100],
       precos: [{ ml: 30, preco: 50 }, { ml: 50, preco: 85 }, { ml: 100, preco: 160 }],
     },
   ],
 };
 
-async function mockApi(page: Page) {
+async function mockApi(
+  page: Page,
+  options: { catalogDelayMs?: number; catalogFailures?: number } = {},
+) {
   const state: { checkout: Record<string, unknown> | null } = { checkout: null };
+  let catalogRequests = 0;
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
-    if (path === '/api/vitrine') return json(catalog);
+    if (path === '/api/vitrine') {
+      catalogRequests += 1;
+      if (catalogRequests <= (options.catalogFailures || 0)) {
+        return json({ detail: 'Servidor acordando' }, 503);
+      }
+      if (options.catalogDelayMs) {
+        await new Promise((resolve) => setTimeout(resolve, options.catalogDelayMs));
+      }
+      return json(catalog);
+    }
     if (path === '/api/admin/configuracoes/publicas') return json({
       nomeLoja: 'L’Essence Furlani', logoUrl: '', whatsapp: '5511999999999', instagram: '', email: '',
       cartaoOnlineAtivo: true, pixManualAtivo: false,
@@ -57,6 +72,19 @@ async function openStore(page: Page) {
   await page.goto('/');
   await expect(page.getByTestId('vitrine-card-ready')).toBeVisible();
 }
+
+test('mantém a abertura visível enquanto o catálogo carrega', async ({ page }) => {
+  await mockApi(page, { catalogDelayMs: 1200 });
+  await page.goto('/');
+  await expect(page.getByLabel('Carregando vitrine')).toBeVisible();
+  await expect(page.getByTestId('vitrine-card-ready')).toBeVisible();
+});
+
+test('recupera automaticamente quando o servidor está acordando', async ({ page }) => {
+  await mockApi(page, { catalogFailures: 1 });
+  await openStore(page);
+  await expect(page.getByLabel('Carregando vitrine')).toHaveCount(0);
+});
 
 async function fillCustomer(page: Page) {
   await page.getByTestId('checkout-name').fill('Cliente Teste');

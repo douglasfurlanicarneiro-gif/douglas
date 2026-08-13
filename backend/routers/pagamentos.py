@@ -34,14 +34,14 @@ _RECONCILIATION_INTERVAL_SECONDS = 20
 
 class InfinitePayWebhookIn(BaseModel):
     invoice_slug: str = Field(min_length=1, max_length=300)
-    amount: int | float | None = None
-    paid_amount: int | float | None = None
-    installments: int | None = None
-    capture_method: str | None = None
+    amount: int | float | None = Field(default=None, ge=0, le=100_000_000)
+    paid_amount: int | float | None = Field(default=None, ge=0, le=100_000_000)
+    installments: int | None = Field(default=None, ge=1, le=24)
+    capture_method: str | None = Field(default=None, max_length=40)
     transaction_nsu: str = Field(min_length=1, max_length=300)
     order_nsu: str = Field(min_length=1, max_length=80)
-    receipt_url: str | None = None
-    items: list[dict] = Field(default_factory=list)
+    receipt_url: str | None = Field(default=None, max_length=2000)
+    items: list[dict] = Field(default_factory=list, max_length=100)
 
 
 class InfinitePayConfirmacaoIn(BaseModel):
@@ -440,7 +440,7 @@ async def webhook_infinitepay(
         raise HTTPException(status_code=401, detail="Webhook não autorizado.")
     event_id = await _registrar_webhook(payload)
     background_tasks.add_task(processar_evento_pagamento, event_id)
-    return {"success": True, "recebido": True}
+    return {"success": True, "message": None, "recebido": True}
 
 
 @router.post("/infinitepay/confirmar", dependencies=[Depends(payment_rate_limit)])

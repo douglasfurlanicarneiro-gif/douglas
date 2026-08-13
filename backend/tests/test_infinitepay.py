@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 from bson import ObjectId
-from fastapi import HTTPException
+from fastapi import BackgroundTasks, HTTPException
 
 from payments import infinitepay
 from routers import pagamentos
@@ -142,6 +142,56 @@ def test_webhook_e_persistido_de_forma_idempotente(monkeypatch):
     event = event_collection.documents[first_id]
     assert event["status"] == "pendente"
     assert event["payload"]["transaction_nsu"] == "transaction-1"
+
+
+def test_webhook_rejeita_token_invalido_antes_de_acessar_o_banco(monkeypatch):
+    payload = pagamentos.InfinitePayWebhookIn(
+        invoice_slug="invoice-1",
+        amount=2500,
+        paid_amount=2500,
+        installments=1,
+        capture_method="pix",
+        transaction_nsu="transaction-1",
+        order_nsu="64d000000000000000000001",
+    )
+    monkeypatch.setattr(pagamentos, "token_webhook_valido", lambda *_: False)
+
+    with pytest.raises(HTTPException) as erro:
+        asyncio.run(
+            pagamentos.webhook_infinitepay(
+                payload,
+                BackgroundTasks(),
+                token="incorreto",
+            )
+        )
+
+    assert erro.value.status_code == 401
+
+
+def test_webhook_valido_responde_no_contrato_oficial_e_enfileira(monkeypatch):
+    payload = pagamentos.InfinitePayWebhookIn(
+        invoice_slug="invoice-1",
+        amount=2500,
+        paid_amount=2500,
+        installments=1,
+        capture_method="credit_card",
+        transaction_nsu="transaction-1",
+        order_nsu="64d000000000000000000001",
+    )
+    tarefas = BackgroundTasks()
+
+    async def registrar(_payload):
+        return "infinitepay:evento-1"
+
+    monkeypatch.setattr(pagamentos, "token_webhook_valido", lambda *_: True)
+    monkeypatch.setattr(pagamentos, "_registrar_webhook", registrar)
+
+    resposta = asyncio.run(
+        pagamentos.webhook_infinitepay(payload, tarefas, token="valido")
+    )
+
+    assert resposta == {"success": True, "message": None, "recebido": True}
+    assert len(tarefas.tasks) == 1
 
 
 def test_backoff_de_reconciliacao_e_limitado():

@@ -103,6 +103,8 @@ class BancoOperacionalFalso:
 
 def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
     monkeypatch.setattr(admin, "get_db", lambda: BancoOperacionalFalso())
+    monkeypatch.setattr(admin, "INFINITEPAY_WEBHOOK_SECRET_DEDICATED", True)
+    monkeypatch.setattr(admin, "MELHOR_ENVIO_BASE_URL", "https://melhorenvio.com.br")
 
     resumo = asyncio.run(admin.resumo_operacional("sessao"))
 
@@ -119,6 +121,28 @@ def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
     assert resumo["errosFrontend24h"] == 2
     assert resumo["errosFrontendRecentes"][0]["mensagem"] == "Falha visual recuperada"
     assert resumo["errosFrontendRecentes"][0]["requestId"] == "request-12345678"
+    assert resumo["integracoes"] == {
+        "infinitePayWebhookSecretDedicado": True,
+        "melhorEnvioAmbiente": "producao",
+    }
+
+
+def test_resumo_operacional_alerta_integracoes_em_configuracao_insegura(monkeypatch):
+    monkeypatch.setattr(admin, "get_db", lambda: BancoOperacionalFalso())
+    monkeypatch.setattr(admin, "INFINITEPAY_WEBHOOK_SECRET_DEDICATED", False)
+    monkeypatch.setattr(
+        admin,
+        "MELHOR_ENVIO_BASE_URL",
+        "https://sandbox.melhorenvio.com.br",
+    )
+
+    resumo = asyncio.run(admin.resumo_operacional("sessao"))
+
+    assert resumo["status"] == "atencao"
+    assert resumo["integracoes"] == {
+        "infinitePayWebhookSecretDedicado": False,
+        "melhorEnvioAmbiente": "sandbox",
+    }
 
 
 def test_reprocessamento_reenfileira_falhas_e_registra_auditoria(monkeypatch):
