@@ -22,6 +22,7 @@ import type {
   Insumo,
   PlanoProducao,
 } from './types';
+import { withOptimizedPerfumeImages } from './utils/perfumeImages';
 
 // Usa a API configurada também no preview local. Se a variável não existir,
 // mantém chamadas relativas para instalações com proxy no mesmo domínio.
@@ -328,14 +329,16 @@ export const deleteOpiniao = (id: string) => request<{ status: string }>(`/opini
 export async function getVitrine(atualizar = false): Promise<VitrineResponse> {
   const path = atualizar ? '/vitrine?atualizar=true' : '/vitrine';
   try {
-    return await request<VitrineResponse>(path, {}, false, COLD_START_TIMEOUT_MS);
+    const response = await request<VitrineResponse>(path, {}, false, COLD_START_TIMEOUT_MS);
+    return { ...response, itens: withOptimizedPerfumeImages(response.itens) };
   } catch (error) {
     if (!(error instanceof ApiError) || ![0, 408, 502, 503, 504].includes(error.status)) {
       throw error;
     }
     // O plano gratuito do Render pode estar terminando de acordar. Uma segunda
     // tentativa curta evita obrigar o cliente a fechar e abrir o aplicativo.
-    return request<VitrineResponse>(path, {}, false, 20000);
+    const response = await request<VitrineResponse>(path, {}, false, 20000);
+    return { ...response, itens: withOptimizedPerfumeImages(response.itens) };
   }
 }
 export const publishVitrine = () => request<{ atualizadoEm: string; itensPublicados: number }>('/vitrine/publish', { method: 'POST' }, true);
