@@ -1,223 +1,116 @@
-# Auditoria de pendências — meta 10/10
+# Auditoria técnica e operacional — meta 10/10
 
-Data de consolidação: 13/08/2026
+Data da última revisão integral: **13/08/2026**
 
-Este documento registra o estado atual da auditoria da L’Essence Furlani e deve ser usado como ponto de retomada. A auditoria antiga, com nota geral 7,4/10, não representa mais o sistema porque grande parte das pendências críticas já foi corrigida.
+Este é o ponto oficial de retomada da L’Essence Furlani. A nota não representa apenas aparência: considera comportamento validado, integridade dos dados, segurança, operação real e riscos externos.
 
-## Avaliação atual
+## Estado atual
 
-Nota geral estimada: **8,9/10**.
+Nota técnica estimada: **9,4/10**.
 
-| Área | Nota atual | Principal pendência |
+Não há falha funcional reproduzível nos fluxos automatizados ou nas verificações ao vivo executadas nesta revisão. Isso não significa “risco zero”: pagamentos, transportadoras, rede, aparelhos e o Render gratuito são sistemas externos e podem falhar. Os riscos restantes estão explicitados abaixo.
+
+| Área | Nota | Situação atual |
 |---|---:|---|
-| UX e identidade visual | 9,2 | Revisão final em diferentes telas e aparelhos |
-| Pagamentos | 9,2 | Configurar segredo dedicado no Render e exercícios financeiros excepcionais |
-| Frete e checkout | 8,8 | Migrar do Sandbox para produção, comprar postagem, gerar etiqueta e rastrear |
-| Estoque | 9,2 | Auditoria integral de custos e concorrência em produção |
-| Backend/API | 9,0 | Reduzir módulos grandes e ampliar testes externos |
-| Segurança | 8,8 | Dependências transitivas e teste de invasão |
-| Banco e integridade | 9,0 | Teste periódico de restauração e reconciliação |
-| Performance/Render | 8,2 | Catálogo pesado e limitação do plano gratuito |
-| Qualidade do frontend | 8,6 | Componentes ainda muito grandes e pouco isolados |
-| Acessibilidade | 8,4 | Testes automáticos WCAG e validação manual |
-| Operação e recuperação | 9,0 | Alertas externos e simulação periódica de desastre |
-| Recursos de ERP | 7,8 | Produção, lotes, compras, fiscal e notificações |
+| UX, identidade e responsividade | 9,5 | Celular e computador cobertos por E2E; falta homologação manual em mais aparelhos reais |
+| Pagamentos | 9,5 | InfinitePay, retomada, idempotência, webhook e conciliação implementados |
+| Frete e checkout | 9,5 | Melhor Envio em produção; Padrão e Prioritária cotadas e recalculadas pelo servidor |
+| Estoque | 9,6 | Reserva e baixa atômicas; saldos negativos legados corrigidos e novo alerta automático criado |
+| Backend e APIs | 9,6 | Rotas sensíveis autenticadas, contratos validados e 170 testes aprovados |
+| Segurança | 9,3 | Segredos externos, step-up, rate limit e cabeçalhos ativos; resta pentest independente |
+| Banco e integridade | 9,4 | Índices e migrações verificados; falta exercício periódico de restauração em produção |
+| Performance e Render gratuito | 8,8 | Cache e recuperação automática ativos; plano gratuito ainda pode adormecer |
+| Qualidade do frontend | 9,2 | Lint, TypeScript, tipografia, Expo Doctor e build aprovados; componentes grandes permanecem |
+| Acessibilidade | 8,8 | Semântica e foco melhorados; faltam Axe, VoiceOver, TalkBack e zoom manual completo |
+| Operação e recuperação | 9,1 | Diagnóstico interno existe; falta alerta externo e rotina mensal de desastre |
+| Recursos de ERP | 8,5 | Custos, insumos, produção, fornecedores e histórico existem; fiscal e lotes ainda são evolução |
 
-## O que já está sólido
+## Evidências desta revisão
 
-- 167 testes do backend aprovados.
-- 24 testes E2E aprovados em celular e computador.
-- Lint, TypeScript e build web aprovados.
-- Expo Doctor com 20/20 verificações aprovadas.
-- Nenhuma vulnerabilidade conhecida nas dependências Python.
-- API, banco e vitrine respondendo normalmente.
-- Catálogo administrativo protegido contra acesso anônimo.
-- Reserva e baixa atômica de estoque.
-- Prevenção de pedidos duplicados.
-- Checkout InfinitePay e retomada de pagamento pendente.
-- Conciliação de pagamentos, estorno e contestação.
-- Histórico e rastreabilidade das operações.
-- Backups protegidos e rotinas de recuperação.
-- Privacidade, aceite de prazo e tratamento de dados.
-- Limites de requisição nas APIs sensíveis.
-- Sincronização automática da vitrine.
-- Avaliações moderadas.
-- Etiquetas internas de produção em PDF.
-- Imagens AVIF e tratamento dos fundos.
-- Responsividade e tipografia mais consistentes.
+- **170 testes de backend aprovados**, 40 cenários condicionais ignorados por dependerem de serviços/recursos opcionais.
+- **28 testes E2E aprovados** em celular e computador.
+- Lint, verificação de tipografia e TypeScript aprovados.
+- Expo Doctor: **20/20**.
+- Build web de produção aprovado.
+- Dependências Python: nenhuma vulnerabilidade conhecida.
+- API e banco: `/health/ready` em estado `ready`, esquema confirmado e latência observada.
+- Segurança web: CSP, HSTS, proteção contra iframe, MIME sniffing, política de permissões e CORS restrito confirmados ao vivo.
+- Documentação interativa da API desativada em produção.
+- Tentativa de CORS a partir de origem não autorizada recusada.
+- Catálogo público: **413 itens publicados**, sem nomes, famílias, ocasiões, notas, preços ou imagens ausentes.
+- **413 imagens acessadas individualmente**, sem resposta quebrada após as correções.
+- 414 perfumes ativos no painel: 413 publicados e 1 não publicado.
+- 19 perfumes arquivados preservados fora do catálogo ativo.
+- Frete real cotado em produção com as duas modalidades, sem criar postagem ou pedido.
+- Total físico reconciliado em **13.365 ml**, reservado 0 ml e disponível 13.365 ml no momento da conferência.
 
-## Pendências críticas
+## Correções concluídas nesta etapa
 
-### 1. Corrigir a suíte E2E — concluído em 13/08/2026
+1. O relatório de rentabilidade deixou de incluir os 19 perfumes arquivados.
+2. Insumos com mínimo zero deixaram de aparecer incorretamente como “REPOSIÇÃO”.
+3. O diagnóstico operacional passou a detectar e alertar saldos físicos negativos.
+4. Os saldos legados de Bleu de Chanel nº 089 e Aventus nº 117 foram corrigidos de -30 ml para 0 ml por conferência auditável.
+5. Quatro URLs de imagem quebradas foram corrigidas:
+   - nº 356, Polo Sport;
+   - nº 357, Polo Sport essência especial;
+   - nº 370, Lost Cherry;
+   - nº 374, Mandarino di Amalfi.
+6. Jubilation XXV nº 014 e Kalemat nº 020 receberam clima e ocasiões que estavam vazios.
+7. A vitrine ganhou fallback visual para futuras imagens externas indisponíveis.
+8. A publicação automática foi forçada e o snapshot terminou sem sincronização pendente.
 
-Resultado atual: **24 testes aprovados e nenhuma reprovação**.
+## Fluxos validados
 
-As seis falhas antigas tinham a mesma causa: os perfumes simulados pelos testes não continham o campo obrigatório `imagemUrl`, introduzido pela otimização de imagens. O processamento falhava e a vitrine entrava corretamente no ciclo de nova tentativa.
+- abertura com servidor lento e recuperação automática;
+- atualização por puxar para atualizar e reconciliação do carrinho salvo;
+- busca, Pronta entrega, Sob encomenda, Favoritos e Filtros;
+- cards, tamanhos, preços, notas e fallback de imagem;
+- carrinho, dados do cliente, CEP, retirada e entrega;
+- Entrega Padrão e Entrega Prioritária;
+- aviso e aceite do prazo de até 14 dias para sob encomenda;
+- resumo de produtos, frete e total calculado;
+- criação idempotente de pedido e retomada de pagamento InfinitePay;
+- acompanhamento e cancelamento permitido antes do atendimento;
+- painel, catálogo, estoque, movimentos e conferência física;
+- Kanban de pedidos, edição de valor negociado e transição de status;
+- estorno/contestação com motivo auditável;
+- custos, margem, fornecedores, insumos e simulação de produção;
+- avaliações moderadas, sugestões e privacidade;
+- backup criptografado, validação e restauração cobertos por testes;
+- proteção de operações destrutivas por reautenticação curta.
 
-Concluído:
+## Riscos e pendências reais para chegar ao 10/10
 
-- contrato dos dados simulados atualizado com `imagemUrl`;
-- seis cenários antigos corrigidos em celular e computador;
-- cobertura acrescentada para catálogo lento;
-- cobertura acrescentada para resposta 503 seguida de recuperação automática;
-- brilho e apresentação inicial preservados;
-- lint, TypeScript e build web aprovados.
+### P0 — operação
 
-### 2. Homologar pagamentos de ponta a ponta — homologação técnica concluída em 13/08/2026
+1. **Backup real:** exportar um `.lfe`, guardar fora do Render e executar restauração controlada mensalmente. O painel ainda não possuía registro de backup exportado na conferência.
+2. **Monitoramento externo:** avisar por e-mail/WhatsApp quando vitrine, API, pagamento ou fila apresentarem falha. Hoje o diagnóstico precisa ser aberto no painel.
 
-Confirmado com segurança, sem gerar nova cobrança:
+### P1 — integrações externas
 
-- pedido real aprovado pela InfinitePay, com três parcelas e NSU registrado;
-- confirmação automática persistida no pedido;
-- retomada de pagamento pendente;
-- webhook autenticado, persistido, idempotente e processado em segundo plano;
-- rejeição de webhook com token inválido antes de acessar o banco;
-- validação do valor recebido, transação duplicada e aprovação atrasada;
-- retentativas automáticas, conciliação e fila de revisão manual;
-- contrato do webhook alinhado à documentação oficial;
-- painel passa a alertar quando `INFINITEPAY_WEBHOOK_SECRET` exclusivo não estiver configurado;
-- limites de tamanho e faixa adicionados ao conteúdo recebido pelo webhook.
+3. Homologar, com autorização financeira específica, cartão recusado, estorno real, contestação e chargeback.
+4. Implementar compra de postagem, etiqueta da transportadora, rastreamento e cancelamento de postagem no Melhor Envio.
+5. Implementar notificações consentidas de pagamento, preparação, envio e entrega.
 
-Pendências externas que não devem ser simuladas com dinheiro real sem autorização específica:
+### P1 — qualidade
 
-- o painel publicado confirmou que o segredo dedicado ainda não está ativo no Render;
-- executar, quando houver ambiente apropriado, cartão recusado, estorno real, contestação e chargeback;
-- testar indisponibilidade real do provedor sem afetar clientes.
+6. Executar Axe, navegação completa por teclado, VoiceOver no iPhone, TalkBack no Android e zoom de 200%.
+7. Acompanhar a correção oficial do `image-size` usado transitivamente pelo Expo/Metro. O `npm audit fix --force` não deve ser executado: ele propõe downgrade incompatível. O risco atual está no processamento de ativos durante o build, não em upload público de imagens.
+8. Adicionar orçamento automático de tamanho do JavaScript, imagens e payload ao CI.
 
-### 3. Auditar o frete em produção — núcleo do checkout validado em 13/08/2026
+### P2 — performance e manutenção
 
-Confirmado:
+9. Carregar detalhes olfativos sob demanda e virtualizar/paginar o catálogo para reduzir o bundle inicial de aproximadamente 1,3 MB não comprimido.
+10. Modularizar `Atelie.tsx`, `Vitrine.tsx`, `CheckoutSheet.tsx` e `backend/routers/admin.py`.
+11. O Render gratuito continuará sujeito a despertar. A abertura já mascara e recupera esse período, mas não elimina a limitação da hospedagem.
 
-- integração do Melhor Envio conectada;
-- cotação real e segura para CEP de teste, sem comprar postagem;
-- modalidades padrão e prioritária com preço e prazo próprios;
-- embalagem, percentual e diferença mínima aplicados corretamente;
-- nova cotação obrigatória no servidor durante o fechamento;
-- produto, CEP e serviço selecionado validados no backend;
-- endereço completo, transportadora, modalidade, preço e prazo congelados no pedido;
-- valor enviado pelo cliente não é considerado fonte confiável;
-- painel passa a exibir explicitamente `Produção` ou `Sandbox`.
+### P2 — evolução para ERP
 
-Ainda pendente:
+12. Lotes, fórmula, maturação, validade e rastreabilidade por pedido.
+13. Pedido de compra, recebimento parcial e histórico de preços de fornecedor.
+14. Fluxo de caixa, contas, DRE, margem líquida, taxas e emissão fiscal.
+15. Usuários e permissões separados para administração, produção, estoque, atendimento e financeiro.
 
-- o painel publicado confirmou `Conectado · Sandbox`; é necessário cadastrar as credenciais produtivas e refazer a autorização OAuth;
-- implementar compra do frete, etiqueta da transportadora e rastreamento;
-- homologar cancelamento de postagem e tratamento de falhas da transportadora.
+## Critério para declarar 10/10
 
-### 4. Resolver dependências do frontend
-
-Existem dez alertas altos em `image-size`, dependência transitiva do Expo/Metro. Não aplicar o `npm audit fix --force`, pois ele propõe uma alteração incompatível do Expo.
-
-- Acompanhar correção oficial do Expo/Metro.
-- Testar atualização em branch separada.
-- Fazer o CI sinalizar novas vulnerabilidades altas.
-
-### 5. Completar a integridade do catálogo
-
-A vitrine pública possui 416 perfumes. Lacuna identificada:
-
-- nº 423, Symphony Louis Vuitton — Compartilhável:
-  - notas de coração vazias;
-  - notas de fundo vazias.
-
-Fazer conferência autenticada de todos os itens:
-
-- custo por ml da Nova Essência;
-- código do fornecedor;
-- embalagem de origem e quantidade;
-- nome, gênero e inspiração;
-- duplicidades;
-- foto correta;
-- AVIF transparente sem fundo branco;
-- margem positiva nos três tamanhos.
-
-## Melhorias importantes
-
-### 6. Notificações automáticas
-
-Enviar, com consentimento e registro, notificações de:
-
-- pagamento confirmado;
-- pedido em preparação;
-- pedido pronto;
-- pedido enviado com rastreio;
-- pedido entregue ou disponível para retirada;
-- pagamento pendente por tempo prolongado.
-
-### 7. Performance
-
-- Paginação ou carregamento progressivo.
-- Cache com `ETag`.
-- Resposta resumida para os cards.
-- Detalhes sob demanda.
-- Imagens responsivas.
-- Core Web Vitals.
-- Limites de tamanho para JavaScript, imagens e API.
-
-O Render gratuito continuará sujeito ao despertar do servidor.
-
-### 8. Modularização
-
-Arquivos grandes que ainda precisam ser separados:
-
-- `frontend/src/components/Atelie.tsx`: aproximadamente 1.964 linhas.
-- `frontend/src/components/Vitrine.tsx`: aproximadamente 1.943 linhas.
-- `frontend/src/components/CheckoutSheet.tsx`: aproximadamente 1.356 linhas.
-- `backend/routers/admin.py`: aproximadamente 1.017 linhas.
-
-Separar regras de negócio, carregamento de dados, componentes visuais, formulários, checkout, catálogo, estoque e configurações.
-
-### 9. Acessibilidade
-
-- Axe automatizado.
-- Navegação somente por teclado.
-- VoiceOver no iPhone.
-- TalkBack no Android.
-- Contraste e zoom de 200%.
-- Tamanhos mínimos de toque.
-- Fontes aumentadas pelo aparelho.
-
-### 10. Observabilidade e recuperação
-
-- Alertas externos para API, vitrine e pagamentos.
-- Painel de erros agrupados.
-- Correlação entre pedido, pagamento e webhook.
-- Alertas de estoque negativo ou divergente.
-- Teste mensal de restauração do backup.
-- Manual de indisponibilidade da InfinitePay e Melhor Envio.
-
-## Evolução para ERP profissional
-
-1. Produção por lote, fórmula, consumo de insumos, maturação, validade e responsável.
-2. Pedidos de compra, previsão, recebimento parcial e histórico de preços.
-3. Rastreabilidade dos lotes usados em cada pedido.
-4. Fluxo de caixa, contas, DRE, taxas, margem líquida e emissão fiscal.
-5. Usuários e permissões para administração, produção, estoque, atendimento e financeiro.
-
-## Ordem oficial de retomada
-
-1. ~~Corrigir os seis testes E2E e a validação da inicialização.~~ Concluído em 13/08/2026.
-2. ~~Homologar tecnicamente InfinitePay e o cálculo de frete em produção.~~ Concluído em 13/08/2026; restam verificações externas explicitadas acima.
-3. Completar Symphony e auditar custos, dados e fotos dos 416 perfumes.
-4. Tratar dependências do frontend.
-5. Implementar rastreamento e etiqueta de transporte.
-6. Implementar notificações automáticas.
-7. Melhorar carregamento e payload do catálogo.
-8. Modularizar os arquivos grandes.
-9. Executar auditoria completa de acessibilidade.
-10. Evoluir produção, compras, lotes, financeiro e fiscal.
-
-## Próximo ponto de retomada
-
-As configurações externas de produção abaixo foram concluídas. O próximo passo é completar Symphony e auditar custos, dados e fotos dos 416 perfumes.
-
-## Atualização de produção — 13/08/2026
-
-- `INFINITEPAY_WEBHOOK_SECRET` exclusivo configurado no Render e alerta operacional eliminado.
-- Credenciais produtivas do Melhor Envio configuradas no Render.
-- OAuth produtivo concluído com o escopo mínimo de cotação de fretes.
-- Token de Sandbox separado do token de Produção para impedir falso estado de conexão.
-- Cotação produtiva real validada sem comprar postagem: Jadlog `.Package Centralizado`, com embalagem, ajuste e prazo administrativo aplicados corretamente.
-- Redirecionamento web do botão **Conectar Melhor Envio** corrigido para não depender de pop-up após chamada assíncrona.
-
-O próximo ponto de retomada passa a ser o tópico 3 da ordem oficial: completar Symphony e executar a conferência integral do catálogo e dos custos.
+O sistema só deve ser declarado 10/10 quando os P0 estiverem operacionais, as homologações externas P1 tiverem evidência e a acessibilidade tiver validação automatizada e manual. Até lá, a base está estável e utilizável, mas a nota deve permanecer honesta.

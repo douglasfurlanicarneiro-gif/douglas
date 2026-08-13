@@ -103,6 +103,9 @@ class BancoOperacionalFalso:
 
 def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
     monkeypatch.setattr(admin, "get_db", lambda: BancoOperacionalFalso())
+    async def saldos(_db):
+        return {"perfume-ok": 100, "perfume-negativo": -30}
+    monkeypatch.setattr(admin, "mapa_saldo_fisico", saldos)
     monkeypatch.setattr(admin, "INFINITEPAY_WEBHOOK_SECRET_DEDICATED", True)
     monkeypatch.setattr(admin, "MELHOR_ENVIO_BASE_URL", "https://melhorenvio.com.br")
 
@@ -121,6 +124,8 @@ def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
     assert resumo["errosFrontend24h"] == 2
     assert resumo["errosFrontendRecentes"][0]["mensagem"] == "Falha visual recuperada"
     assert resumo["errosFrontendRecentes"][0]["requestId"] == "request-12345678"
+    assert resumo["estoquesNegativos"] == [{"perfumeId": "perfume-negativo", "saldoMl": -30}]
+    assert resumo["estoquesNegativosTotal"] == 1
     assert resumo["integracoes"] == {
         "infinitePayWebhookSecretDedicado": True,
         "melhorEnvioAmbiente": "producao",
@@ -129,6 +134,9 @@ def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
 
 def test_resumo_operacional_alerta_integracoes_em_configuracao_insegura(monkeypatch):
     monkeypatch.setattr(admin, "get_db", lambda: BancoOperacionalFalso())
+    async def saldos(_db):
+        return {}
+    monkeypatch.setattr(admin, "mapa_saldo_fisico", saldos)
     monkeypatch.setattr(admin, "INFINITEPAY_WEBHOOK_SECRET_DEDICATED", False)
     monkeypatch.setattr(
         admin,

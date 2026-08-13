@@ -154,11 +154,14 @@ function VitrineCard({
   onDetails: () => void;
   onToggleFavorite: () => void;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
   const temNotas = item.notasSaida || item.notasCoracao || item.notasFundo;
   const ocasioes = item.ocasioes || [];
   const familias = familiasDoPerfume(item);
   const climaOcasiao = ocasioes.length ? resumirCategorias(ocasioes, 2, 'ocasião', 'ocasiões') : 'Versátil · Todas as ocasiões';
   const familiasResumo = resumirCategorias(familias, 2, 'família', 'famílias');
+
+  useEffect(() => setImageFailed(false), [item.imagemUrl]);
 
   return (
     <View style={styles.card} testID={`vitrine-card-${item.id}`}>
@@ -188,7 +191,7 @@ function VitrineCard({
           accessibilityRole="button"
           accessibilityLabel={`Conhecer ${item.nome}`}
         >
-          {item.imagemUrl ? (
+          {item.imagemUrl && !imageFailed ? (
             <Image
               source={{ uri: item.imagemUrl }}
               style={styles.productImage}
@@ -196,11 +199,12 @@ function VitrineCard({
               transition={180}
               accessible={false}
               accessibilityLabel=""
+              onError={() => setImageFailed(true)}
             />
           ) : (
             <View style={styles.imagePlaceholder}>
               <Feather name="image" size={25} color={PRODUCT_CARD_COLORS.muted} />
-              <Text style={styles.imagePlaceholderText}>Adicionar foto</Text>
+              <Text style={styles.imagePlaceholderText}>Imagem indisponível</Text>
             </View>
           )}
         </Pressable>

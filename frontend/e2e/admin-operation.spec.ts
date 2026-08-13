@@ -141,6 +141,8 @@ async function mockAdminApi(page: Page) {
       pagamentosRevisaoManual: 1,
       pagamentosEmEspera: 2,
       pagamentosProcessando: 0,
+      estoquesNegativosTotal: 1,
+      estoquesNegativos: [{ perfumeId: 'perfume-b', saldoMl: -30 }],
       ultimoBackupEm: '2026-08-10T10:00:00Z',
       ultimaRestauracaoEm: null,
       integracoes: {
@@ -155,6 +157,30 @@ async function mockAdminApi(page: Page) {
         ultimaTentativaEm: '2026-08-10T10:00:00Z',
       }],
     });
+    if (path === '/api/admin/insumos' && request.method() === 'GET') return json([
+      {
+        id: 'insumo-sem-minimo',
+        nome: 'Essência sem mínimo definido',
+        categoria: 'essencia',
+        unidade: 'ml',
+        custoUnitario: 1,
+        estoqueMinimo: 0,
+        saldoAtual: 0,
+        valorEstoque: 0,
+        ativo: true,
+      },
+      {
+        id: 'insumo-baixo',
+        nome: 'Base abaixo do mínimo',
+        categoria: 'base',
+        unidade: 'ml',
+        custoUnitario: 0.02,
+        estoqueMinimo: 1000,
+        saldoAtual: 250,
+        valorEstoque: 5,
+        ativo: true,
+      },
+    ]);
     if (path === '/api/admin/backup/validar' && request.method() === 'POST') {
       return json({
         valido: true,
@@ -195,6 +221,7 @@ test('painel mostra saúde, recuperação e valida o backup antes de restaurar',
   await openAdminSystem(page);
 
   await expect(page.getByText('Pedido pedido-42 · 5 tentativa(s)')).toBeVisible();
+  await expect(page.getByText(/Há 1 saldo\(s\) físico\(s\) negativo\(s\)/)).toBeVisible();
   await expect(page.getByText('Reprocessar confirmações com falha')).toBeVisible();
   await expect(page.getByText('Restaurar backup', { exact: true })).toBeVisible();
 
@@ -369,4 +396,16 @@ test('mantém cadastro, movimentação e conferência de estoque funcionais', as
     quantidadeFisicaMl: 180,
     saldoEsperadoMl: 150,
   });
+});
+
+
+test('só sinaliza reposição quando existe mínimo positivo e o saldo está abaixo dele', async ({ page }) => {
+  await mockAdminApi(page);
+  await openAdminSystem(page);
+
+  await page.getByText('Abrir produção').click();
+  await expect(page.getByText('Base abaixo do mínimo')).toBeVisible();
+  await expect(page.getByText('250 ml · REPOSIÇÃO')).toBeVisible();
+  await expect(page.getByText('0 ml · REPOSIÇÃO', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('1', { exact: true })).toBeVisible();
 });

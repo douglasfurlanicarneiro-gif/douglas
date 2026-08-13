@@ -64,6 +64,10 @@ function parseNumber(value: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function needsRestock(item: Insumo) {
+  return item.estoqueMinimo > 0 && item.saldoAtual < item.estoqueMinimo;
+}
+
 function InlineNotice({ text, error }: { text: string; error?: boolean }) {
   if (!text) return null;
   return (
@@ -447,7 +451,7 @@ export function InsumosView({ perfumes, onChanged }: { perfumes: Perfume[]; onCh
   };
 
   const totalValue = items.reduce((sum, item) => sum + item.valorEstoque, 0);
-  const below = items.filter((item) => item.ativo && item.saldoAtual <= item.estoqueMinimo).length;
+  const below = items.filter((item) => item.ativo && needsRestock(item)).length;
 
   if (loading) return <ActivityIndicator color={COLORS.gold} style={{ margin: SPACING.xl }} accessibilityLabel="Carregando dados operacionais" />;
   return (
@@ -491,7 +495,7 @@ export function InsumosView({ perfumes, onChanged }: { perfumes: Perfume[]; onCh
       <Card title="Matérias-primas" subtitle="Saldo por movimentação; custos e cadastros podem ser editados sem alterar o histórico." icon="layers">
         {items.filter((item) => item.ativo).length === 0 && <Text style={styles.emptyText}>Nenhum insumo ativo cadastrado.</Text>}
         {items.filter((item) => item.ativo).map((item) => {
-          const low = item.saldoAtual <= item.estoqueMinimo;
+          const low = needsRestock(item);
           return (
             <React.Fragment key={item.id}>
               <View style={styles.inventoryRow}>

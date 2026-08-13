@@ -24,7 +24,7 @@ const catalog = {
 
 async function mockApi(
   page: Page,
-  options: { catalogDelayMs?: number; catalogFailures?: number } = {},
+  options: { catalogDelayMs?: number; catalogFailures?: number; brokenImage?: boolean } = {},
 ) {
   const state: { checkout: Record<string, unknown> | null } = { checkout: null };
   let catalogRequests = 0;
@@ -40,7 +40,12 @@ async function mockApi(
       if (options.catalogDelayMs) {
         await new Promise((resolve) => setTimeout(resolve, options.catalogDelayMs));
       }
-      return json(catalog);
+      return json(options.brokenImage ? {
+        ...catalog,
+        itens: catalog.itens.map((item, index) => (
+          index === 0 ? { ...item, imagemUrl: '/imagem-quebrada.avif' } : item
+        )),
+      } : catalog);
     }
     if (path === '/api/admin/configuracoes/publicas') return json({
       nomeLoja: 'L’Essence Furlani', logoUrl: '', whatsapp: '5511999999999', instagram: '', email: '',
@@ -100,6 +105,12 @@ test('mantém filtros e catálogo legíveis', async ({ page }) => {
   await expect(page.getByTestId('filter-made-to-order')).toContainText('Sob encomenda');
   await expect(page.getByTestId('filter-favorites')).toContainText('Favoritos');
   await expect(page.getByTestId('filter-open')).toContainText('Filtros');
+});
+
+test('mostra uma alternativa elegante quando a foto externa falha', async ({ page }) => {
+  await mockApi(page, { brokenImage: true });
+  await openStore(page);
+  await expect(page.getByText('Imagem indisponível')).toBeVisible();
 });
 
 test('calcula frete, total e envia checkout completo', async ({ page }) => {

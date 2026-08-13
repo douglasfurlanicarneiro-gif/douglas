@@ -1531,6 +1531,14 @@ export function Atelie({
                 danger
               />
             )}
+            {!!operationalSummary?.estoquesNegativos?.length && (
+              <View style={styles.operationWarning}>
+                <Feather name="alert-octagon" size={15} color={COLORS.rust} />
+                <Text style={styles.operationWarningText}>
+                  Há {operationalSummary.estoquesNegativosTotal} saldo(s) físico(s) negativo(s). Confira a quantidade real na aba Estoque antes de continuar vendendo esses itens.
+                </Text>
+              </View>
+            )}
             {!!operationalSummary?.errosFrontendRecentes?.[0] && (
               <View style={styles.operationWarning}>
                 <Feather name="smartphone" size={15} color={COLORS.rust} />

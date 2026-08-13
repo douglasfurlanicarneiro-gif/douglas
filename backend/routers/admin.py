@@ -365,6 +365,7 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
         esquema_banco,
         erros_frontend_24h,
         erros_frontend_recentes,
+        saldos_estoque,
     ) = await asyncio.gather(
         db.eventos_pagamento.count_documents({"status": "falhou"}),
         db.eventos_pagamento.count_documents({"status": "revisao_manual"}),
@@ -390,7 +391,14 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
         .sort("ultimaOcorrenciaEm", -1)
         .limit(5)
         .to_list(5),
+        mapa_saldo_fisico(db),
     )
+    estoques_negativos = [
+        {"perfumeId": perfume_id, "saldoMl": int(saldo_ml)}
+        for perfume_id, saldo_ml in saldos_estoque.items()
+        if int(saldo_ml) < 0
+    ]
+    estoques_negativos.sort(key=lambda item: item["saldoMl"])
     banco_pronto = (
         (esquema_banco or {}).get("status") == "pronto"
         and int((esquema_banco or {}).get("versao", 0)) >= DATABASE_SCHEMA_VERSION
@@ -407,6 +415,7 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
             falhos
             or revisao_manual
             or erros_frontend_24h
+            or estoques_negativos
             or not banco_pronto
             or not integracoes_prontas
         ) else "ok",
@@ -429,6 +438,8 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
             "melhorEnvioAmbiente": melhor_envio_ambiente,
         },
         "errosFrontend24h": int(erros_frontend_24h),
+        "estoquesNegativosTotal": len(estoques_negativos),
+        "estoquesNegativos": estoques_negativos[:20],
         "errosFrontendRecentes": [
             {
                 "id": str(erro.get("_id", "")),

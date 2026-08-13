@@ -45,7 +45,7 @@ async def rentabilidade_catalogo(_: str = Depends(require_atelie_auth)):
     db = get_db()
     config = await obter_config_custos(db)
     perfumes = await db.perfumes.find(
-        {},
+        {"arquivadoEm": None},
         {
             "nome": 1,
             "precos": 1,

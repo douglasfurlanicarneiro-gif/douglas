@@ -544,6 +544,11 @@ export type OperationalSummary = {
   ultimoBackupEm: string | null;
   ultimaRestauracaoEm: string | null;
   errosFrontend24h: number;
+  estoquesNegativosTotal: number;
+  estoquesNegativos: {
+    perfumeId: string;
+    saldoMl: number;
+  }[];
   integracoes: {
     infinitePayWebhookSecretDedicado: boolean;
     melhorEnvioAmbiente: 'sandbox' | 'producao';
