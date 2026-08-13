@@ -53,6 +53,7 @@ class ItemCompraIn(BaseModel):
 
 class FreteEscolhidoIn(BaseModel):
     serviceId: int = Field(gt=0)
+    categoriaFrete: Optional[Literal["padrao", "prioritaria"]] = None
 
 
 class CompraIn(BaseModel):
@@ -428,6 +429,10 @@ async def _criar_compra(
                 opcao
                 for opcao in opcoes_frete
                 if opcao["serviceId"] == payload.freteEscolhido.serviceId
+                and (
+                    payload.freteEscolhido.categoriaFrete is None
+                    or opcao.get("categoriaFrete") == payload.freteEscolhido.categoriaFrete
+                )
             ),
             None,
         )

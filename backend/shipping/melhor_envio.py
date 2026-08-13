@@ -404,6 +404,18 @@ async def cotar_frete(
         )
         opcoes_base = [mais_rapida, mais_economica]
 
+    # Algumas contas/CEPs produtivos retornam somente um serviço físico. A
+    # loja, porém, oferece duas modalidades comerciais com regras próprias de
+    # preparação, preço e prazo. Nessa situação ambas usam a mesma cotação da
+    # transportadora, sem inventar custo-base, e recebem os ajustes separados
+    # configurados no painel.
+    if len(opcoes_base) == 1:
+        unica = opcoes_base[0]
+        opcoes_base = [
+            {**unica, "categoriaForcada": "padrao"},
+            {**unica, "categoriaForcada": "prioritaria"},
+        ]
+
     prioritario_id = None
     if len(opcoes_base) > 1:
         prioritario_id = min(
@@ -413,7 +425,12 @@ async def cotar_frete(
 
     opcoes: list[dict[str, Any]] = []
     for opcao in opcoes_base:
-        prioritaria = opcao["serviceId"] == prioritario_id
+        categoria_forcada = opcao.get("categoriaForcada")
+        prioritaria = (
+            categoria_forcada == "prioritaria"
+            if categoria_forcada
+            else opcao["serviceId"] == prioritario_id
+        )
         prefixo = "Prioritario" if prioritaria else "Padrao"
         tipo_ajuste = str(config.get(f"ajuste{prefixo}Tipo", "valor"))
         valor_ajuste = max(0.0, float(config.get(f"ajuste{prefixo}Valor", 0)))
@@ -426,7 +443,7 @@ async def cotar_frete(
         )
         preco_final = round(base_transportadora + taxa + acrescimo, 2)
         opcoes.append({
-            **opcao,
+            **{chave: valor for chave, valor in opcao.items() if chave != "categoriaForcada"},
             "categoriaFrete": "prioritaria" if prioritaria else "padrao",
             "nomeExibicao": "Entrega Prioritária" if prioritaria else "Entrega Padrão",
             "taxaEmbalagem": taxa,

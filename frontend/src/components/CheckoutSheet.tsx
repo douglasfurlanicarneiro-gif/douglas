@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
@@ -138,13 +138,18 @@ export function CheckoutSheet({
         : fastest
     )).serviceId;
   }, [opcoesFrete]);
+  const isPriorityOption = useCallback(
+    (option: OpcaoFrete) => option.categoriaFrete === 'prioritaria'
+      || (option.categoriaFrete == null && option.serviceId === priorityServiceId),
+    [priorityServiceId],
+  );
   const displayedShippingOptions = useMemo(
     () => [...opcoesFrete].sort((first, second) => {
-      if (first.serviceId === priorityServiceId) return -1;
-      if (second.serviceId === priorityServiceId) return 1;
+      if (isPriorityOption(first)) return -1;
+      if (isPriorityOption(second)) return 1;
       return first.preco - second.preco;
     }),
-    [opcoesFrete, priorityServiceId],
+    [isPriorityOption, opcoesFrete],
   );
 
   const itensFrete = useMemo(
@@ -212,7 +217,10 @@ export function CheckoutSheet({
           if (cancelled) return;
           setOpcoesFrete(opcoes);
           setFreteSelecionado((current) => (
-            opcoes.find((item) => item.serviceId === current?.serviceId)
+            opcoes.find((item) => (
+              item.serviceId === current?.serviceId
+              && item.categoriaFrete === current?.categoriaFrete
+            ))
             || opcoes[0]
             || null
           ));
@@ -337,6 +345,7 @@ export function CheckoutSheet({
               },
               freteEscolhido: {
                 serviceId: freteSelecionado!.serviceId,
+                categoriaFrete: freteSelecionado!.categoriaFrete,
               },
             }
           : {}),
@@ -398,13 +407,14 @@ export function CheckoutSheet({
   ];
 
   const optionCard = (opcao: OpcaoFrete) => {
-    const active = freteSelecionado?.serviceId === opcao.serviceId;
+    const active = freteSelecionado?.serviceId === opcao.serviceId
+      && freteSelecionado?.categoriaFrete === opcao.categoriaFrete;
     const displayName = opcao.nomeExibicao || (
-      opcao.serviceId === priorityServiceId ? 'Entrega Prioritária' : 'Entrega Padrão'
+      isPriorityOption(opcao) ? 'Entrega Prioritária' : 'Entrega Padrão'
     );
     return (
       <Pressable
-        key={opcao.serviceId}
+        key={`${opcao.serviceId}-${opcao.categoriaFrete || 'legado'}`}
         onPress={() => setFreteSelecionado(opcao)}
         accessibilityRole="radio"
         accessibilityLabel={`${displayName}, prazo estimado ${opcao.prazoDias} ${opcao.prazoDias === 1 ? 'dia útil' : 'dias úteis'}, ${brl(opcao.preco)}`}

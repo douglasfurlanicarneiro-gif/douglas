@@ -108,23 +108,27 @@ def test_cotacao_exibe_preco_final_prazo_e_filtra_transportadora(monkeypatch):
         )
     )
 
-    assert result == [
-        {
-            "serviceId": 3,
-            "transportadora": "Jadlog",
-            "servico": ".Package",
-            "precoTransportadora": 18.5,
-            "prazoTransportadora": 4,
-            "categoriaFrete": "padrao",
-            "nomeExibicao": "Entrega Padrão",
-            "taxaEmbalagem": 5.0,
-            "tipoAjuste": "valor",
-            "valorAjuste": 0.0,
-            "preco": 23.5,
-            "freteGratis": False,
-            "prazoDias": 4,
-        }
-    ]
+    assert len(result) == 2
+    por_categoria = {item["categoriaFrete"]: item for item in result}
+    assert set(por_categoria) == {"padrao", "prioritaria"}
+    assert por_categoria["padrao"] == {
+        "serviceId": 3,
+        "transportadora": "Jadlog",
+        "servico": ".Package",
+        "precoTransportadora": 18.5,
+        "prazoTransportadora": 4,
+        "categoriaFrete": "padrao",
+        "nomeExibicao": "Entrega Padrão",
+        "taxaEmbalagem": 5.0,
+        "tipoAjuste": "valor",
+        "valorAjuste": 0.0,
+        "preco": 23.5,
+        "freteGratis": False,
+        "prazoDias": 4,
+    }
+    assert por_categoria["prioritaria"]["serviceId"] == 3
+    assert por_categoria["prioritaria"]["nomeExibicao"] == "Entrega Prioritária"
+    assert por_categoria["prioritaria"]["preco"] == 26.5
 
 
 def test_cotacao_aplica_regras_independentes_por_modelo(monkeypatch):

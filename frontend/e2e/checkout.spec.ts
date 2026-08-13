@@ -52,7 +52,7 @@ async function mockApi(
     });
     if (path === '/api/frete/cotar') return json({ opcoes: [
       { categoriaFrete: 'padrao', nomeExibicao: 'Entrega Padrão', serviceId: 1, transportadora: 'Jadlog', servico: 'Package', precoTransportadora: 18.9, taxaEmbalagem: 6, preco: 24.9, prazoDias: 6 },
-      { categoriaFrete: 'prioritaria', nomeExibicao: 'Entrega Prioritária', serviceId: 2, transportadora: 'Jadlog', servico: 'Com', precoTransportadora: 21.9, taxaEmbalagem: 6, preco: 27.9, prazoDias: 4 },
+      { categoriaFrete: 'prioritaria', nomeExibicao: 'Entrega Prioritária', serviceId: 1, transportadora: 'Jadlog', servico: 'Package', precoTransportadora: 18.9, taxaEmbalagem: 6, preco: 27.9, prazoDias: 4 },
     ] });
     if (path === '/api/compras' && request.method() === 'POST') {
       state.checkout = request.postDataJSON();
@@ -111,6 +111,7 @@ test('calcula frete, total e envia checkout completo', async ({ page }) => {
   await expect(page.getByTestId('checkout-street')).toHaveValue('Rua de Teste');
   await page.getByTestId('checkout-number').fill('112');
   await expect(page.getByTestId('shipping-option-padrao')).toBeVisible();
+  await expect(page.getByTestId('shipping-option-prioritaria')).toBeVisible();
   await page.getByTestId('shipping-option-padrao').click();
   await page.getByTestId('checkout-to-payment').click();
   await expect(page.getByTestId('checkout-sheet')).toContainText('Perfume Pronta Entrega');
@@ -121,7 +122,7 @@ test('calcula frete, total e envia checkout completo', async ({ page }) => {
   await expect.poll(() => state.checkout).not.toBeNull();
   expect(state.checkout).toMatchObject({
     cliente: 'Cliente Teste', contato: '11999999999',
-    tipoEntrega: 'entrega', freteEscolhido: { serviceId: 1 },
+    tipoEntrega: 'entrega', freteEscolhido: { serviceId: 1, categoriaFrete: 'padrao' },
     itens: [{ perfumeId: 'ready', ml: 50, quantidade: 1 }],
   });
 });
