@@ -209,4 +209,15 @@ Separar regras de negócio, carregamento de dados, componentes visuais, formulá
 
 ## Próximo ponto de retomada
 
-Antes do tópico 3, fechar a configuração externa: **cadastrar `INFINITEPAY_WEBHOOK_SECRET` exclusivo e migrar o Melhor Envio de Sandbox para Produção no Render**, refazendo a autorização OAuth. Depois disso, completar Symphony e auditar custos, dados e fotos dos 416 perfumes.
+As configurações externas de produção abaixo foram concluídas. O próximo passo é completar Symphony e auditar custos, dados e fotos dos 416 perfumes.
+
+## Atualização de produção — 13/08/2026
+
+- `INFINITEPAY_WEBHOOK_SECRET` exclusivo configurado no Render e alerta operacional eliminado.
+- Credenciais produtivas do Melhor Envio configuradas no Render.
+- OAuth produtivo concluído com o escopo mínimo de cotação de fretes.
+- Token de Sandbox separado do token de Produção para impedir falso estado de conexão.
+- Cotação produtiva real validada sem comprar postagem: Jadlog `.Package Centralizado`, com embalagem, ajuste e prazo administrativo aplicados corretamente.
+- Redirecionamento web do botão **Conectar Melhor Envio** corrigido para não depender de pop-up após chamada assíncrona.
+
+O próximo ponto de retomada passa a ser o tópico 3 da ordem oficial: completar Symphony e executar a conferência integral do catálogo e dos custos.
