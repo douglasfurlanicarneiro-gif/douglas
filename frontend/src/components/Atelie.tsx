@@ -441,6 +441,10 @@ export function Atelie({
   const connectMelhorEnvio = async () => {
     try {
       const { url } = await autorizarMelhorEnvio();
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.assign(url);
+        return;
+      }
       await Linking.openURL(url);
     } catch {
       setSheet({ type: 'info', label: 'O aplicativo do Melhor Envio ainda precisa ser configurado no servidor.' });
