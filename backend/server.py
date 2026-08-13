@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 
 from availability import ensure_initial_ready_delivery
+from catalog_seed import ensure_current_nova_essencia_launches
 from config import ATELIE_ADMIN_PASSWORD, ATELIE_ADMIN_USER, CORS_ORIGINS, IS_RENDER
 from database import close_client, get_db
 from database_integrity import ensure_database_schema
@@ -104,6 +105,7 @@ async def _bootstrap_database_once() -> dict:
     ):
         sequencias_reparadas = await reparar_sequencias(db, "perfumes")
         pedidos_reparados = await reparar_sequencias(db, "pedidos")
+        lancamentos = await ensure_current_nova_essencia_launches(db)
         disponibilidade = await ensure_initial_ready_delivery(db)
     # Migrações e índices usam uma trava própria: não bloqueiam o checkout e
     # também não são executados simultaneamente por duas instâncias no deploy.
@@ -115,11 +117,12 @@ async def _bootstrap_database_once() -> dict:
         busy_detail="O esquema do banco está sendo atualizado por outra instância.",
     ):
         esquema = await _criar_indices()
-    if sequencias_reparadas:
+    if sequencias_reparadas or lancamentos["adicionados"]:
         await vitrine.marcar_vitrine_pendente(db)
     return {
         "sequenciasReparadas": sequencias_reparadas,
         "pedidosReparados": pedidos_reparados,
+        "lancamentos": lancamentos,
         "disponibilidade": disponibilidade,
         "esquema": esquema,
     }
