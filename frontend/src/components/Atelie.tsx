@@ -138,7 +138,7 @@ export function Atelie({
   const { width } = useWindowDimensions();
   const desktopViewport = width >= 1200;
   const [tab, setTab] = useState('dashboard');
-  const [systemView, setSystemView] = useState<'main' | 'historico' | 'arquivados' | 'privacidade' | 'fornecedores' | 'custos' | 'insumos'>('main');
+  const [systemView, setSystemView] = useState<'main' | 'historico' | 'arquivados' | 'privacidade' | 'backup' | 'fornecedores' | 'custos' | 'insumos'>('main');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
@@ -747,6 +747,7 @@ export function Atelie({
   const doBackup = async () => {
     try {
       await downloadBackup();
+      await refreshOperationalSummary();
       setSheet({ type: 'info', label: 'Backup criptografado gerado com sucesso. Guarde o arquivo .lfe em um local seguro; ele não pode ser lido como um JSON comum.' });
     } catch {
       setSheet({ type: 'info', label: 'Não foi possível baixar o backup. Abra o painel no navegador e tente novamente.' });
@@ -1182,6 +1183,59 @@ export function Atelie({
         );
       }
 
+      if (systemView === 'backup') {
+        return (
+          <View style={styles.systemPage}>
+            <Pressable onPress={() => setSystemView('main')} style={styles.systemBackButton}>
+              <Feather name="arrow-left" size={16} color={COLORS.gold} />
+              <Text style={styles.systemBackText}>Voltar ao Sistema</Text>
+            </Pressable>
+            <SystemCard
+              icon="database"
+              title="Backup e restauração"
+              subtitle="Proteja os dados da loja e recupere uma cópia anterior com segurança."
+            >
+              <View style={styles.operationHealthGrid}>
+                <View style={styles.operationHealthItem}>
+                  <Text style={styles.backupStatusValue}>
+                    {operationalSummary?.ultimoBackupEm ? fmtDate(operationalSummary.ultimoBackupEm) : 'Não realizado'}
+                  </Text>
+                  <Text style={styles.operationHealthLabel}>Último backup</Text>
+                </View>
+                <View style={styles.operationHealthItem}>
+                  <Text style={styles.backupStatusValue}>
+                    {operationalSummary?.ultimaRestauracaoEm ? fmtDate(operationalSummary.ultimaRestauracaoEm) : 'Nunca restaurado'}
+                  </Text>
+                  <Text style={styles.operationHealthLabel}>Última restauração</Text>
+                </View>
+              </View>
+              <View style={styles.backupGuidance}>
+                <Feather name="shield" size={16} color={COLORS.gold} />
+                <Text style={styles.backupGuidanceText}>
+                  Exporte uma cópia antes de alterações importantes. O arquivo é criptografado e deve ser guardado fora do aparelho usado no painel.
+                </Text>
+              </View>
+              <SystemAction
+                icon="download"
+                title="Baixar backup agora"
+                subtitle="Gera uma cópia criptografada .lfe com os dados atuais."
+                onPress={() => void doBackup()}
+              />
+              <SystemAction
+                icon="upload"
+                title="Restaurar um backup"
+                subtitle="Primeiro valida o arquivo; só depois, com sua senha, substitui os dados."
+                onPress={chooseAndRestoreBackup}
+                danger
+              />
+              <Text style={styles.operationHealthHint}>
+                A restauração é transacional: se alguma etapa falhar, nenhuma coleção será parcialmente substituída.
+              </Text>
+            </SystemCard>
+          </View>
+        );
+      }
+
       if (systemView === 'custos') {
         return (
           <View style={styles.systemPage}>
@@ -1565,8 +1619,14 @@ export function Atelie({
             />
           </SystemCard>
 
-          <SystemCard icon="database" title="Base de dados" subtitle="Backup e limpezas protegidas por confirmação de senha.">
-            <SystemAction icon="download" title="Exportar backup criptografado" subtitle="Baixe uma cópia protegida e compactada dos dados atuais." onPress={doBackup} />
+          <SystemCard icon="database" title="Base de dados" subtitle="Backup, registros preservados e limpezas protegidas.">
+            <SystemAction
+              icon="database"
+              title="Abrir backup e restauração"
+              subtitle="Baixe uma cópia segura ou recupere um backup anterior."
+              onPress={() => setSystemView('backup')}
+              badge={operationalSummary?.ultimoBackupEm ? 'PROTEGIDO' : 'PENDENTE'}
+            />
             <SystemAction
               icon="archive"
               title="Itens arquivados"
@@ -1580,12 +1640,6 @@ export function Atelie({
               subtitle="Atenda solicitações de acesso, correção, exclusão e revogação."
               onPress={() => void openPrivacidade()}
               badge={solicitacoesPrivacidade.filter((item) => item.status === 'recebida').length ? String(solicitacoesPrivacidade.filter((item) => item.status === 'recebida').length) : undefined}
-            />
-            <SystemAction
-              icon="upload"
-              title="Restaurar backup"
-              subtitle="Valide e restaure um arquivo .lfe anterior com transação segura."
-              onPress={chooseAndRestoreBackup}
             />
             <SystemAction
               icon="trash-2"
@@ -1969,6 +2023,9 @@ const styles = StyleSheet.create({
   operationHealthValue: { color: COLORS.bone, fontSize: FONT_SIZES.title, fontWeight: '700' },
   operationHealthLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   operationHealthHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 15, marginBottom: 8 },
+  backupStatusValue: { color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '700', textAlign: 'center' },
+  backupGuidance: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: 11, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: 6 },
+  backupGuidanceText: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, lineHeight: 18 },
   operationWarning: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 9, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: 4 },
   operationWarningText: { flex: 1, color: COLORS.rust, fontSize: FONT_SIZES.caption, lineHeight: 15 },
   supplierActive: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 4, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.gold + '44' },

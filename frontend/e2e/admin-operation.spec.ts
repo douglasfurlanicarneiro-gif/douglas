@@ -223,10 +223,14 @@ test('painel mostra saúde, recuperação e valida o backup antes de restaurar',
   await expect(page.getByText('Pedido pedido-42 · 5 tentativa(s)')).toBeVisible();
   await expect(page.getByText(/Há 1 saldo\(s\) físico\(s\) negativo\(s\)/)).toBeVisible();
   await expect(page.getByText('Reprocessar confirmações com falha')).toBeVisible();
-  await expect(page.getByText('Restaurar backup', { exact: true })).toBeVisible();
+  await expect(page.getByText('Abrir backup e restauração', { exact: true })).toBeVisible();
+  await page.getByText('Abrir backup e restauração', { exact: true }).click();
+  await expect(page.getByText('Backup e restauração', { exact: true })).toBeVisible();
+  await expect(page.getByText('Baixar backup agora', { exact: true })).toBeVisible();
+  await expect(page.getByText('Restaurar um backup', { exact: true })).toBeVisible();
 
   const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.getByText('Restaurar backup', { exact: true }).click();
+  await page.getByText('Restaurar um backup', { exact: true }).click();
   const fileChooser = await fileChooserPromise;
   await fileChooser.setFiles('e2e/fixtures/test-backup.lfe');
 
