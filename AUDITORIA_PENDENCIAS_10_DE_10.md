@@ -11,8 +11,8 @@ Nota geral estimada: **8,9/10**.
 | Área | Nota atual | Principal pendência |
 |---|---:|---|
 | UX e identidade visual | 9,2 | Revisão final em diferentes telas e aparelhos |
-| Pagamentos | 9,3 | Exercícios financeiros excepcionais e segredo dedicado no Render |
-| Frete e checkout | 9,0 | Compra da postagem, etiqueta e rastreamento da transportadora |
+| Pagamentos | 9,2 | Configurar segredo dedicado no Render e exercícios financeiros excepcionais |
+| Frete e checkout | 8,8 | Migrar do Sandbox para produção, comprar postagem, gerar etiqueta e rastrear |
 | Estoque | 9,2 | Auditoria integral de custos e concorrência em produção |
 | Backend/API | 9,0 | Reduzir módulos grandes e ampliar testes externos |
 | Segurança | 8,8 | Dependências transitivas e teste de invasão |
@@ -80,7 +80,7 @@ Confirmado com segurança, sem gerar nova cobrança:
 
 Pendências externas que não devem ser simuladas com dinheiro real sem autorização específica:
 
-- confirmar no painel publicado se o segredo dedicado está ativo no Render;
+- o painel publicado confirmou que o segredo dedicado ainda não está ativo no Render;
 - executar, quando houver ambiente apropriado, cartão recusado, estorno real, contestação e chargeback;
 - testar indisponibilidade real do provedor sem afetar clientes.
 
@@ -100,7 +100,7 @@ Confirmado:
 
 Ainda pendente:
 
-- confirmar o indicador `Produção` depois da publicação desta versão;
+- o painel publicado confirmou `Conectado · Sandbox`; é necessário cadastrar as credenciais produtivas e refazer a autorização OAuth;
 - implementar compra do frete, etiqueta da transportadora e rastreamento;
 - homologar cancelamento de postagem e tratamento de falhas da transportadora.
 
@@ -209,4 +209,4 @@ Separar regras de negócio, carregamento de dados, componentes visuais, formulá
 
 ## Próximo ponto de retomada
 
-Começar pelo tópico 3: **completar Symphony e auditar custos, dados e fotos dos 416 perfumes**, preservando os dados já conferidos e produzindo um relatório exato de lacunas antes de qualquer correção em massa.
+Antes do tópico 3, fechar a configuração externa: **cadastrar `INFINITEPAY_WEBHOOK_SECRET` exclusivo e migrar o Melhor Envio de Sandbox para Produção no Render**, refazendo a autorização OAuth. Depois disso, completar Symphony e auditar custos, dados e fotos dos 416 perfumes.
