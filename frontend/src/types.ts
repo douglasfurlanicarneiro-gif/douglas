@@ -434,6 +434,7 @@ export type CheckoutPayload = {
   tipoEntrega: 'entrega' | 'retirada';
   freteEscolhido?: {
     serviceId: number;
+    categoriaFrete?: 'padrao' | 'prioritaria';
   };
 };
 
