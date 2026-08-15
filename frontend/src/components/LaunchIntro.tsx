@@ -3,6 +3,7 @@ import { Animated, Easing, Platform, StyleSheet, useWindowDimensions, View } fro
 import { LinearGradient } from 'expo-linear-gradient';
 import { COLORS, TYPOGRAPHY } from '../theme';
 import { AppText as Text } from './Typography';
+import { useReducedMotion } from '../hooks/use-reduced-motion';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
 
@@ -14,6 +15,7 @@ export function LaunchIntro({
   storeName?: string;
 }) {
   const { width, height } = useWindowDimensions();
+  const reducedMotion = useReducedMotion();
   const [logoReady, setLogoReady] = useState(false);
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -48,6 +50,16 @@ export function LaunchIntro({
 
   useEffect(() => {
     if (!logoReady) return;
+
+    if (reducedMotion) {
+      logoOpacity.setValue(1);
+      logoScale.setValue(1);
+      captionOpacity.setValue(1);
+      captionTranslateY.setValue(0);
+      shineOpacity.setValue(0);
+      const timer = setTimeout(onFinish, 320);
+      return () => clearTimeout(timer);
+    }
 
     const animation = Animated.sequence([
       Animated.parallel([
@@ -126,7 +138,7 @@ export function LaunchIntro({
     });
 
     return () => animation.stop();
-  }, [captionOpacity, captionTranslateY, logoOpacity, logoReady, logoScale, onFinish, overlayOpacity, shineOpacity, shineProgress]);
+  }, [captionOpacity, captionTranslateY, logoOpacity, logoReady, logoScale, onFinish, overlayOpacity, reducedMotion, shineOpacity, shineProgress]);
 
   return (
     <Animated.View

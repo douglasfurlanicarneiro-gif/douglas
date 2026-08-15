@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform, type StyleProp, type ViewStyle } from 'react-native';
+import { View, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { COLORS, SPACING, TYPOGRAPHY, FONT_SIZES } from '../theme';
 import { AppText as Text } from './Typography';
+import { useReducedMotion } from '../hooks/use-reduced-motion';
 
 type Props = {
   visible: boolean;
@@ -25,6 +26,9 @@ export function BottomSheet({
   tone = 'dark',
   contentContainerStyle,
 }: Props) {
+  const { width } = useWindowDimensions();
+  const desktop = width >= 900;
+  const reducedMotion = useReducedMotion();
   const scrollRef = useRef<ScrollView>(null);
   const closeRef = useRef<React.ElementRef<typeof Pressable>>(null);
   const sheetRef = useRef<React.ElementRef<typeof Pressable>>(null);
@@ -87,7 +91,7 @@ export function BottomSheet({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={reducedMotion ? 'none' : desktop ? 'fade' : 'slide'}
       onRequestClose={onClose}
       statusBarTranslucent
       accessibilityViewIsModal
@@ -98,10 +102,19 @@ export function BottomSheet({
         testID="bottom-sheet-backdrop"
         accessible={false}
       >
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.avoider}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={[styles.avoider, desktop && styles.avoiderDesktop]}
+        >
           <Pressable
             ref={sheetRef}
-            style={[styles.sheet, tone === 'light' && styles.sheetLight, compact && styles.sheetCompact]}
+            style={[
+              styles.sheet,
+              desktop && styles.sheetDesktop,
+              tone === 'light' && styles.sheetLight,
+              compact && styles.sheetCompact,
+              desktop && compact && styles.sheetCompactDesktop,
+            ]}
             onPress={() => {}}
             testID={testID}
             accessibilityLabel={title}
@@ -141,9 +154,12 @@ export function BottomSheet({
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(10,9,6,0.72)', justifyContent: 'flex-end' },
   avoider: { flex: 1, justifyContent: 'flex-end', minHeight: 0 },
+  avoiderDesktop: { justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
   sheet: { backgroundColor: COLORS.surfaceRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24, height: '88%', maxHeight: '88%', minHeight: 0, overflow: 'hidden' },
+  sheetDesktop: { width: '92%', maxWidth: 1120, height: '84%', maxHeight: 820, borderRadius: 24, borderWidth: 1, borderColor: COLORS.border },
   sheetLight: { backgroundColor: COLORS.surface },
   sheetCompact: { height: 'auto' },
+  sheetCompactDesktop: { width: '92%', maxWidth: 680, maxHeight: '78%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   headerLight: { borderBottomColor: COLORS.border },
   title: { ...TYPOGRAPHY.subtitle, color: COLORS.bone, fontSize: FONT_SIZES.heading, lineHeight: 24, flex: 1 },

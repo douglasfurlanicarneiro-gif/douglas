@@ -146,6 +146,7 @@ function VitrineCard({
   onReview,
   onDetails,
   onToggleFavorite,
+  reserveFloatingActionSpace,
 }: {
   item: VitrineItem;
   favorite: boolean;
@@ -153,6 +154,7 @@ function VitrineCard({
   onReview: () => void;
   onDetails: () => void;
   onToggleFavorite: () => void;
+  reserveFloatingActionSpace: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const temNotas = item.notasSaida || item.notasCoracao || item.notasFundo;
@@ -267,7 +269,7 @@ function VitrineCard({
         </View>
       )}
 
-      <View style={styles.cardActions}>
+      <View style={[styles.cardActions, reserveFloatingActionSpace && styles.cardActionsFabSafe]}>
         <Pressable
           onPress={onReview}
           style={styles.reviewButton}
@@ -284,7 +286,7 @@ function VitrineCard({
         accessibilityRole="button"
         accessibilityLabel={`Conhecer a fragrância ${item.nome}`}
       >
-          <Text style={styles.detailsText}>Conhecer a fragrância</Text>
+          <Text style={styles.detailsText} numberOfLines={1}>Conhecer a fragrância</Text>
           <Feather name="arrow-right" size={13} color={COLORS.gold} />
       </Pressable>
       </View>
@@ -947,6 +949,7 @@ export function Vitrine({
               onReview={() => setReviewItem(item)}
               onDetails={() => setDetailItem(item)}
               onToggleFavorite={() => toggleFavorite(item.id)}
+              reserveFloatingActionSpace={phoneViewport}
             />
           </View>
         )}
@@ -1058,7 +1061,7 @@ export function Vitrine({
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && styles.quickFilterTextActive,
-                      ]} numberOfLines={1}>Pronta entrega</Text>
+                      ]} numberOfLines={1}>{narrowViewport ? 'Pronta' : 'Pronta entrega'}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1100,7 +1103,7 @@ export function Vitrine({
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && styles.quickFilterTextActive,
-                      ]} numberOfLines={1}>Sob encomenda</Text>
+                      ]} numberOfLines={1}>{narrowViewport ? 'Encomenda' : 'Sob encomenda'}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1194,8 +1197,10 @@ export function Vitrine({
         <Feather name="message-circle" size={22} color={COLORS.ink} />
       </Pressable>
 
+      <View style={styles.bottomNavShell} pointerEvents="box-none">
       <View style={[
         styles.bottomNav,
+        !phoneViewport && styles.bottomNavDesktop,
         { paddingBottom: Math.max(insets.bottom, 12) },
       ]}>
         <View style={styles.navItem}>
@@ -1230,6 +1235,7 @@ export function Vitrine({
           </View>
           <Text style={styles.navText}>Pedidos</Text>
         </Pressable>
+      </View>
       </View>
 
       {cartOpen && <React.Suspense fallback={null}><LazyCheckoutSheet
@@ -1912,12 +1918,15 @@ const styles = StyleSheet.create({
   notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
   notesEmptyText: { ...TYPOGRAPHY.bodySmall, color: PRODUCT_CARD_COLORS.muted, fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
+  cardActionsFabSafe: { paddingRight: 48 },
   reviewButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 },
   reviewText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption },
-  detailsButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingHorizontal: 4 },
-  detailsText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  detailsButton: { minHeight: 44, flexShrink: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingHorizontal: 4 },
+  detailsText: { flexShrink: 1, color: COLORS.goldText, fontSize: FONT_SIZES.caption, fontWeight: '600' },
   fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
+  bottomNavShell: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' },
+  bottomNav: { width: '100%', flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
+  bottomNavDesktop: { maxWidth: 820, marginBottom: 12, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.lg, shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
   navTextActive: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, marginTop: 3 },
   navText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },

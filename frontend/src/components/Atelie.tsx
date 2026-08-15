@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, useWindowDimensions, Linking, Platform } from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, useWindowDimensions, Linking, Platform, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
@@ -31,6 +31,7 @@ import type { CatalogoEstoqueResumo, Compra, ConfiguracaoFrete, ConfiguracoesLoj
 import { publicStoreConfig, storeNameParts, whatsappNumber } from '../storeConfig';
 import { CustosView, FornecedoresView, InsumosView } from './GestaoOperacional';
 import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
+import { useReducedMotion } from '../hooks/use-reduced-motion';
 import {
   ConfirmSheetContent,
   SystemAction,
@@ -137,8 +138,24 @@ export function Atelie({
 }) {
   const { width } = useWindowDimensions();
   const desktopViewport = width >= 1200;
+  const reducedMotion = useReducedMotion();
+  const contentTransition = React.useRef(new Animated.Value(1)).current;
   const [tab, setTab] = useState('dashboard');
   const [systemView, setSystemView] = useState<'main' | 'historico' | 'arquivados' | 'privacidade' | 'backup' | 'fornecedores' | 'custos' | 'insumos'>('main');
+
+  useEffect(() => {
+    if (reducedMotion) {
+      contentTransition.setValue(1);
+      return;
+    }
+    contentTransition.setValue(0);
+    Animated.timing(contentTransition, {
+      toValue: 1,
+      duration: 190,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [contentTransition, reducedMotion, systemView, tab]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [perfumes, setPerfumes] = useState<Perfume[]>([]);
@@ -1833,7 +1850,19 @@ export function Atelie({
           scrollEventThrottle={16}
         >
           <View style={[styles.adminContent, desktopViewport && styles.adminContentWide]}>
-            {renderContent()}
+            <Animated.View
+              style={{
+                opacity: contentTransition,
+                transform: [{
+                  translateY: contentTransition.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [reducedMotion ? 0 : 7, 0],
+                  }),
+                }],
+              }}
+            >
+              {renderContent()}
+            </Animated.View>
           </View>
         </ScrollView>
       </View>

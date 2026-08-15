@@ -101,10 +101,18 @@ async function fillCustomer(page: Page) {
 test('mantém filtros e catálogo legíveis', async ({ page }) => {
   await mockApi(page);
   await openStore(page);
-  await expect(page.getByTestId('filter-ready-delivery')).toContainText('Pronta entrega');
-  await expect(page.getByTestId('filter-made-to-order')).toContainText('Sob encomenda');
+  await expect(page.getByTestId('filter-ready-delivery')).toContainText(/Pronta(?: entrega)?/);
+  await expect(page.getByTestId('filter-made-to-order')).toContainText(/(?:Sob )?encomenda/i);
   await expect(page.getByTestId('filter-favorites')).toContainText('Favoritos');
   await expect(page.getByTestId('filter-open')).toContainText('Filtros');
+
+  const filterLabels = await Promise.all([
+    page.getByTestId('filter-ready-delivery').innerText(),
+    page.getByTestId('filter-made-to-order').innerText(),
+    page.getByTestId('filter-favorites').innerText(),
+    page.getByTestId('filter-open').innerText(),
+  ]);
+  expect(filterLabels.every((label) => !label.includes('…'))).toBe(true);
 });
 
 test('mostra uma alternativa elegante quando a foto externa falha', async ({ page }) => {
@@ -117,6 +125,16 @@ test('calcula frete, total e envia checkout completo', async ({ page }) => {
   const state = await mockApi(page);
   await openStore(page);
   await page.getByTestId('buy-ready-50').click();
+  const sheetBox = await page.getByTestId('checkout-sheet').boundingBox();
+  const viewport = page.viewportSize();
+  expect(sheetBox).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  if ((viewport?.width || 0) >= 900) {
+    expect(sheetBox?.width || 0).toBeLessThanOrEqual(1120);
+    expect(Math.abs((sheetBox?.x || 0) - ((viewport?.width || 0) - (sheetBox?.width || 0)) / 2)).toBeLessThanOrEqual(2);
+  } else {
+    expect(sheetBox?.width || 0).toBeGreaterThanOrEqual((viewport?.width || 0) - 2);
+  }
   await fillCustomer(page);
   await page.getByTestId('checkout-cep').fill('03069000');
   await expect(page.getByTestId('checkout-street')).toHaveValue('Rua de Teste');
