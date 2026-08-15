@@ -43,7 +43,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#D8CBB9"
         }
-      ]
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true
