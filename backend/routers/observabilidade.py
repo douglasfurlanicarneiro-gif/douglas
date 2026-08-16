@@ -61,9 +61,11 @@ async def registrar_erro_frontend(payload: FrontendErrorIn, request: Request):
                 "versao": _sanitizar(payload.versao, 80),
                 "ultimoRequestId": request_id,
             },
+            # Uma nova ocorrência reabre automaticamente um alerta que o
+            # administrador já havia marcado como resolvido.
+            "$unset": {"resolvidoEm": ""},
             "$inc": {"ocorrencias": 1},
         },
         upsert=True,
     )
     return {"recebido": True, "requestId": request_id}
-

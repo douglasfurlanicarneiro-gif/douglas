@@ -19,7 +19,7 @@ import {
   listPedidos, createPedido, updatePedido, deletePedido, registerPaymentOperation,
   listOpinioesAdmin, moderateOpiniao, deleteOpiniao,
   listSugestoes, deleteSugestao, listCompras, deleteCompra,
-  downloadBackup, downloadOrderLabels, auditCatalog, validateBackup, restoreBackup, getOperationalSummary, retryFailedPayments, getMetricas, resetAllOrders,
+  downloadBackup, downloadOrderLabels, auditCatalog, validateBackup, restoreBackup, getOperationalSummary, retryFailedPayments, resolveFrontendError, getMetricas, resetAllOrders,
   getConfiguracaoFrete, updateConfiguracaoFrete, autorizarMelhorEnvio,
   aplicarPrecos, ApiError, getConfiguracoesLoja, updateConfiguracoesLoja, limparDados,
   listArquivados, restoreArquivado,
@@ -838,6 +838,22 @@ export function Atelie({
       setLoadingOperation(false);
     }
   };
+
+  const dismissFrontendError = async (errorId: string) => {
+    setLoadingOperation(true);
+    try {
+      await resolveFrontendError(errorId);
+      await refreshOperationalSummary();
+      setSheet({ type: 'info', label: 'Ocorrência marcada como resolvida. Se voltar a acontecer, o alerta aparecerá novamente.' });
+    } catch (error) {
+      setSheet({
+        type: 'info',
+        label: error instanceof ApiError ? error.message : 'Não foi possível resolver a ocorrência.',
+      });
+    } finally {
+      setLoadingOperation(false);
+    }
+  };
   const chooseAndRestoreBackup = () => {
     if (Platform.OS !== 'web' || typeof document === 'undefined') {
       setSheet({ type: 'info', label: 'Abra o painel em um navegador para selecionar e restaurar o arquivo .lfe.' });
@@ -1611,20 +1627,32 @@ export function Atelie({
               </View>
             )}
             {!!operationalSummary?.errosFrontendRecentes?.[0] && (
-              <View style={styles.operationWarning}>
-                <Feather name="smartphone" size={15} color={COLORS.rust} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.operationWarningText}>
-                    {operationalSummary.errosFrontendRecentes[0].mensagem}
-                  </Text>
-                  <Text style={styles.operationHealthHint}>
-                    {operationalSummary.errosFrontendRecentes[0].plataforma || 'app'} · {operationalSummary.errosFrontendRecentes[0].ocorrencias} ocorrência(s)
-                    {operationalSummary.errosFrontendRecentes[0].requestId
-                      ? ` · código ${operationalSummary.errosFrontendRecentes[0].requestId}`
-                      : ''}
-                  </Text>
+              <>
+                <View style={styles.operationWarning}>
+                  <Feather name="smartphone" size={15} color={COLORS.rust} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.operationWarningText}>
+                      {operationalSummary.errosFrontendRecentes[0].mensagem}
+                    </Text>
+                    <Text style={styles.operationHealthHint}>
+                      {operationalSummary.errosFrontendRecentes[0].plataforma || 'app'} · {operationalSummary.errosFrontendRecentes[0].ocorrencias} ocorrência(s)
+                      {operationalSummary.errosFrontendRecentes[0].caminho
+                        ? ` · tela ${operationalSummary.errosFrontendRecentes[0].caminho}`
+                        : ''}
+                      {operationalSummary.errosFrontendRecentes[0].requestId
+                        ? ` · código ${operationalSummary.errosFrontendRecentes[0].requestId}`
+                        : ''}
+                    </Text>
+                  </View>
                 </View>
-              </View>
+                <SystemAction
+                  icon="check-circle"
+                  title="Marcar ocorrência como resolvida"
+                  subtitle="Remove o alerta atual. Ele reaparecerá automaticamente se a falha voltar."
+                  onPress={() => void dismissFrontendError(operationalSummary.errosFrontendRecentes[0].id)}
+                  disabled={loadingOperation}
+                />
+              </>
             )}
             <SystemAction
               icon="refresh-cw"

@@ -62,9 +62,31 @@ function apiErrorMessage(body: unknown): string {
   if (Array.isArray(detail)) {
     const messages = detail.flatMap((item) => {
       if (!item || typeof item !== 'object') return [];
-      const error = item as { loc?: unknown; msg?: unknown };
+      const error = item as { loc?: unknown; msg?: unknown; type?: unknown; ctx?: unknown };
       const location = Array.isArray(error.loc) ? error.loc.map(String) : [];
       if (location.includes('email')) return ['Informe um e-mail válido.'];
+      const field = location.at(-1) || 'valor';
+      const labels: Record<string, string> = {
+        ml: 'O volume',
+        quantidade: 'A quantidade',
+        quantidadeMl: 'A quantidade em ml',
+        taxaEmbalagem: 'A taxa de embalagem',
+        diferencaMinimaPrioritario: 'A diferença mínima do frete prioritário',
+        preco: 'O preço',
+      };
+      const label = labels[field] || 'O valor informado';
+      const context = error.ctx && typeof error.ctx === 'object'
+        ? error.ctx as Record<string, unknown>
+        : {};
+      if (error.type === 'less_than_equal' && context.le !== undefined) {
+        return [`${label} deve ser no máximo ${context.le}.`];
+      }
+      if (error.type === 'greater_than' && context.gt !== undefined) {
+        return [`${label} deve ser maior que ${context.gt}.`];
+      }
+      if (error.type === 'greater_than_equal' && context.ge !== undefined) {
+        return [`${label} deve ser pelo menos ${context.ge}.`];
+      }
       if (typeof error.msg !== 'string') return [];
       return [error.msg.replace(/^Value error,\s*/i, '')];
     });
@@ -652,6 +674,13 @@ export const getOperationalSummary = () =>
 export const retryFailedPayments = () =>
   request<{ status: string; reprocessados: number }>(
     '/admin/operacao/pagamentos/reprocessar-falhos',
+    { method: 'POST' },
+    true,
+  );
+
+export const resolveFrontendError = (errorId: string) =>
+  request<{ status: string; id: string }>(
+    `/admin/operacao/erros-frontend/${encodeURIComponent(errorId)}/resolver`,
     { method: 'POST' },
     true,
   );

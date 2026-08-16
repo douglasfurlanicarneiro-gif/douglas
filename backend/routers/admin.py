@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import re
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -354,6 +355,11 @@ async def restaurar_backup_recebido(
 @router.get("/operacao/resumo")
 async def resumo_operacional(_: str = Depends(require_atelie_auth)):
     db = get_db()
+    erros_frontend_abertos = {"resolvidoEm": {"$exists": False}}
+    erros_frontend_abertos_24h = {
+        **erros_frontend_abertos,
+        "ultimaOcorrenciaEm": {"$gte": datetime.now(timezone.utc) - timedelta(hours=24)},
+    }
     (
         falhos,
         revisao_manual,
@@ -384,10 +390,8 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
             sort=[("data", -1)],
         ),
         db.configuracoes.find_one({"_id": "database_schema"}),
-        db.frontend_errors.count_documents(
-            {"ultimaOcorrenciaEm": {"$gte": datetime.now(timezone.utc) - timedelta(hours=24)}}
-        ),
-        db.frontend_errors.find({})
+        db.frontend_errors.count_documents(erros_frontend_abertos_24h),
+        db.frontend_errors.find(erros_frontend_abertos)
         .sort("ultimaOcorrenciaEm", -1)
         .limit(5)
         .to_list(5),
@@ -464,6 +468,34 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
             for evento in eventos
         ],
     }
+
+
+@router.post("/operacao/erros-frontend/{erro_id}/resolver")
+async def resolver_erro_frontend(
+    erro_id: str,
+    _: str = Depends(require_atelie_auth),
+):
+    if not re.fullmatch(r"[a-f0-9]{32}", erro_id):
+        raise HTTPException(status_code=400, detail="Identificador de ocorrência inválido.")
+
+    db = get_db()
+    agora = datetime.now(timezone.utc)
+    resultado = await db.frontend_errors.update_one(
+        {"_id": erro_id, "resolvidoEm": {"$exists": False}},
+        {"$set": {"resolvidoEm": agora}},
+    )
+    if not resultado.matched_count:
+        raise HTTPException(status_code=404, detail="A ocorrência já foi resolvida ou não existe.")
+
+    await registrar_auditoria(
+        db,
+        acao="resolver-erro-frontend",
+        recurso="saude-operacional",
+        recurso_id=erro_id,
+        titulo="Ocorrência do aplicativo resolvida",
+        detalhes="Ocorrência do aplicativo marcada como resolvida.",
+    )
+    return {"status": "Ocorrência resolvida.", "id": erro_id}
 
 
 @router.post("/operacao/pagamentos/reprocessar-falhos")

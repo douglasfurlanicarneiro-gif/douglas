@@ -75,6 +75,9 @@ class ConfiguracoesFalsas:
 
 
 class FrontendErrorsFalsos:
+    def __init__(self):
+        self.ultima_atualizacao = None
+
     async def count_documents(self, _filtro):
         return 2
 
@@ -91,6 +94,10 @@ class FrontendErrorsFalsos:
                 "ultimoRequestId": "request-12345678",
             }
         ])
+
+    async def update_one(self, filtro, atualizacao):
+        self.ultima_atualizacao = (filtro, atualizacao)
+        return type("Resultado", (), {"matched_count": 1})()
 
 
 class BancoOperacionalFalso:
@@ -165,6 +172,20 @@ def test_reprocessamento_reenfileira_falhas_e_registra_auditoria(monkeypatch):
     assert atualizacao["$set"]["status"] == "repetir"
     assert atualizacao["$set"]["tentativas"] == 0
     assert banco.operacoes_sistema.inseridos[0]["tipo"] == "auditoria:reprocessar"
+
+
+def test_resolver_erro_frontend_fecha_alerta_e_registra_auditoria(monkeypatch):
+    banco = BancoOperacionalFalso()
+    monkeypatch.setattr(admin, "get_db", lambda: banco)
+    erro_id = "a" * 32
+
+    resposta = asyncio.run(admin.resolver_erro_frontend(erro_id, "sessao"))
+
+    assert resposta == {"status": "Ocorrência resolvida.", "id": erro_id}
+    filtro, atualizacao = banco.frontend_errors.ultima_atualizacao
+    assert filtro == {"_id": erro_id, "resolvidoEm": {"$exists": False}}
+    assert "resolvidoEm" in atualizacao["$set"]
+    assert banco.operacoes_sistema.inseridos[0]["tipo"] == "auditoria:resolver-erro-frontend"
 
 
 def test_download_de_backup_retorna_stream_e_remove_temporario(monkeypatch, tmp_path):

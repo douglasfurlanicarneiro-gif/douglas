@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 
 async function mockAdminApi(page: Page) {
+  let frontendErrorOpen = true;
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -149,6 +150,17 @@ async function mockAdminApi(page: Page) {
         infinitePayWebhookSecretDedicado: true,
         melhorEnvioAmbiente: 'producao',
       },
+      errosFrontend24h: frontendErrorOpen ? 1 : 0,
+      errosFrontendRecentes: frontendErrorOpen ? [{
+        id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        tipo: 'unhandled_rejection',
+        mensagem: 'O volume deve ser no máximo 1000.',
+        plataforma: 'web',
+        caminho: '/painel',
+        ocorrencias: 3,
+        ultimaOcorrenciaEm: '2026-08-10T10:00:00Z',
+        requestId: 'request-erro-e2e',
+      }] : [],
       falhasRecentes: [{
         id: 'evento-1',
         orderNsu: 'pedido-42',
@@ -199,6 +211,10 @@ async function mockAdminApi(page: Page) {
     if (path === '/api/admin/operacao/pagamentos/reprocessar-falhos') {
       return json({ status: 'Eventos reenfileirados.', reprocessados: 1 });
     }
+    if (path === '/api/admin/operacao/erros-frontend/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/resolver') {
+      frontendErrorOpen = false;
+      return json({ status: 'Ocorrência resolvida.', id: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' });
+    }
     return json({ detail: `Mock opcional ausente para ${path}` }, 404);
   });
 }
@@ -223,6 +239,11 @@ test('painel mostra saúde, recuperação e valida o backup antes de restaurar',
   await expect(page.getByText('Pedido pedido-42 · 5 tentativa(s)')).toBeVisible();
   await expect(page.getByText(/Há 1 saldo\(s\) físico\(s\) negativo\(s\)/)).toBeVisible();
   await expect(page.getByText('Reprocessar confirmações com falha')).toBeVisible();
+  await expect(page.getByText('O volume deve ser no máximo 1000.')).toBeVisible();
+  await page.getByText('Marcar ocorrência como resolvida').click();
+  await expect(page.getByText(/Ocorrência marcada como resolvida/)).toBeVisible();
+  await page.getByTestId('info-ok').click();
+  await expect(page.getByText('O volume deve ser no máximo 1000.')).toHaveCount(0);
   await expect(page.getByText('Abrir backup e restauração', { exact: true })).toBeVisible();
   await page.getByText('Abrir backup e restauração', { exact: true }).click();
   await expect(page.getByText('Backup e restauração', { exact: true })).toBeVisible();
