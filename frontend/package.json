@@ -10,25 +10,26 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export --platform web",
+    "check:bundle": "node ./scripts/check-web-bundle.mjs",
     "lint": "expo lint && node ./scripts/check-typography.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
     "@expo-google-fonts/dm-sans": "0.4.2",
-    "@expo/metro-runtime": "~57.0.10",
+    "@expo/metro-runtime": "~57.0.12",
     "@expo/vector-icons": "15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "expo": "~57.0.13",
+    "expo": "~57.0.15",
     "expo-clipboard": "~57.0.1",
-    "expo-constants": "~57.0.11",
+    "expo-constants": "~57.0.13",
     "expo-font": "~57.0.1",
     "expo-haptics": "~57.0.1",
     "expo-image": "~57.0.3",
     "expo-linear-gradient": "~57.0.1",
-    "expo-linking": "~57.0.6",
-    "expo-router": "~57.0.13",
+    "expo-linking": "~57.0.7",
+    "expo-router": "~57.0.15",
     "expo-secure-store": "~57.0.1",
-    "expo-splash-screen": "~57.0.6",
+    "expo-splash-screen": "~57.0.7",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
     "expo-system-ui": "~57.0.2",
@@ -60,6 +61,9 @@
     "uuid": "11.1.1"
   },
   "overrides": {
+    "metro": "0.84.5",
+    "metro-config": "0.84.5",
+    "metro-transform-worker": "0.84.5",
     "@expo/metro-config": {
       "postcss": "8.5.26"
     },
