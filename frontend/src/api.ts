@@ -186,7 +186,9 @@ function criticalHeaders(): HeadersInit {
 }
 
 // Perfumes
-export const listPerfumes = () => request<Perfume[]>('/perfumes', {}, true);
+export const listPerfumes = async () => withOptimizedPerfumeImages(
+  await request<Perfume[]>('/perfumes', {}, true),
+);
 export type CatalogAudit = {
   total: number;
   comProblemas: number;

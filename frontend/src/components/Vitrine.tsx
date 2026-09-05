@@ -13,6 +13,7 @@ import { ApiError, confirmarPagamentoInfinitePay, createOpiniao, createSolicitac
 import type { CartItem } from './CheckoutSheet';
 import { storage } from '../utils/storage';
 import { tamanhoDisponivel } from '../utils/availability';
+import { perfumeNotes } from '../utils/perfumeNotes';
 import { useWebPullToRefresh } from '../hooks/use-web-pull-to-refresh';
 import {
   instagramLink,
@@ -157,7 +158,8 @@ function VitrineCard({
   reserveFloatingActionSpace: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
-  const temNotas = item.notasSaida || item.notasCoracao || item.notasFundo;
+  const notas = perfumeNotes(item);
+  const temNotas = notas.rows.length > 0;
   const ocasioes = item.ocasioes || [];
   const familias = familiasDoPerfume(item);
   const climaOcasiao = ocasioes.length ? resumirCategorias(ocasioes, 2, 'ocasião', 'ocasiões') : 'Versátil · Todas as ocasiões';
@@ -259,9 +261,7 @@ function VitrineCard({
 
       {temNotas ? (
         <View style={styles.notes}>
-          {!!item.notasSaida && <NoteRow label="TOPO" value={item.notasSaida} />}
-          {!!item.notasCoracao && <NoteRow label="CORAÇÃO" value={item.notasCoracao} />}
-          {!!item.notasFundo && <NoteRow label="FUNDO" value={item.notasFundo} />}
+          {notas.rows.map((row) => <NoteRow key={row.label} label={row.label} value={row.value} />)}
         </View>
       ) : (
         <View style={styles.notesEmpty}>

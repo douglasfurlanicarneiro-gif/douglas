@@ -11,6 +11,7 @@ import { Chip, PrimaryButton, SecondaryButton, TInput } from './atoms';
 import { DEFAULT_STORE_CONFIG, whatsappNumber } from '../storeConfig';
 import { AppText as Text } from './Typography';
 import { tamanhoDisponivel } from '../utils/availability';
+import { perfumeNotes } from '../utils/perfumeNotes';
 import { openInfinitePayCheckout } from '../utils/paymentCheckout';
 
 const CUSTOMER_ORDER_ACTION_WIDTH = 104;
@@ -180,6 +181,7 @@ export function PerfumeDetailSheet({
   onReview: () => void;
   onBuy: (ml: number, preco: number) => void;
 }) {
+  const notas = perfume ? perfumeNotes(perfume) : null;
   return (
     <BottomSheet visible={!!perfume} onClose={onClose} title="Detalhes da fragrância" tone="light">
       {perfume && (
@@ -228,10 +230,10 @@ export function PerfumeDetailSheet({
             </Text>
           </View>
 
-          <Text style={[styles.sectionLabel, styles.detailSectionLabel]}>PIRÂMIDE OLFATIVA</Text>
-          <Note label="TOPO" value={perfume.notasSaida} />
-          <Note label="CORAÇÃO" value={perfume.notasCoracao} />
-          <Note label="BASE" value={perfume.notasFundo} />
+          <Text style={[styles.sectionLabel, styles.detailSectionLabel]}>{notas?.title}</Text>
+          {notas?.rows.length ? notas.rows.map((row) => (
+            <Note key={row.label} label={row.label} value={row.value} />
+          )) : <Text style={styles.bodyText}>Notas olfativas em atualização.</Text>}
 
           <Text style={[styles.sectionLabel, styles.detailSectionLabel, { marginTop: SPACING.lg }]}>ESCOLHA O TAMANHO</Text>
           <View style={styles.sizeWrap}>

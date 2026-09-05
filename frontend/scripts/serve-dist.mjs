@@ -4,6 +4,7 @@ import { extname, resolve, sep } from 'node:path';
 
 const root = resolve('dist');
 const mime = {
+  '.avif': 'image/avif',
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.ico': 'image/x-icon',

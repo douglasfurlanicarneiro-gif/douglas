@@ -28,6 +28,11 @@ services:
         destination: /index.html
 
     headers:
+      # O nome inclui o hash do conteúdo: uma nova foto sempre tem outra URL.
+      - path: /perfume-images/catalog-*
+        name: Cache-Control
+        value: "public, max-age=31536000, immutable"
+
       # Arquivos gerados pelo Expo podem ficar em cache por bastante tempo.
       - path: /_expo/static/*
         name: Cache-Control

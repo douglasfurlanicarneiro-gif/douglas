@@ -158,7 +158,7 @@ export function PerfumeForm({
       </Field>
 
       <View style={styles.notesCard}>
-        <Text style={styles.cardEyebrow}>PIRÂMIDE OLFATIVA</Text>
+        <Text style={styles.cardEyebrow}>NOTAS OLFATIVAS</Text>
         {([
           { color: COLORS.topNote, label: 'Saída', key: 'notasSaida' },
           { color: COLORS.heartNote, label: 'Coração', key: 'notasCoracao' },
@@ -175,6 +175,10 @@ export function PerfumeForm({
           </View>
         ))}
       </View>
+
+      <Text style={styles.adminHint}>
+        Se a referência informar apenas uma lista de notas, preencha em Saída e deixe Coração e Fundo vazios. A vitrine exibirá “Notas olfativas”.
+      </Text>
 
       <Text style={styles.sectionLabel}>Tamanhos e preços</Text>
       {form.precos.map((price, index) => (

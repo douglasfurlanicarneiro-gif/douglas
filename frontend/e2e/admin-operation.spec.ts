@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import catalogImages from '../src/data/catalogImages.json';
 
 
 async function mockAdminApi(page: Page) {
@@ -231,6 +232,43 @@ async function openAdminSystem(page: Page) {
   await expect(page.getByText('Saúde operacional')).toBeVisible();
 }
 
+
+test('catálogo e vitrine exibem a mesma foto local e notas sem fases inventadas', async ({ page }) => {
+  await mockAdminApi(page);
+  const [id, image] = Object.entries(catalogImages)[0];
+  const perfume = {
+    id, seq: 1, nome: 'Fragrância de teste', imagemUrl: image.source,
+    prontaEntrega: true, disponivel: true, publicavel: true, familia: 'Cítrico',
+    familias: ['Cítrico'], concentracao: 'EDP', ocasioes: ['Dia'],
+    precos: [{ ml: 30, preco: 50 }], tamanhosDisponiveisMl: [30],
+    notasSaida: 'Bergamota, Toranja, Gengibre', notasCoracao: '', notasFundo: '',
+  };
+  for (const endpoint of ['vitrine', 'perfumes']) {
+    await page.route(`**/api/${endpoint}`, (route) => route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify(endpoint === 'vitrine' ? { itens: [perfume], atualizadoEm: null } : [perfume]),
+    }));
+  }
+  await page.goto('/');
+  const card = page.getByTestId(`vitrine-card-${id}`);
+  await expect(card).toBeVisible();
+  await expect(card.getByText('NOTAS', { exact: true })).toBeVisible();
+  await expect(card.getByText('TOPO', { exact: true })).toHaveCount(0);
+  const photo = page.locator(`img[src$="${image.path}"]`).first();
+  await expect(photo).toBeVisible();
+  await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+  await card.getByText('Conhecer a fragrância').click();
+  await expect(page.getByText('NOTAS OLFATIVAS', { exact: true })).toBeVisible();
+  await page.reload();
+  await page.getByTestId('atelie-access-button').click();
+  await page.getByTestId('login-usuario').fill('admin');
+  await page.getByTestId('login-senha').fill('senha-local');
+  await page.getByTestId('login-submit').click();
+  await expect(page.getByText('Administração')).toBeVisible();
+  await page.getByTestId('tab-catalogo').click();
+  await expect(photo).toBeVisible();
+  await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+});
 
 test('painel mostra saúde, recuperação e valida o backup antes de restaurar', async ({ page }) => {
   await mockAdminApi(page);

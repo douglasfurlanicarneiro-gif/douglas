@@ -22,9 +22,33 @@ O Expo Router atual utiliza a interface CommonJS de `query-string`. A correção
 
 Próxima ação para essa cadeia: avaliar uma atualização compatível do roteador/dependência ou preparar uma correção de compatibilidade explícita, acompanhada de testes de parâmetros de URL, retorno do pagamento e entradas malformadas. A atualização do SDK está concluída; a eliminação total dos alertas ainda está pendente.
 
+## Retomada de 04/09/2026 — tópico 2: catálogo e fotos
+
+Bloco implementado, com validação local concluída:
+
+- **413 perfumes publicados conferidos**, sem nomes duplicados e sem URLs inacessíveis na consulta. Nenhum preço, custo, estoque, nome ou número de perfume foi alterado neste bloco.
+- **413 referências de imagem em AVIF com transparência**, servidas pelo próprio site: 410 arquivos únicos, 6.847.085 bytes no total. Reutilizamos imagens já preparadas e cópias byte a byte de imagens transparentes existentes; não houve geração de frascos artificiais. Oito referências sem recorte adequado foram conferidas visualmente e substituídas por fotos da mesma fragrância.
+- O mapa de imagens agora exige correspondência de **ID do perfume + URL original**. A numeração deixou de determinar silenciosamente a foto. Uma nova URL escolhida no painel tem prioridade, seja JPG, WebP ou AVIF.
+- A mesma resolução de imagem é aplicada ao catálogo administrativo e à vitrine, incluindo a edição do produto. Os nomes dos arquivos contêm hash do conteúdo para evitar reutilizar uma foto antiga do cache; política de cache imutável declarada no Render.
+- O banco **não recebeu migração em massa**. As URLs originais continuam na API bruta; a aplicação resolve as imagens pelo mapa compartilhado. Ao salvar um produto no editor, a URL exibida pode ser persistida pelo fluxo normal. Produtos novos ou fotos modificadas depois deste levantamento precisam de nova conferência; não são convertidos automaticamente.
+- A conferência pública não abrange produtos não publicados/arquivados. Não foi feita inspeção autenticada do painel real nesta etapa; a consistência painel/vitrine foi testada com API simulada.
+- O nº 423, Symphony, tem uma lista de notas divulgadas, não uma pirâmide completa: [Louis Vuitton](https://br.louisvuitton.com/por-br/produtos/symphony-nvprod3230006v/LP0249) e [Fragrantica](https://www.fragrantica.com/perfume/Louis-Vuitton/Symphony-68357.html). Uma lista única agora aparece como **Notas olfativas**, sem inventar coração/fundo nem exibir linhas vazias. Pirâmides completas foram preservadas. O editor recebeu orientação de preenchimento.
+
+### Evidências e reprodução
+
+- Lint/tipografia, TypeScript, build web, integridade dos hashes e orçamento de bundle aprovados.
+- **40 testes automatizados aprovados**: 30 execuções E2E com APIs simuladas e 10 verificações de funções/ativos, distribuídas pelos projetos celular e computador. Incluem a foto local decodificada nas duas áreas, lista de notas, mudança de URL, preservação de dados, checkout, frete, estoque e operação administrativa.
+- JavaScript total: **1.778.761 bytes**; maior arquivo: **1.399.399 bytes**. Ambos dentro dos limites existentes.
+- Segunda leitura do catálogo público e dos ativos preparados: **413/413 AVIF transparentes, zero erros e zero imagens a revisar**.
+- Mapa versionado: `frontend/src/data/catalogImages.json`. Testes: `frontend/e2e/catalog-assets.spec.ts` e `frontend/e2e/admin-operation.spec.ts`.
+- Conferência repetível, sem autenticação ou alterações no banco: `python scripts/audit-catalog-images.py --output output/catalog-images-NOVA-DATA`. Requer Python com Pillow (suporte AVIF) e requests. Usar diretório novo; o script recusa sobrescrever uma origem modificada durante a mesma auditoria.
+- `scripts/prepare-catalog-assets.py` prepara cópias verificadas e gera o mapa, somente com `--write`. Novas origens sem transparência exigem revisão. O relatório/proveniência deste lote está em `output/catalog-images-20260904/` no ambiente local.
+
+Observação: as contagens anteriores de 192 AVIF, 127 JPG, 94 WebP e 401 URLs externas descreviam a **API bruta**, não necessariamente o que já era renderizado pela vitrine, que possuía substituições locais.
+
 ### Próximo bloco da auditoria
 
-Revisar o catálogo e planejar a hospedagem própria das imagens. A consulta pública de 04/09 encontrou 413 perfumes, sem nomes duplicados, sem exposição dos campos administrativos verificados e sem sincronização pendente. O nº 423 tem coração/fundo vazios; confirmar a informação de origem antes de preencher, sem inventar uma pirâmide olfativa. As extensões atuais são 192 AVIF, 127 JPG e 94 WebP; 401 imagens dependem de domínios externos. AVIF, por si só, não remove fundo branco.
+Avaliar a correção compatível dos três alertas moderados descritos no tópico 1, sem rebaixar o Expo nem ocultar avisos. Depois, homologar com acesso autorizado os produtos não publicados, pagamentos/retomada e frete real; continuar os itens operacionais abaixo. A auditoria integral não está concluída e as notas históricas não equivalem a uma certificação 10/10.
 
 Depois seguem as homologações externas, backup/restauração, segurança administrativa, acessibilidade, performance, monitoramento e evolução do painel descritos no histórico. Cada bloco deve terminar com validação e um ponto de retomada registrado.
 
