@@ -1,6 +1,34 @@
 # Auditoria técnica e operacional — meta 10/10
 
-Data da última revisão integral: **13/08/2026**
+Último ponto de retomada: **04/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
+
+## Retomada de 04/09/2026 — tópico 1: dependências
+
+Atualização compatível implementada e validada:
+
+- Expo `57.0.20`, Expo Router `57.0.19` e React Native `0.86.3`; as 13 dependências apontadas pelo Expo foram alinhadas ao SDK 57.
+- As duas versões transitivas de `@xmldom/xmldom` foram atualizadas para `0.8.15` e `0.9.12`, corrigindo o alerta [GHSA-6gmq-8vp8-gcm6](https://github.com/advisories/GHSA-6gmq-8vp8-gcm6).
+- O instalador do Expo registrou o plugin de `expo-secure-store`, já utilizado pelo aplicativo nativo.
+- Instalação limpa com `npm ci`, Expo Doctor **20/20**, lint/tipografia, TypeScript, build web e orçamento do bundle aprovados.
+- **28 testes E2E aprovados**, com APIs simuladas, nos projetos celular e computador. Esses testes não comprovam transações financeiras ou postagens reais.
+- JavaScript total: **1.708.002 bytes**; maior arquivo: **1.328.978 bytes**, dentro dos limites existentes. O hash do script inline continua autorizado pela CSP do Render.
+- Auditoria npm completa: **3 alertas moderados**, nenhum alto ou crítico. O bloqueio de vulnerabilidades altas/críticas no CI permanece ativo.
+
+### Pendência de segurança que continua aberta
+
+Os três alertas restantes vêm de uma única cadeia: `expo-router → query-string@7.1.3 → decode-uri-component@0.2.2`, afetada por [GHSA-vcc3-ghjq-m6fr](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr). Uma entrada de URL malformada pode causar consumo excessivo de CPU.
+
+O Expo Router atual utiliza a interface CommonJS de `query-string`. A correção publicada de `decode-uri-component` é `0.5.0`, em ESM, e não é uma substituição direta do `require()` usado pela versão instalada. O `npm audit fix --force` propõe voltar para Expo Router `5.1.11`, incompatível com esta base. Nenhum desses atalhos foi aplicado e os alertas não foram ocultados.
+
+Próxima ação para essa cadeia: avaliar uma atualização compatível do roteador/dependência ou preparar uma correção de compatibilidade explícita, acompanhada de testes de parâmetros de URL, retorno do pagamento e entradas malformadas. A atualização do SDK está concluída; a eliminação total dos alertas ainda está pendente.
+
+### Próximo bloco da auditoria
+
+Revisar o catálogo e planejar a hospedagem própria das imagens. A consulta pública de 04/09 encontrou 413 perfumes, sem nomes duplicados, sem exposição dos campos administrativos verificados e sem sincronização pendente. O nº 423 tem coração/fundo vazios; confirmar a informação de origem antes de preencher, sem inventar uma pirâmide olfativa. As extensões atuais são 192 AVIF, 127 JPG e 94 WebP; 401 imagens dependem de domínios externos. AVIF, por si só, não remove fundo branco.
+
+Depois seguem as homologações externas, backup/restauração, segurança administrativa, acessibilidade, performance, monitoramento e evolução do painel descritos no histórico. Cada bloco deve terminar com validação e um ponto de retomada registrado.
+
+## Histórico — revisão integral de 13/08/2026
 
 Este é o ponto oficial de retomada da L’Essence Furlani. A nota não representa apenas aparência: considera comportamento validado, integridade dos dados, segurança, operação real e riscos externos.
 
