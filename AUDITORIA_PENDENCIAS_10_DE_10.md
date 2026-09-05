@@ -2,13 +2,23 @@
 
 Último ponto de retomada: **05/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
 
+## Retomada de 05/09/2026 — tópico 5: backup, etapa isolada
+
+- Corrigida a limpeza do ZIP temporário quando a autenticação AES-GCM rejeita o arquivo por adulteração ou chave incorreta. Antes, esse caminho podia deixar conteúdo descriptografado no disco temporário.
+- Limite descompactado conferido antes de ler o manifesto; manifesto possui limite próprio e deve ser objeto JSON. Leitura de registros limitada antes de materializar uma linha excessiva.
+- Ensaio com dados exclusivamente fictícios: exportação criptografada, validação e restauração das 19 coleções, preservando ObjectIds, datas, centavos, listas e Unicode; limpeza dos temporários confirmada. Banco simulado, sem acesso à produção.
+- Backend: **190 testes aprovados, 40 ignorados**. Nove novos casos, incluindo chave errada, adulteração, manifesto inválido, limites e ciclo completo.
+- **Ainda não homologado em MongoDB real:** não há `mongod` nem Docker disponíveis nesta máquina. Falta ensaio em réplica isolada para validar transação, rollback por falha e índices, além de conferir estratégia consistente de exportação durante escritas concorrentes. Não restaurar produção como teste.
+- Operação pendente: cópia real criptografada guardada fora do Render, guarda separada da chave, definição de RPO/RTO e exercício periódico documentado. O backup guarda URLs de imagens; não inclui todos os arquivos externos.
+- Revisão adicional: diferenciar falha de auditoria após commit de falha da própria restauração, evitando orientar repetição indevida. Este bloco não altera o fluxo transacional nem afirma recuperação completa de desastre.
+
 ## Retomada de 05/09/2026 — tópico 4: proteção do valor online
 
 - Inspeção autenticada, sem salvar alterações em pedidos reais: endereço completo e modalidade prioritária presentes no pedido entregue da amostra; retirada e aceite de prazo presentes em pedido pendente. Amostra não equivale à homologação de todos os pedidos.
 - Bloqueada a alteração do total de pedidos vinculados à InfinitePay, no formulário e na API (HTTP 409 antes de qualquer gravação). Editar o total local não altera o checkout externo. Observações e endereço continuam editáveis; pedidos manuais preservam negociação de valor.
 - Divergência entre o valor registrado na cobrança e o total do pedido gera aviso. Nenhum valor histórico foi corrigido automaticamente e nenhuma cobrança foi realizada como teste.
 - Validação local: 181 testes de backend aprovados, 40 ignorados; 44 verificações Playwright aprovadas e três testes Node de URLs. TypeScript, lint/tipografia, build e orçamento aprovados.
-- Render autenticado: backend em `7bdd031`, sem diferenças de backend até `798fd14`. Publicação deste novo bloco ainda deve ser confirmada nos dois serviços.
+- Render autenticado: proteção publicada em `ac1d0b7` nos dois serviços, ambos Live; readiness do banco e esquema OK. CI `33991496083` concluído com sucesso. Antes desse bloco o backend estava em `7bdd031`, sem diferenças de backend até `798fd14`.
 - Continuam pendentes: conferir cobrança/retomada com o provedor sem gerar pagamento indevido; exercício de backup/restauração isolado; demais itens operacionais e de acessibilidade do histórico.
 
 ## Retomada de 05/09/2026 — tópico 3: correção dos alertas de URL

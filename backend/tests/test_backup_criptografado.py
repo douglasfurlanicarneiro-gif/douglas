@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import pytest
 from bson import ObjectId
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import backup_service
 
 from backup_service import (
     BACKUP_COLLECTIONS,
@@ -192,3 +193,85 @@ def test_restauracao_substitui_colecoes_e_reconstroi_object_id():
         caminho.unlink(missing_ok=True)
         if zip_path:
             zip_path.unlink(missing_ok=True)
+
+
+@pytest.mark.parametrize("adulterar", [False, True])
+def test_falha_de_autenticidade_remove_temporario(monkeypatch, tmp_path, adulterar):
+    monkeypatch.setattr(backup_service.tempfile, "tempdir", str(tmp_path))
+    segredo = "chave-ficticia-de-teste-com-mais-de-32-caracteres"
+    caminho, _ = asyncio.run(gerar_backup_criptografado(BancoFalso(), segredo))
+    try:
+        if adulterar:
+            conteudo = bytearray(caminho.read_bytes())
+            conteudo[-1] ^= 1
+            caminho.write_bytes(conteudo)
+        else:
+            segredo = "outra-chave-ficticia-de-teste-com-32-caracteres"
+        with pytest.raises(ValueError, match="adulterado|chave"):
+            descriptografar_e_validar_backup(caminho, segredo)
+        assert list(tmp_path.iterdir()) == [caminho]
+    finally:
+        caminho.unlink(missing_ok=True)
+
+
+@pytest.mark.parametrize("manifesto", [[], None, "invalido", 42])
+def test_manifesto_deve_ser_objeto(tmp_path, manifesto):
+    caminho = tmp_path / "manifesto.zip"
+    with zipfile.ZipFile(caminho, "w") as archive:
+        archive.writestr("manifesto.json", json.dumps(manifesto))
+    with pytest.raises(ValueError, match="manifesto.*inválido"):
+        backup_service._validar_zip_backup(caminho)
+
+
+def test_limite_e_verificado_antes_de_descompactar_manifesto(monkeypatch, tmp_path):
+    caminho = tmp_path / "grande.zip"
+    with zipfile.ZipFile(caminho, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("manifesto.json", " " * 1024)
+    monkeypatch.setattr(backup_service, "MAX_BACKUP_UNCOMPRESSED_BYTES", 512)
+    def leitura_proibida(*args, **kwargs):
+        pytest.fail("Não deveria descompactar um arquivo acima do limite")
+    monkeypatch.setattr(zipfile.ZipFile, "read", leitura_proibida)
+    with pytest.raises(ValueError, match="descompactado excede"):
+        backup_service._validar_zip_backup(caminho)
+
+
+def test_rejeita_registro_acima_do_limite(monkeypatch, tmp_path):
+    caminho = tmp_path / "registro.zip"
+    manifesto = {"aplicacao": "L'Essence Furlani", "versao": 3, "colecoes": {"clientes": 1}}
+    with zipfile.ZipFile(caminho, "w") as archive:
+        archive.writestr("manifesto.json", json.dumps(manifesto))
+        archive.writestr("dados/clientes.ndjson", json.dumps({"nome": "a" * 1024}) + "\n")
+    monkeypatch.setattr(backup_service, "MAX_BACKUP_LINE_BYTES", 512)
+    with pytest.raises(ValueError, match="Registro excessivamente grande"):
+        backup_service._validar_zip_backup(caminho)
+
+
+def test_ciclo_completo_preserva_todas_as_colecoes_com_dados_ficticios(monkeypatch, tmp_path):
+    monkeypatch.setattr(backup_service.tempfile, "tempdir", str(tmp_path))
+    origem = BancoFalso()
+    esperados = {}
+    for nome in BACKUP_COLLECTIONS:
+        esperados[nome] = [{
+            "_id": ObjectId(), "referenciaTeste": nome,
+            "totalCentavos": 12345, "ativo": True, "opcional": None,
+            "itens": [{"perfumeId": ObjectId(), "volume": 50}],
+            "data": datetime(2026, 9, 5, tzinfo=timezone.utc),
+            "texto": "Fragrância fictícia — coração",
+        }]
+        origem._colecoes[nome] = ColecaoFalsa(esperados[nome])
+    segredo = "chave-apenas-para-ensaio-isolado-sem-dados-reais"
+    caminho, resumo_exportado = asyncio.run(gerar_backup_criptografado(origem, segredo))
+    zip_path = None
+    try:
+        zip_path, manifesto = descriptografar_e_validar_backup(caminho, segredo)
+        destino = BancoRestauravel()
+        resumo = asyncio.run(restaurar_backup_validado(destino, zip_path, manifesto))
+        assert resumo["totalRegistros"] == len(BACKUP_COLLECTIONS)
+        assert resumo["colecoes"] == resumo_exportado["colecoes"]
+        for nome in BACKUP_COLLECTIONS:
+            assert destino.colecoes[nome].documentos == esperados[nome]
+    finally:
+        caminho.unlink(missing_ok=True)
+        if zip_path:
+            zip_path.unlink(missing_ok=True)
+    assert list(tmp_path.iterdir()) == []

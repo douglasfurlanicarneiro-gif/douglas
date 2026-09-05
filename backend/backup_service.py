@@ -194,6 +194,7 @@ def descriptografar_e_validar_backup(path: Path, segredo: str) -> tuple[Path, di
                     restante -= len(bloco)
                 destino.write(decryptor.finalize())
     except InvalidTag as exc:
+        zip_path.unlink(missing_ok=True)
         raise ValueError("Backup adulterado ou chave de criptografia incorreta.") from exc
     except Exception:
         zip_path.unlink(missing_ok=True)
@@ -220,10 +221,17 @@ def _validar_zip_backup(zip_path: Path) -> dict:
             raise ValueError("O backup contém arquivos internos duplicados.")
         if "manifesto.json" not in nomes:
             raise ValueError("O backup não contém manifesto.")
+        tamanho_total = sum(info.file_size for info in archive.infolist())
+        if tamanho_total > MAX_BACKUP_UNCOMPRESSED_BYTES:
+            raise ValueError("O backup descompactado excede o limite de segurança.")
+        if archive.getinfo("manifesto.json").file_size > MAX_BACKUP_LINE_BYTES:
+            raise ValueError("O manifesto excede o limite de segurança.")
         try:
             manifesto = json.loads(archive.read("manifesto.json"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             raise ValueError("O manifesto do backup é inválido.") from exc
+        if not isinstance(manifesto, dict):
+            raise ValueError("O manifesto do backup é inválido.")
         if manifesto.get("aplicacao") != "L'Essence Furlani" or manifesto.get("versao") != 3:
             raise ValueError("Versão ou origem do backup não reconhecida.")
         contagens = manifesto.get("colecoes")
@@ -243,14 +251,10 @@ def _validar_zip_backup(zip_path: Path) -> dict:
         esperados = {"manifesto.json", *(f"dados/{nome}.ndjson" for nome in colecoes)}
         if nomes != esperados:
             raise ValueError("A estrutura interna do backup não corresponde ao manifesto.")
-        tamanho_total = sum(info.file_size for info in archive.infolist())
-        if tamanho_total > MAX_BACKUP_UNCOMPRESSED_BYTES:
-            raise ValueError("O backup descompactado excede o limite de segurança.")
-
         for colecao in colecoes:
             total = 0
             with archive.open(f"dados/{colecao}.ndjson") as origem:
-                for linha in origem:
+                while linha := origem.readline(MAX_BACKUP_LINE_BYTES + 1):
                     if len(linha) > MAX_BACKUP_LINE_BYTES:
                         raise ValueError(f"Registro excessivamente grande em {colecao}.")
                     try:
