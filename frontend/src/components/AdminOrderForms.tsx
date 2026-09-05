@@ -156,6 +156,10 @@ export function PedidoForm({
     cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [],
   });
   const pedidoRecebido = Boolean(initial?.id);
+  const valorOnlineBloqueado = Boolean(initial?.id && initial.pagamento?.provedor === 'infinitepay');
+  const valorCobrancaDivergente = valorOnlineBloqueado
+    && initial?.pagamento?.valor != null
+    && Math.round(Number(initial.pagamento.valor) * 100) !== Math.round(Number(initial.total) * 100);
   const [valorPersonalizado, setValorPersonalizado] = useState(Boolean(initial?.id || initial?.ajusteManual));
   const [valorFinalInput, setValorFinalInput] = useState(
     initial?.total != null ? Number(initial.total).toFixed(2).replace('.', ',') : '',
@@ -519,7 +523,7 @@ export function PedidoForm({
             <Text style={styles.manualValueEyebrow}>VALOR DO PEDIDO</Text>
             <Text style={styles.manualValueTitle}>Valor final combinado</Text>
           </View>
-          {valorPersonalizado && (
+          {valorPersonalizado && !valorOnlineBloqueado && (
             <Pressable
               onPress={() => {
                 setValorPersonalizado(false);
@@ -533,12 +537,20 @@ export function PedidoForm({
           )}
         </View>
         <Text style={styles.manualValueHint}>
-          Informe aqui o total negociado com o cliente, inclusive quando houver desconto.
+          {valorOnlineBloqueado
+            ? 'Valor protegido: alterações no painel não atualizam a cobrança da InfinitePay. Observações e endereço continuam editáveis.'
+            : 'Informe aqui o total negociado com o cliente, inclusive quando houver desconto.'}
         </Text>
+        {valorCobrancaDivergente && (
+          <Text style={styles.manualValueError} testID="pedido-cobranca-divergente">
+            O valor registrado na cobrança difere do total deste pedido. Confira na InfinitePay antes de cobrar o cliente. Nenhum valor foi corrigido automaticamente.
+          </Text>
+        )}
         <View style={styles.manualValueInputRow}>
           <Text style={styles.manualValueCurrency}>R$</Text>
           <TInput
             keyboardType="decimal-pad"
+            editable={!valorOnlineBloqueado}
             value={valorPersonalizado ? valorFinalInput : totalCalculado.toFixed(2).replace('.', ',')}
             onChangeText={(value) => {
               setValorFinalInput(value);

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import catalogImages from '../src/data/catalogImages.json';
 
 
-async function mockAdminApi(page: Page) {
+async function mockAdminApi(page: Page, options: { manualPayment?: boolean; divergentPayment?: boolean } = {}) {
   let frontendErrorOpen = true;
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -67,7 +67,8 @@ async function mockAdminApi(page: Page) {
       pagamento: {
         status: 'pago',
         metodo: 'cartao',
-        provedor: 'infinitepay',
+        provedor: options.manualPayment ? 'painel' : 'infinitepay',
+        valor: options.divergentPayment ? 40 : 50,
         transactionNsu: 'e2e-42',
         historico: [],
       },
@@ -376,7 +377,7 @@ test('move pedido pelo Kanban mantendo a transição esperada', async ({ page })
 
 
 test('edita pedido preservando cálculo e valor final negociado', async ({ page }) => {
-  await mockAdminApi(page);
+  await mockAdminApi(page, { manualPayment: true });
   await openAdminSystem(page);
 
   await page.getByTestId('tab-pedidos').click();
@@ -400,6 +401,20 @@ test('edita pedido preservando cálculo e valor final negociado', async ({ page 
   expect(payload.itens[0]).toMatchObject({ precoUnitario: 50, subtotal: 50 });
 });
 
+
+test('protege valor online, avisa divergência e preserva edição do cliente', async ({ page }) => {
+  await mockAdminApi(page, { divergentPayment: true });
+  await openAdminSystem(page);
+  await page.getByTestId('tab-pedidos').click();
+  await page.getByTestId('kanban-pedido-pedido-e2e').getByText('Detalhes').click();
+  await expect(page.getByTestId('pedido-valor-final')).not.toBeEditable();
+  await expect(page.getByTestId('pedido-restaurar-valor')).toHaveCount(0);
+  await expect(page.getByTestId('pedido-cobranca-divergente')).toBeVisible();
+  await page.getByTestId('pedido-cliente').fill('Cliente Atualizado');
+  const saved = page.waitForRequest((request) => request.url().endsWith('/api/pedidos/pedido-e2e') && request.method() === 'PUT');
+  await page.getByTestId('pedido-save').click();
+  expect((await saved).postDataJSON()).toMatchObject({ total: 50, cliente: 'Cliente Atualizado' });
+});
 
 test('registra solicitação de estorno com motivo auditável', async ({ page }) => {
   await mockAdminApi(page);

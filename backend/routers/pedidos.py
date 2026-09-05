@@ -222,6 +222,24 @@ async def _persistir_pedido_e_estoque(
     novo_status: str,
 ) -> None:
     """Atualiza pedido e estoque com CAS e compensação em caso de falha."""
+    # O checkout externo tem valor próprio; editar o pedido não o atualiza.
+    # Também protege cobranças em criação e pedidos já pagos.
+    if (
+        (existente.get("pagamento") or {}).get("provedor") == "infinitepay"
+        and "total" in atualizacao
+        and valor_em_centavos(atualizacao["total"]) != valor_em_centavos(existente.get("total", 0))
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "VALOR_COBRANCA_ONLINE_BLOQUEADO",
+                "message": (
+                    "Este pedido possui pagamento vinculado à InfinitePay. "
+                    "O valor não pode ser alterado pelo painel, pois isso não atualiza a cobrança. "
+                    "Confira a cobrança no provedor antes de negociar outro valor."
+                ),
+            },
+        )
     status_anterior = str(existente.get("status", "pendente"))
     validar_transicao_status(status_anterior, novo_status)
 

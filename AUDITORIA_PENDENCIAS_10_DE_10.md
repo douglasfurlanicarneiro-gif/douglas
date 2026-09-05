@@ -2,6 +2,15 @@
 
 Último ponto de retomada: **05/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
 
+## Retomada de 05/09/2026 — tópico 4: proteção do valor online
+
+- Inspeção autenticada, sem salvar alterações em pedidos reais: endereço completo e modalidade prioritária presentes no pedido entregue da amostra; retirada e aceite de prazo presentes em pedido pendente. Amostra não equivale à homologação de todos os pedidos.
+- Bloqueada a alteração do total de pedidos vinculados à InfinitePay, no formulário e na API (HTTP 409 antes de qualquer gravação). Editar o total local não altera o checkout externo. Observações e endereço continuam editáveis; pedidos manuais preservam negociação de valor.
+- Divergência entre o valor registrado na cobrança e o total do pedido gera aviso. Nenhum valor histórico foi corrigido automaticamente e nenhuma cobrança foi realizada como teste.
+- Validação local: 181 testes de backend aprovados, 40 ignorados; 44 verificações Playwright aprovadas e três testes Node de URLs. TypeScript, lint/tipografia, build e orçamento aprovados.
+- Render autenticado: backend em `7bdd031`, sem diferenças de backend até `798fd14`. Publicação deste novo bloco ainda deve ser confirmada nos dois serviços.
+- Continuam pendentes: conferir cobrança/retomada com o provedor sem gerar pagamento indevido; exercício de backup/restauração isolado; demais itens operacionais e de acessibilidade do histórico.
+
 ## Retomada de 05/09/2026 — tópico 3: correção dos alertas de URL
 
 - Corrigida a cadeia de três alertas moderados: `decode-uri-component` atualizado de `0.2.2` para a versão oficial `0.5.0`, indicada em [GHSA-vcc3-ghjq-m6fr](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr). O Expo Router não foi rebaixado e nenhum alerta foi ignorado.
