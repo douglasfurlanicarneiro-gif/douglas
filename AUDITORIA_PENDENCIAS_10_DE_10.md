@@ -1,6 +1,23 @@
 # Auditoria técnica e operacional — meta 10/10
 
-Último ponto de retomada: **04/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
+Último ponto de retomada: **05/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
+
+## Retomada de 05/09/2026 — tópico 3: correção dos alertas de URL
+
+- Corrigida a cadeia de três alertas moderados: `decode-uri-component` atualizado de `0.2.2` para a versão oficial `0.5.0`, indicada em [GHSA-vcc3-ghjq-m6fr](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr). O Expo Router não foi rebaixado e nenhum alerta foi ignorado.
+- `query-string@7.1.3` espera uma função CommonJS; a versão corrigida do decoder exporta uma função ESM. O script versionado `frontend/scripts/patch-query-string.cjs` adapta somente essa importação e preserva o tratamento legado de `+`, inclusive em fragmentos. O código do decoder oficial permanece intacto.
+- A adaptação é reaplicada por `postinstall`, é idempotente e recusa versões/conteúdo inesperados. O build verifica sua presença e executa testes de URL. Instalações que desativem scripts precisam executar a adaptação explicitamente antes de gerar o aplicativo.
+- **Instalação limpa `npm ci` aprovada; npm audit: zero vulnerabilidades conhecidas** no frontend no momento desta consulta. Isso não é garantia de ausência de falhas no aplicativo ou serviços externos.
+- **45 verificações locais aprovadas**: 42 na suíte Playwright (32 E2E com APIs simuladas + 10 verificações de funções/ativos) e três testes de decodificação em Node. Cobertura adicional de Unicode, espaços, sinais de mais codificados, parâmetros repetidos, identificadores de retorno do pagamento, fragmentos e UTF-8 malformado; a carga adversarial roda somente em processo local isolado com timeout de cinco segundos.
+- TypeScript, lint/tipografia, Expo Doctor **20/20**, build web e orçamento aprovados. JavaScript: 1.778.883 bytes no total; maior arquivo: 1.399.592 bytes.
+- O CI agora rejeita também vulnerabilidades moderadas. A instalação do Playwright passou a baixar somente o Chromium headless utilizado pelos testes, com limite explícito de oito minutos para essa etapa.
+- A execução anterior [33937332100](https://github.com/douglasfurlanicarneiro-gif/douglas/actions/runs/33937332100) terminou **cancelada** durante a instalação do navegador. Backend aprovado; testes E2E remotos não executados. A publicação anterior do catálogo foi confirmada no Render e verificada ao vivo, mas não devemos registrar aquela execução do frontend como aprovada.
+
+### Ponto de retomada após este bloco
+
+Homologar pagamentos/retomada, frete e endereços no painel real com acesso autorizado; depois, exercício de backup/restauração em ambiente isolado. Permanecem os demais itens do histórico (acessibilidade em aparelhos reais, monitoramento e operação). Não realizar cobranças, postagens ou restauração de produção como teste sem autorização específica.
+
+Manutenção futura: retirar a ponte quando o roteador adotar dependências compatíveis corrigidas. Qualquer atualização de `query-string` ou do decoder exige revisão da ponte e nova execução dos testes. A auditoria integral ainda não está encerrada.
 
 ## Retomada de 04/09/2026 — tópico 1: dependências
 
@@ -14,7 +31,7 @@ Atualização compatível implementada e validada:
 - JavaScript total: **1.708.002 bytes**; maior arquivo: **1.328.978 bytes**, dentro dos limites existentes. O hash do script inline continua autorizado pela CSP do Render.
 - Auditoria npm completa: **3 alertas moderados**, nenhum alto ou crítico. O bloqueio de vulnerabilidades altas/críticas no CI permanece ativo.
 
-### Pendência de segurança que continua aberta
+### Pendência registrada em 04/09 — resolvida no tópico 3 acima
 
 Os três alertas restantes vêm de uma única cadeia: `expo-router → query-string@7.1.3 → decode-uri-component@0.2.2`, afetada por [GHSA-vcc3-ghjq-m6fr](https://github.com/advisories/GHSA-vcc3-ghjq-m6fr). Uma entrada de URL malformada pode causar consumo excessivo de CPU.
 

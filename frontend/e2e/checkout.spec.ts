@@ -85,6 +85,17 @@ test('mantém a abertura visível enquanto o catálogo carrega', async ({ page }
   await expect(page.getByTestId('vitrine-card-ready')).toBeVisible();
 });
 
+test('abre com parâmetros de URL Unicode e malformados sem travar', async ({ page }) => {
+  await mockApi(page);
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/?nome=Jo%C3%A3o+Silva&token=a%2Bb&invalido=' + '%FF'.repeat(150));
+  await expect(page.getByTestId('vitrine-card-ready')).toBeVisible();
+  await page.getByTestId('filter-made-to-order').click();
+  await expect(page.getByTestId('vitrine-card-order')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('recupera automaticamente quando o servidor está acordando', async ({ page }) => {
   await mockApi(page, { catalogFailures: 1 });
   await openStore(page);

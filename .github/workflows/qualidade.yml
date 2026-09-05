@@ -58,8 +58,8 @@ jobs:
         run: npm run lint
       - name: Validar tipos
         run: npx tsc --noEmit
-      - name: Rejeitar vulnerabilidades altas ou críticas
-        run: npm audit --audit-level=high
+      - name: Rejeitar vulnerabilidades moderadas, altas ou críticas
+        run: npm audit --audit-level=moderate
       - name: Gerar vitrine web
         env:
           EXPO_PUBLIC_BACKEND_URL: https://lessence-furlani-api.onrender.com
@@ -67,6 +67,7 @@ jobs:
       - name: Validar orçamento do bundle web
         run: npm run check:bundle
       - name: Instalar navegador de testes
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 8
+        run: npx playwright install --with-deps --only-shell chromium
       - name: Testar vitrine, carrinho, frete e checkout
         run: npm run test:e2e
