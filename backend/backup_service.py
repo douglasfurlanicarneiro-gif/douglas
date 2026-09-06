@@ -290,7 +290,7 @@ async def restaurar_backup_validado(db, zip_path: Path, manifesto: dict) -> dict
         for colecao in colecoes
     }
     async with db.client.start_session() as session:
-        async with session.start_transaction():
+        async with await session.start_transaction():
             for colecao in colecoes:
                 await db[colecao].delete_many({}, session=session)
                 if documentos[colecao]:

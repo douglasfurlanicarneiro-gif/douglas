@@ -136,7 +136,7 @@ class ContextoAssincrono:
 
 
 class SessaoFalsa:
-    def start_transaction(self):
+    async def start_transaction(self):
         return ContextoAssincrono(self)
 
 

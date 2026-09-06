@@ -9,6 +9,7 @@
 - Índice único pré-existente deve ser preservado. Duplicidade proposital em clientes força erro após substituições anteriores na transação; todas as coleções devem permanecer iguais ao estado anterior.
 - Limpeza restrita aos bancos criados e contêiner efêmero do job. O teste fica disponível para regressões futuras.
 - Local: 193 testes aprovados e 41 ignorados, incluindo este ensaio por ausência de MongoDB. Resultado real deve ser conferido no novo job antes de marcar homologado.
+- Primeiro ensaio real (`34044409264`) detectou incompatibilidade: `AsyncClientSession.start_transaction` exige `await` no PyMongo utilizado. A restauração falhava antes das gravações; o mock anterior não representava esse contrato. Código e mock corrigidos; novo ensaio necessário.
 - Referência de configuração: https://www.mongodb.com/docs/manual/tutorial/deploy-replica-set-for-testing/
 - Fora deste ensaio: recuperação de arquivo real externo e sua chave, snapshot consistente durante escritas concorrentes, perda de rede/resultado de commit incerto, múltiplos membros/failover e medição de RPO/RTO. Réplica de um membro não demonstra alta disponibilidade.
 
