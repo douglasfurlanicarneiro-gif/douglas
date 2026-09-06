@@ -1,6 +1,13 @@
 # Auditoria técnica e operacional — meta 10/10
 
-Último ponto de retomada: **05/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
+Último ponto de retomada: **06/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
+
+## Retomada de 06/09/2026 — tópico 6: retorno da restauração
+
+- Falha do registro de auditoria após a restauração retorna sucesso com `auditoriaRegistrada: false` e aviso explícito para não repetir a operação. O erro é registrado no servidor sem ser apresentado como falha da transação.
+- Painel exibe o aviso recebido; erro rejeitado na atualização da tela após sucesso também não se torna erro de restauração. Campos adicionais são opcionais para manter compatibilidade.
+- 193 testes backend aprovados, 40 ignorados. Testes novos distinguem sucesso integral, falha de auditoria e falha da restauração e conferem limpeza dos temporários. Teste de interface verifica aviso e ausência do botão de repetir após sucesso, em celular e computador.
+- Sem restauração ou cobrança real. Continuam pendentes ensaio MongoDB isolado (incluindo resultado de commit incerto/interrupção de rede), consistência da exportação concorrente e operação de cópias externas. A auditoria completa não está encerrada.
 
 ## Retomada de 05/09/2026 — tópico 5: backup, etapa isolada
 

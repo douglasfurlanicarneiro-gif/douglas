@@ -664,7 +664,7 @@ export const validateBackup = (file: Blob) =>
   uploadBackup<BackupValidation>('/admin/backup/validar', file);
 
 export const restoreBackup = (file: Blob) =>
-  uploadBackup<{ status: string; colecoes: Record<string, number>; totalRegistros: number }>(
+  uploadBackup<{ status: string; colecoes: Record<string, number>; totalRegistros: number; auditoriaRegistrada?: boolean; aviso?: string }>(
     '/admin/backup/restaurar?confirmacao=RESTAURAR',
     file,
     true,

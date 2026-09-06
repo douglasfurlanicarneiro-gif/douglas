@@ -881,11 +881,14 @@ export function Atelie({
           onConfirm: async () => {
             try {
               const result = await restoreBackup(file);
-              await load();
-              await refreshOperationalSummary();
+              // Uma falha de atualização da tela não desfaz a restauração.
+              const atualizacoes = await Promise.allSettled([load(), refreshOperationalSummary()]);
+              const avisoAtualizacao = atualizacoes.some((item) => item.status === 'rejected')
+                ? ' Não foi possível atualizar todos os dados da tela. Reabra o painel; não repita a restauração.'
+                : '';
               setSheet({
                 type: 'info',
-                label: `Backup restaurado com segurança: ${result.totalRegistros} registro(s) aplicados.`,
+                label: `${result.aviso || `Backup restaurado com segurança: ${result.totalRegistros} registro(s) aplicados.`}${avisoAtualizacao}`,
               });
             } catch (error) {
               setSheet({

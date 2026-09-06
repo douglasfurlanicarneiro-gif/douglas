@@ -323,16 +323,25 @@ async def restaurar_backup_recebido(
         async with stock_lock(db):
             resumo = await restaurar_backup_validado(db, zip_path, manifesto)
         invalidate_catalog_cache()
-        await registrar_auditoria(
-            db,
-            acao="restaurar",
-            recurso="backup",
-            recurso_id=str(manifesto.get("geradoEm") or "v3"),
-            titulo="Backup criptografado restaurado",
-            detalhes=f"{resumo['totalRegistros']} registro(s) restaurados com transação.",
-            metadados={"colecoes": resumo["colecoes"]},
-        )
-        return {"status": "Backup restaurado com segurança.", **resumo}
+        # A transação já terminou: falha de auditoria não desfaz os dados.
+        try:
+            await registrar_auditoria(
+                db,
+                acao="restaurar",
+                recurso="backup",
+                recurso_id=str(manifesto.get("geradoEm") or "v3"),
+                titulo="Backup criptografado restaurado",
+                detalhes=f"{resumo['totalRegistros']} registro(s) restaurados com transação.",
+                metadados={"colecoes": resumo["colecoes"]},
+            )
+        except Exception:
+            logger.exception("backup_restore_audit_failed_after_commit")
+            return {
+                "status": "Backup restaurado com aviso.", **resumo,
+                "auditoriaRegistrada": False,
+                "aviso": "Os dados foram restaurados, mas o registro de auditoria falhou. Não repita a restauração; confira os dados e contate o suporte.",
+            }
+        return {"status": "Backup restaurado com segurança.", **resumo, "auditoriaRegistrada": True}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except HTTPException:

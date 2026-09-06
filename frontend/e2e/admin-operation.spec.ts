@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import catalogImages from '../src/data/catalogImages.json';
 
 
-async function mockAdminApi(page: Page, options: { manualPayment?: boolean; divergentPayment?: boolean } = {}) {
+async function mockAdminApi(page: Page, options: { manualPayment?: boolean; divergentPayment?: boolean; backupWarning?: boolean } = {}) {
   let frontendErrorOpen = true;
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -208,7 +208,9 @@ async function mockAdminApi(page: Page, options: { manualPayment?: boolean; dive
       if (request.headers()['x-atelie-step-up'] !== 'stepup-e2e') {
         return json({ detail: 'Reautenticação ausente.' }, 403);
       }
-      return json({ status: 'Backup restaurado.', colecoes: { clientes: 2 }, totalRegistros: 2 });
+      return json({ status: 'Backup restaurado.', colecoes: { clientes: 2 }, totalRegistros: 2,
+        ...(options.backupWarning ? { auditoriaRegistrada: false, aviso: 'Os dados foram restaurados, mas o registro de auditoria falhou. Não repita a restauração; confira os dados e contate o suporte.' } : {}),
+      });
     }
     if (path === '/api/admin/operacao/pagamentos/reprocessar-falhos') {
       return json({ status: 'Eventos reenfileirados.', reprocessados: 1 });
@@ -271,8 +273,9 @@ test('catálogo e vitrine exibem a mesma foto local e notas sem fases inventadas
   await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 });
 
-test('painel mostra saúde, recuperação e valida o backup antes de restaurar', async ({ page }) => {
-  await mockAdminApi(page);
+for (const backupWarning of [false, true]) {
+test(`painel valida restauração e informa auditoria (aviso=${backupWarning})`, async ({ page }) => {
+  await mockAdminApi(page, { backupWarning });
   await openAdminSystem(page);
 
   await expect(page.getByText('Pedido pedido-42 · 5 tentativa(s)')).toBeVisible();
@@ -300,8 +303,10 @@ test('painel mostra saúde, recuperação e valida o backup antes de restaurar',
   await expect(page.getByTestId('critical-password')).toBeVisible();
   await page.getByTestId('critical-password').fill('senha-local');
   await page.getByText('Restaurar agora').click();
-  await expect(page.getByText(/Backup restaurado com segurança: 2 registro/)).toBeVisible();
+  await expect(page.getByText(backupWarning ? /Não repita a restauração/ : /Backup restaurado com segurança: 2 registro/)).toBeVisible();
+  await expect(page.getByText('Restaurar agora', { exact: true })).toHaveCount(0);
 });
+}
 
 
 test('gerencia a disponibilidade e revisa antes de salvar', async ({ page }) => {

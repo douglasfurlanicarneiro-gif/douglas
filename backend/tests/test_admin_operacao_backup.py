@@ -1,5 +1,9 @@
 import asyncio
 from datetime import datetime, timezone
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, Mock
+import pytest
+from fastapi import HTTPException
 
 from fastapi.responses import StreamingResponse
 
@@ -216,3 +220,48 @@ def test_download_de_backup_retorna_stream_e_remove_temporario(monkeypatch, tmp_
 
     assert asyncio.run(consumir()) == b"backup-criptografado"
     assert not arquivo.exists()
+
+
+@pytest.mark.parametrize("falha", [None, "auditoria", "restauracao"])
+def test_retorno_distingue_auditoria_de_restauracao(monkeypatch, tmp_path, falha):
+    upload = tmp_path / "upload.lfe"
+    zip_path = tmp_path / "validado.zip"
+    upload.touch()
+    zip_path.touch()
+    resumo = {"totalRegistros": 2, "colecoes": {"clientes": 2}}
+    restaurar = AsyncMock(return_value=resumo)
+    auditar = AsyncMock()
+    cache = Mock()
+    if falha == "auditoria":
+        auditar.side_effect = RuntimeError("Falha simulada na auditoria")
+    if falha == "restauracao":
+        restaurar.side_effect = RuntimeError("Falha simulada na transação")
+    @asynccontextmanager
+    async def lock(_db):
+        yield
+    monkeypatch.setattr(admin, "BACKUP_ENCRYPTION_KEY", "x" * 32)
+    monkeypatch.setattr(admin, "get_db", lambda: object())
+    monkeypatch.setattr(admin, "_salvar_backup_recebido", AsyncMock(return_value=upload))
+    monkeypatch.setattr(admin, "descriptografar_e_validar_backup", lambda *_: (zip_path, {"geradoEm": "teste"}))
+    monkeypatch.setattr(admin, "stock_lock", lock)
+    monkeypatch.setattr(admin, "restaurar_backup_validado", restaurar)
+    monkeypatch.setattr(admin, "registrar_auditoria", auditar)
+    monkeypatch.setattr(admin, "invalidate_catalog_cache", cache)
+    if falha == "restauracao":
+        with pytest.raises(HTTPException) as erro:
+            asyncio.run(admin.restaurar_backup_recebido(None, "RESTAURAR", "sessao"))
+        assert erro.value.status_code == 503
+        auditar.assert_not_awaited()
+        cache.assert_not_called()
+    else:
+        resposta = asyncio.run(admin.restaurar_backup_recebido(None, "RESTAURAR", "sessao"))
+        assert resposta["totalRegistros"] == 2
+        assert resposta["auditoriaRegistrada"] is (falha is None)
+        if falha:
+            assert "Não repita a restauração" in resposta["aviso"]
+        else:
+            assert "aviso" not in resposta
+        cache.assert_called_once()
+    restaurar.assert_awaited_once()
+    assert not upload.exists()
+    assert not zip_path.exists()
