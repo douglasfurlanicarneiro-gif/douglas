@@ -106,22 +106,26 @@ async def gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
             compression=zipfile.ZIP_DEFLATED,
             compresslevel=6,
         ) as archive:
-            for colecao in BACKUP_COLLECTIONS:
-                total = 0
-                with archive.open(f"dados/{colecao}.ndjson", "w") as destino:
-                    async for documento in db[colecao].find({}):
-                        linha = json.dumps(
-                            _json_seguro(documento),
-                            ensure_ascii=False,
-                            separators=(",", ":"),
-                        ).encode("utf-8")
-                        destino.write(linha + b"\n")
-                        total += 1
-                contagens[colecao] = total
+            # Uma única visão majority-committed para todas as coleções.
+            # Se o snapshot expirar/falhar, abortar: nunca exportar visão mista.
+            async with db.client.start_session(snapshot=True) as session:
+                for colecao in BACKUP_COLLECTIONS:
+                    total = 0
+                    with archive.open(f"dados/{colecao}.ndjson", "w") as destino:
+                        async for documento in db[colecao].find({}, session=session):
+                            linha = json.dumps(
+                                _json_seguro(documento),
+                                ensure_ascii=False,
+                                separators=(",", ":"),
+                            ).encode("utf-8")
+                            destino.write(linha + b"\n")
+                            total += 1
+                    contagens[colecao] = total
             manifesto = {
                 "aplicacao": "L'Essence Furlani",
                 "geradoEm": gerado_em,
                 "versao": 3,
+                "consistencia": "snapshot-majority",
                 "formato": "ndjson-em-zip-cifrado-aes-256-gcm",
                 "colecoes": contagens,
             }

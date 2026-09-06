@@ -2,6 +2,14 @@
 
 Último ponto de retomada: **06/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
 
+## Retomada de 06/09/2026 — tópico 8: backup durante escritas
+
+- Exportação usa uma sessão PyMongo `snapshot=True`, passada explicitamente a todos os cursores. As coleções compartilham a visão majority-committed escolhida na primeira leitura, conforme https://pymongo.readthedocs.io/en/stable/api/pymongo/client_session.html#snapshot-reads . Requer MongoDB compatível (5.0+); sem fallback silencioso para leitura inconsistente.
+- Manifesto v3 recebe marcador informativo `consistencia: snapshot-majority`; arquivos antigos continuam aceitos, sem alegar retroativamente que eram consistentes.
+- Falha do snapshot descarta os arquivos parciais. Teste local confere mesma sessão e limpeza após erro simulado.
+- Ensaio real ampliado: alteração atômica em perfumes e pedidos entre duas leituras; o backup deve preservar o estado anterior de todas as 19 coleções e restaurá-lo, enquanto a origem confirma os valores novos. Resultado desta extensão ainda deve ser confirmado no CI.
+- Limite: snapshot preserva um momento do banco; não corrige inconsistências previamente gravadas por operações não transacionais. Permanecem volume/duração máximos, rede/commit incerto, recuperação de cópia externa e chave, failover e RPO/RTO.
+
 ## Retomada de 06/09/2026 — tópico 7: ensaio MongoDB real
 
 - Novo job independente no GitHub com MongoDB 8.0 descartável, réplica de um membro, porta publicada somente no loopback do runner. Nenhum segredo, URL ou banco de produção é usado.
@@ -10,6 +18,7 @@
 - Limpeza restrita aos bancos criados e contêiner efêmero do job. O teste fica disponível para regressões futuras.
 - Local: 193 testes aprovados e 41 ignorados, incluindo este ensaio por ausência de MongoDB. Resultado real deve ser conferido no novo job antes de marcar homologado.
 - Primeiro ensaio real (`34044409264`) detectou incompatibilidade: `AsyncClientSession.start_transaction` exige `await` no PyMongo utilizado. A restauração falhava antes das gravações; o mock anterior não representava esse contrato. Código e mock corrigidos; novo ensaio necessário.
+- Confirmação posterior: CI `34044534193` integralmente aprovado, incluindo MongoDB real, restauração, índice e rollback. Correção `54585a6` publicada no backend; readiness OK. A pendência de escritas concorrentes é tratada no tópico 8.
 - Referência de configuração: https://www.mongodb.com/docs/manual/tutorial/deploy-replica-set-for-testing/
 - Fora deste ensaio: recuperação de arquivo real externo e sua chave, snapshot consistente durante escritas concorrentes, perda de rede/resultado de commit incerto, múltiplos membros/failover e medição de RPO/RTO. Réplica de um membro não demonstra alta disponibilidade.
 

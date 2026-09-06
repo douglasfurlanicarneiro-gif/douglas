@@ -61,6 +61,40 @@ async def _ensaio():
             assert antes[nome] == esperados
         assert await destino.clientes.index_information() == indices
 
+        # Alterar duas coleções atomicamente DEPOIS de ler a primeira, mas
+        # ANTES de ler a segunda. Sem snapshot o backup mistura os dois momentos.
+        class ColecaoComEscritaConcorrente:
+            def __init__(self, nome):
+                self.nome = nome
+
+            async def find(self, filtro, **kwargs):
+                async for documento in origem[self.nome].find(filtro, **kwargs):
+                    yield documento
+                if self.nome == "perfumes":
+                    async with client.start_session() as escrita:
+                        async with await escrita.start_transaction():
+                            for nome in ("perfumes", "pedidos"):
+                                await origem[nome].update_one({}, {"$set": {"totalCentavos": 54321}}, session=escrita)
+
+        class BancoComEscritaConcorrente:
+            def __init__(self):
+                self.client = client
+
+            def __getitem__(self, nome):
+                return ColecaoComEscritaConcorrente(nome)
+
+        chave = "chave-ficticia-exclusiva-do-ensaio-concorrente"
+        cifrado, _ = await gerar_backup_criptografado(BancoComEscritaConcorrente(), chave)
+        arquivos.append(cifrado)
+        zip_path, manifesto = descriptografar_e_validar_backup(cifrado, chave)
+        arquivos.append(zip_path)
+        assert manifesto["consistencia"] == "snapshot-majority"
+        await restaurar_backup_validado(destino, zip_path, manifesto)
+        for nome in BACKUP_COLLECTIONS:
+            assert await destino[nome].find({}).to_list(None) == antes[nome]
+        for nome in ("perfumes", "pedidos"):
+            assert (await origem[nome].find_one({}))["totalCentavos"] == 54321
+
         # A falha ocorre depois de coleções anteriores já terem sido substituídas
         # dentro da transação. O índice único real força o aborto integral.
         await origem.perfumes.update_one({}, {"$set": {"totalCentavos": 99999}})

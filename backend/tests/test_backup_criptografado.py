@@ -37,12 +37,14 @@ class ColecaoFalsa:
     def __init__(self, documentos):
         self._documentos = documentos
 
-    def find(self, _filtro):
+    def find(self, _filtro, session=None):
+        assert session is not None
         return CursorAssincrono(self._documentos)
 
 
 class BancoFalso:
     def __init__(self):
+        self.client = ClienteMongoFalso()
         self._colecoes = {
             nome: ColecaoFalsa([]) for nome in BACKUP_COLLECTIONS
         }
@@ -141,7 +143,9 @@ class SessaoFalsa:
 
 
 class ClienteMongoFalso:
-    def start_session(self):
+    def start_session(self, **kwargs):
+        if kwargs:
+            assert kwargs == {"snapshot": True}
         return ContextoAssincrono(SessaoFalsa())
 
 
@@ -274,4 +278,23 @@ def test_ciclo_completo_preserva_todas_as_colecoes_com_dados_ficticios(monkeypat
         caminho.unlink(missing_ok=True)
         if zip_path:
             zip_path.unlink(missing_ok=True)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_snapshot_unico_e_falha_descarta_backup_parcial(monkeypatch, tmp_path):
+    monkeypatch.setattr(backup_service.tempfile, "tempdir", str(tmp_path))
+    banco = BancoFalso()
+    sessoes = []
+    class ColecaoComFalha:
+        async def find(self, _filtro, session=None):
+            sessoes.append(session)
+            yield {"codigo": "ficticio"}
+            if len(sessoes) == 2:
+                raise RuntimeError("SnapshotTooOld simulado")
+    for nome in BACKUP_COLLECTIONS:
+        banco._colecoes[nome] = ColecaoComFalha()
+    with pytest.raises(RuntimeError, match="SnapshotTooOld"):
+        asyncio.run(gerar_backup_criptografado(banco, "chave-ficticia-de-teste-com-mais-de-32-caracteres"))
+    assert len(sessoes) == 2
+    assert sessoes[0] is not None and sessoes[0] is sessoes[1]
     assert list(tmp_path.iterdir()) == []
