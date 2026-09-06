@@ -2,6 +2,16 @@
 
 Último ponto de retomada: **06/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
 
+## Retomada de 06/09/2026 — tópico 7: ensaio MongoDB real
+
+- Novo job independente no GitHub com MongoDB 8.0 descartável, réplica de um membro, porta publicada somente no loopback do runner. Nenhum segredo, URL ou banco de produção é usado.
+- Teste exige ativação explícita e usa endereço local fixo; cria dois bancos com nomes aleatórios exclusivos. Exporta, valida e restaura as 19 coleções com dados fictícios, verificando ObjectIds, datas, valores e listas.
+- Índice único pré-existente deve ser preservado. Duplicidade proposital em clientes força erro após substituições anteriores na transação; todas as coleções devem permanecer iguais ao estado anterior.
+- Limpeza restrita aos bancos criados e contêiner efêmero do job. O teste fica disponível para regressões futuras.
+- Local: 193 testes aprovados e 41 ignorados, incluindo este ensaio por ausência de MongoDB. Resultado real deve ser conferido no novo job antes de marcar homologado.
+- Referência de configuração: https://www.mongodb.com/docs/manual/tutorial/deploy-replica-set-for-testing/
+- Fora deste ensaio: recuperação de arquivo real externo e sua chave, snapshot consistente durante escritas concorrentes, perda de rede/resultado de commit incerto, múltiplos membros/failover e medição de RPO/RTO. Réplica de um membro não demonstra alta disponibilidade.
+
 ## Retomada de 06/09/2026 — tópico 6: retorno da restauração
 
 - Falha do registro de auditoria após a restauração retorna sucesso com `auditoriaRegistrada: false` e aviso explícito para não repetir a operação. O erro é registrado no servidor sem ser apresentado como falha da transação.

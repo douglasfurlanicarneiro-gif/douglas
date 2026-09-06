@@ -15,6 +15,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  backup-mongodb:
+    name: Backup · MongoDB isolado e rollback
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Instalar dependências de teste
+        run: python -m pip install --disable-pip-version-check -r backend/requirements-dev.txt
+      - name: Iniciar MongoDB descartável sem credenciais de produção
+        run: |
+          docker run -d --name lessence-backup-test -p 127.0.0.1:27028:27028 mongo:8.0 mongod --replSet backup_test --bind_ip_all --port 27028
+          for tentativa in $(seq 1 40); do
+            if docker exec lessence-backup-test mongosh --port 27028 --quiet --eval 'db.adminCommand({ping:1})'; then break; fi
+            sleep 2
+          done
+          docker exec lessence-backup-test mongosh --port 27028 --quiet --eval 'rs.initiate({_id:"backup_test",members:[{_id:0,host:"localhost:27028"}]})'
+          for tentativa in $(seq 1 40); do
+            if docker exec lessence-backup-test mongosh --port 27028 --quiet --eval 'quit(db.hello().isWritablePrimary ? 0 : 1)'; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - name: Verificar dados, índices e rollback real
+        working-directory: backend
+        env:
+          RUN_ISOLATED_MONGO_BACKUP: "1"
+        run: python -m pytest -q tests/test_backup_mongodb_isolado.py
+      - name: Remover somente o contêiner de teste
+        if: always()
+        run: docker rm -f -v lessence-backup-test || true
+
   backend:
     name: Backend · testes e dependências
     runs-on: ubuntu-latest
