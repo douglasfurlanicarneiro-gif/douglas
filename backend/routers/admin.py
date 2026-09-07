@@ -206,18 +206,28 @@ async def baixar_backup(_: str = Depends(require_atelie_auth)):
         )
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("backup_export_failed")
+        raise HTTPException(status_code=503, detail="Não foi possível gerar o backup completo. Nenhum arquivo foi disponibilizado. Tente novamente mais tarde.") from exc
     data = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    await registrar_auditoria(
-        get_db(),
-        acao="exportar",
-        recurso="backup",
-        recurso_id=data,
-        titulo="Backup criptografado exportado",
-        detalhes=(
-            f"Backup v3 gerado com {sum(resumo['colecoes'].values())} registro(s)."
-        ),
-        metadados={"tamanhoBytes": resumo["tamanhoBytes"]},
-    )
+    try:
+        await registrar_auditoria(
+            get_db(),
+            acao="exportar",
+            recurso="backup",
+            recurso_id=data,
+            titulo="Backup criptografado exportado",
+            detalhes=(
+                f"Backup v3 gerado com {sum(resumo['colecoes'].values())} registro(s)."
+            ),
+            metadados={"tamanhoBytes": resumo["tamanhoBytes"]},
+        )
+    except BaseException as exc:
+        caminho.unlink(missing_ok=True)
+        if not isinstance(exc, Exception):
+            raise
+        logger.exception("backup_export_audit_failed")
+        raise HTTPException(status_code=503, detail="O backup não foi disponibilizado porque o registro de auditoria falhou. Tente novamente mais tarde.") from exc
     return StreamingResponse(
         transmitir_e_remover(caminho),
         media_type="application/octet-stream",

@@ -2,12 +2,20 @@
 
 Último ponto de retomada: **06/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
 
+## Retomada de 06/09/2026 — tópico 9: limites e falhas de exportação
+
+- Geração passa a respeitar os limites já usados na validação: registro de 2 MiB (incluindo quebra de linha), total descompactado de 128 MiB (incluindo manifesto) e arquivo cifrado de 64 MiB (incluindo cabeçalho, nonce e tag). Manifesto também respeita o limite próprio. Não há truncamento nem entrega de arquivo parcial.
+- Cancelamento durante geração remove temporários e continua propagado. Falha de exportação retorna 503 com orientação sem detalhes internos; falha da auditoria antes do download remove o arquivo e informa que não foi disponibilizado.
+- 200 testes locais aprovados, 41 ignorados. Novos casos para os três limites, cancelamento, falha de geração e falha de auditoria. Ensaio MongoDB permanece obrigatório no CI.
+- Ainda pendentes: política de timeout global, carga/volume representativos, falhas na criação inicial de temporários e garantia de limpeza se o streaming nem chegar a iniciar; confirmação de download/guarda externa não pode ser inferida do registro de geração. Não foram testados arquivos reais grandes nem exportados dados de produção.
+
 ## Retomada de 06/09/2026 — tópico 8: backup durante escritas
 
 - Exportação usa uma sessão PyMongo `snapshot=True`, passada explicitamente a todos os cursores. As coleções compartilham a visão majority-committed escolhida na primeira leitura, conforme https://pymongo.readthedocs.io/en/stable/api/pymongo/client_session.html#snapshot-reads . Requer MongoDB compatível (5.0+); sem fallback silencioso para leitura inconsistente.
 - Manifesto v3 recebe marcador informativo `consistencia: snapshot-majority`; arquivos antigos continuam aceitos, sem alegar retroativamente que eram consistentes.
 - Falha do snapshot descarta os arquivos parciais. Teste local confere mesma sessão e limpeza após erro simulado.
 - Ensaio real ampliado: alteração atômica em perfumes e pedidos entre duas leituras; o backup deve preservar o estado anterior de todas as 19 coleções e restaurá-lo, enquanto a origem confirma os valores novos. Resultado desta extensão ainda deve ser confirmado no CI.
+- Resultado confirmado: CI `34044885801` integralmente aprovado; ensaio real concorrente passou. Backend `86be4b5` ativo no Render, readiness OK.
 - Limite: snapshot preserva um momento do banco; não corrige inconsistências previamente gravadas por operações não transacionais. Permanecem volume/duração máximos, rede/commit incerto, recuperação de cópia externa e chave, failover e RPO/RTO.
 
 ## Retomada de 06/09/2026 — tópico 7: ensaio MongoDB real

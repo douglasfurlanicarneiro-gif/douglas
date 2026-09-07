@@ -298,3 +298,25 @@ def test_snapshot_unico_e_falha_descarta_backup_parcial(monkeypatch, tmp_path):
     assert len(sessoes) == 2
     assert sessoes[0] is not None and sessoes[0] is sessoes[1]
     assert list(tmp_path.iterdir()) == []
+
+
+@pytest.mark.parametrize("limite", ["MAX_BACKUP_LINE_BYTES", "MAX_BACKUP_UNCOMPRESSED_BYTES", "MAX_BACKUP_ENCRYPTED_BYTES"])
+def test_exportacao_respeita_limites_da_restauracao(monkeypatch, tmp_path, limite):
+    monkeypatch.setattr(backup_service.tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setattr(backup_service, limite, 64)
+    with pytest.raises(ValueError, match="limite restaurável"):
+        asyncio.run(gerar_backup_criptografado(BancoFalso(), "chave-ficticia-com-mais-de-trinta-e-dois-caracteres"))
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_cancelamento_remove_arquivos_parciais(monkeypatch, tmp_path):
+    monkeypatch.setattr(backup_service.tempfile, "tempdir", str(tmp_path))
+    banco = BancoFalso()
+    class ColecaoCancelada:
+        async def find(self, *args, **kwargs):
+            yield {"ficticio": True}
+            raise asyncio.CancelledError()
+    banco._colecoes["perfumes"] = ColecaoCancelada()
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(gerar_backup_criptografado(banco, "chave-ficticia-com-mais-de-trinta-e-dois-caracteres"))
+    assert list(tmp_path.iterdir()) == []

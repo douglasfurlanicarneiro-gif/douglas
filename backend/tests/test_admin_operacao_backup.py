@@ -265,3 +265,24 @@ def test_retorno_distingue_auditoria_de_restauracao(monkeypatch, tmp_path, falha
     restaurar.assert_awaited_once()
     assert not upload.exists()
     assert not zip_path.exists()
+
+
+@pytest.mark.parametrize("falha", ["geracao", "auditoria"])
+def test_exportacao_falha_sem_arquivo_ou_erro_interno_exposto(monkeypatch, tmp_path, falha):
+    caminho = tmp_path / "backup.lfe"
+    gerar = AsyncMock(side_effect=RuntimeError("detalhe-interno-sigiloso"))
+    if falha == "auditoria":
+        caminho.write_bytes(b"ficticio")
+        gerar = AsyncMock(return_value=(caminho, {"colecoes": {"clientes": 1}, "tamanhoBytes": 8}))
+    monkeypatch.setattr(admin, "BACKUP_ENCRYPTION_KEY", "x" * 32)
+    monkeypatch.setattr(admin, "get_db", lambda: object())
+    monkeypatch.setattr(admin, "gerar_backup_criptografado", gerar)
+    auditar = AsyncMock(side_effect=RuntimeError("detalhe-interno-sigiloso"))
+    monkeypatch.setattr(admin, "registrar_auditoria", auditar)
+    with pytest.raises(HTTPException) as erro:
+        asyncio.run(admin.baixar_backup("sessao"))
+    assert erro.value.status_code == 503
+    assert "detalhe-interno" not in erro.value.detail
+    assert not caminho.exists()
+    if falha == "geracao":
+        auditar.assert_not_awaited()

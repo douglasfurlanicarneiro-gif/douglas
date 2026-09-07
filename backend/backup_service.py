@@ -98,6 +98,7 @@ async def gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
     encrypted_path = Path(encrypted_name)
     gerado_em = datetime.now(timezone.utc).isoformat()
     contagens: dict[str, int] = {}
+    tamanho_descompactado = 0
 
     try:
         with zipfile.ZipFile(
@@ -118,7 +119,13 @@ async def gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
                                 ensure_ascii=False,
                                 separators=(",", ":"),
                             ).encode("utf-8")
-                            destino.write(linha + b"\n")
+                            linha += b"\n"
+                            if len(linha) > MAX_BACKUP_LINE_BYTES:
+                                raise ValueError("Um registro excede o limite restaurável do backup. Nenhum arquivo foi gerado.")
+                            tamanho_descompactado += len(linha)
+                            if tamanho_descompactado > MAX_BACKUP_UNCOMPRESSED_BYTES:
+                                raise ValueError("Os dados excedem o limite restaurável do backup. Nenhum arquivo foi gerado.")
+                            destino.write(linha)
                             total += 1
                     contagens[colecao] = total
             manifesto = {
@@ -129,11 +136,13 @@ async def gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
                 "formato": "ndjson-em-zip-cifrado-aes-256-gcm",
                 "colecoes": contagens,
             }
-            archive.writestr(
-                "manifesto.json",
-                json.dumps(manifesto, ensure_ascii=False, indent=2).encode("utf-8"),
-            )
+            manifesto_bytes = json.dumps(manifesto, ensure_ascii=False, indent=2).encode("utf-8")
+            if len(manifesto_bytes) > MAX_BACKUP_LINE_BYTES or tamanho_descompactado + len(manifesto_bytes) > MAX_BACKUP_UNCOMPRESSED_BYTES:
+                raise ValueError("O manifesto e os dados excedem o limite restaurável do backup. Nenhum arquivo foi gerado.")
+            archive.writestr("manifesto.json", manifesto_bytes)
 
+        if plain_path.stat().st_size + len(BACKUP_MAGIC) + 12 + 16 > MAX_BACKUP_ENCRYPTED_BYTES:
+            raise ValueError("O arquivo excede o limite restaurável do backup. Nenhum arquivo foi gerado.")
         nonce = os.urandom(12)
         encryptor = Cipher(algorithms.AES(chave), modes.GCM(nonce)).encryptor()
         encryptor.authenticate_additional_data(BACKUP_MAGIC)
@@ -144,7 +153,7 @@ async def gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
                 destino.write(encryptor.update(bloco))
             destino.write(encryptor.finalize())
             destino.write(encryptor.tag)
-    except Exception:
+    except BaseException:
         encrypted_path.unlink(missing_ok=True)
         raise
     finally:
