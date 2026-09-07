@@ -320,3 +320,33 @@ def test_cancelamento_remove_arquivos_parciais(monkeypatch, tmp_path):
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(gerar_backup_criptografado(banco, "chave-ficticia-com-mais-de-trinta-e-dois-caracteres"))
     assert list(tmp_path.iterdir()) == []
+
+
+def test_timeout_descarta_exportacao(monkeypatch, tmp_path):
+    monkeypatch.setattr(backup_service.tempfile, "tempdir", str(tmp_path))
+    monkeypatch.setattr(backup_service, "MAX_BACKUP_EXPORT_SECONDS", 0.01)
+    banco = BancoFalso()
+    class ColecaoLenta:
+        async def find(self, *args, **kwargs):
+            yield {"ficticio": True}
+            await asyncio.sleep(10)
+    banco._colecoes["perfumes"] = ColecaoLenta()
+    with pytest.raises(TimeoutError):
+        asyncio.run(gerar_backup_criptografado(banco, "chave-ficticia-com-mais-de-trinta-e-dois-caracteres"))
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_falha_no_segundo_temporario_remove_primeiro(monkeypatch, tmp_path):
+    monkeypatch.setattr(backup_service.tempfile, "tempdir", str(tmp_path))
+    mkstemp_real = backup_service.tempfile.mkstemp
+    chamadas = 0
+    def criar(*args, **kwargs):
+        nonlocal chamadas
+        chamadas += 1
+        if chamadas == 2:
+            raise OSError("disco cheio simulado")
+        return mkstemp_real(*args, **kwargs)
+    monkeypatch.setattr(backup_service.tempfile, "mkstemp", criar)
+    with pytest.raises(OSError):
+        asyncio.run(gerar_backup_criptografado(BancoFalso(), "chave-ficticia-com-mais-de-trinta-e-dois-caracteres"))
+    assert list(tmp_path.iterdir()) == []

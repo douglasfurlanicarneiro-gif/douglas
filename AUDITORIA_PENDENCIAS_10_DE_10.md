@@ -1,6 +1,14 @@
 # Auditoria técnica e operacional — meta 10/10
 
-Último ponto de retomada: **06/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
+Último ponto de retomada: **07/09/2026**. O relatório integral de 13/08/2026 permanece abaixo como histórico; suas notas e contagens não representam uma nova homologação.
+
+## Retomada de 07/09/2026 — tópico 10: prazo e downloads interrompidos
+
+- Geração limitada a 120 segundos por timeout cooperativo, com pontos de cancelamento nos registros e blocos de cifra. Timeout descarta os temporários e retorna 503 orientando que nenhum arquivo foi disponibilizado. Não é preempção de chamadas síncronas de disco/compressão, nem limite total do download ou da auditoria posterior.
+- Falha ao criar o segundo temporário limpa o primeiro. Resposta de streaming fecha o gerador e remove o arquivo em bloco finally, inclusive se falhar o envio dos cabeçalhos antes de começar o corpo.
+- 207 testes locais aprovados, 41 ignorados. Cobertura adicional: timeout, falha de disco simulada na criação, envio normal, desconexão nos cabeçalhos/corpo e cancelamento. Sem exportar/restaurar dados reais.
+- Limites restantes: encerramento abrupto do processo/sistema não executa finally; não há garantia de retenção externa nem confirmação de download pelo cliente. Falta carga representativa, prazo de auditoria pós-geração e cenários rede/commit incerto.
+- Tópico 9 confirmado: CI `34070047370` integralmente aprovado, backend `128cc39` publicado e readiness saudável.
 
 ## Retomada de 06/09/2026 — tópico 9: limites e falhas de exportação
 

@@ -193,6 +193,23 @@ async def restaurar_arquivado(
     return {"status": "Registro restaurado."}
 
 
+class BackupStreamingResponse(StreamingResponse):
+    """Limpa inclusive quando o envio dos cabeçalhos falha antes do gerador."""
+
+    def __init__(self, caminho: Path, **kwargs):
+        self.caminho_backup = caminho
+        super().__init__(transmitir_e_remover(caminho), **kwargs)
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            try:
+                await self.body_iterator.aclose()
+            finally:
+                self.caminho_backup.unlink(missing_ok=True)
+
+
 @router.get("/backup")
 async def baixar_backup(_: str = Depends(require_atelie_auth)):
     if not BACKUP_ENCRYPTION_KEY:
@@ -204,6 +221,8 @@ async def baixar_backup(_: str = Depends(require_atelie_auth)):
         caminho, resumo = await gerar_backup_criptografado(
             get_db(), BACKUP_ENCRYPTION_KEY
         )
+    except TimeoutError as exc:
+        raise HTTPException(status_code=503, detail="A exportação excedeu o tempo máximo. Nenhum arquivo foi disponibilizado. Tente novamente mais tarde.") from exc
     except ValueError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
@@ -228,8 +247,8 @@ async def baixar_backup(_: str = Depends(require_atelie_auth)):
             raise
         logger.exception("backup_export_audit_failed")
         raise HTTPException(status_code=503, detail="O backup não foi disponibilizado porque o registro de auditoria falhou. Tente novamente mais tarde.") from exc
-    return StreamingResponse(
-        transmitir_e_remover(caminho),
+    return BackupStreamingResponse(
+        caminho,
         media_type="application/octet-stream",
         headers={
             "Content-Disposition": (

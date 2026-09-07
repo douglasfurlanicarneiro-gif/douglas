@@ -286,3 +286,38 @@ def test_exportacao_falha_sem_arquivo_ou_erro_interno_exposto(monkeypatch, tmp_p
     assert not caminho.exists()
     if falha == "geracao":
         auditar.assert_not_awaited()
+
+
+@pytest.mark.parametrize("interromper", [None, "http.response.start", "http.response.body", "cancelar"])
+def test_download_limpa_arquivo_ao_terminar_ou_interromper(tmp_path, interromper):
+    from starlette.requests import ClientDisconnect
+    caminho = tmp_path / "download.lfe"
+    caminho.write_bytes(b"arquivo-ficticio")
+    resposta = admin.BackupStreamingResponse(caminho)
+    mensagens = []
+    async def enviar(mensagem):
+        if interromper == "cancelar":
+            raise asyncio.CancelledError()
+        if mensagem["type"] == interromper:
+            raise OSError("conexao interrompida")
+        mensagens.append(mensagem)
+    async def receber():
+        return {"type": "http.disconnect"}
+    chamada = resposta({"type": "http", "asgi": {"spec_version": "2.4"}}, receber, enviar)
+    if interromper:
+        with pytest.raises(asyncio.CancelledError if interromper == "cancelar" else ClientDisconnect):
+            asyncio.run(chamada)
+    else:
+        asyncio.run(chamada)
+        assert b"".join(m.get("body", b"") for m in mensagens) == b"arquivo-ficticio"
+    assert not caminho.exists()
+
+
+def test_exportacao_timeout_retorna_orientacao(monkeypatch):
+    monkeypatch.setattr(admin, "BACKUP_ENCRYPTION_KEY", "x" * 32)
+    monkeypatch.setattr(admin, "get_db", lambda: object())
+    monkeypatch.setattr(admin, "gerar_backup_criptografado", AsyncMock(side_effect=TimeoutError()))
+    with pytest.raises(HTTPException) as erro:
+        asyncio.run(admin.baixar_backup("sessao"))
+    assert erro.value.status_code == 503
+    assert "tempo máximo" in erro.value.detail

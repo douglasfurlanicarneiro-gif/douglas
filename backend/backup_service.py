@@ -44,6 +44,7 @@ BACKUP_COLLECTIONS = (
 MAX_BACKUP_ENCRYPTED_BYTES = 64 * 1024 * 1024
 MAX_BACKUP_UNCOMPRESSED_BYTES = 128 * 1024 * 1024
 MAX_BACKUP_LINE_BYTES = 2 * 1024 * 1024
+MAX_BACKUP_EXPORT_SECONDS = 120
 
 
 def _json_seguro(valor):
@@ -86,15 +87,25 @@ def _chave_aes(segredo: str) -> bytes:
 
 
 async def gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
+    """Prazo cooperativo; o cancelamento limpa os temporários antes de retornar."""
+    async with asyncio.timeout(MAX_BACKUP_EXPORT_SECONDS):
+        return await _gerar_backup_criptografado(db, segredo)
+
+
+async def _gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
     """Cria ZIP interno por cursor e o cifra em AES-256-GCM por blocos."""
     chave = _chave_aes(segredo)
     plain_fd, plain_name = tempfile.mkstemp(prefix="lessence-backup-", suffix=".zip")
-    encrypted_fd, encrypted_name = tempfile.mkstemp(
-        prefix="lessence-backup-", suffix=".lfe"
-    )
     os.close(plain_fd)
-    os.close(encrypted_fd)
     plain_path = Path(plain_name)
+    try:
+        encrypted_fd, encrypted_name = tempfile.mkstemp(
+            prefix="lessence-backup-", suffix=".lfe"
+        )
+        os.close(encrypted_fd)
+    except BaseException:
+        plain_path.unlink(missing_ok=True)
+        raise
     encrypted_path = Path(encrypted_name)
     gerado_em = datetime.now(timezone.utc).isoformat()
     contagens: dict[str, int] = {}
@@ -114,6 +125,7 @@ async def gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
                     total = 0
                     with archive.open(f"dados/{colecao}.ndjson", "w") as destino:
                         async for documento in db[colecao].find({}, session=session):
+                            await asyncio.sleep(0)  # Permite timeout mesmo com cursor em memória.
                             linha = json.dumps(
                                 _json_seguro(documento),
                                 ensure_ascii=False,
@@ -150,6 +162,7 @@ async def gerar_backup_criptografado(db, segredo: str) -> tuple[Path, dict]:
             destino.write(BACKUP_MAGIC)
             destino.write(nonce)
             while bloco := origem.read(1024 * 1024):
+                await asyncio.sleep(0)
                 destino.write(encryptor.update(bloco))
             destino.write(encryptor.finalize())
             destino.write(encryptor.tag)
