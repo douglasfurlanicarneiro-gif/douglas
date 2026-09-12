@@ -13,11 +13,100 @@ from backup_service import (
     BACKUP_COLLECTIONS, gerar_backup_criptografado,
     descriptografar_e_validar_backup, restaurar_backup_validado,
 )
+from routers import pedidos as pedidos_router
 
 
 @pytest.mark.skipif(os.environ.get("RUN_ISOLATED_MONGO_BACKUP") != "1", reason="Requer réplica local descartável na porta 27028")
 def test_backup_real_roundtrip_indices_e_rollback():
     asyncio.run(_ensaio())
+
+
+@pytest.mark.skipif(os.environ.get("RUN_ISOLATED_MONGO_BACKUP") != "1", reason="Requer réplica local descartável na porta 27028")
+def test_ajuste_manual_real_confirma_e_reverte_transacao(monkeypatch):
+    asyncio.run(_ensaio_ajuste_manual(monkeypatch))
+
+
+async def _ensaio_ajuste_manual(monkeypatch):
+    client = AsyncMongoClient(
+        "mongodb://127.0.0.1:27028/?replicaSet=backup_test&directConnection=true",
+        serverSelectionTimeoutMS=10000, tz_aware=True,
+    )
+    nome_banco = "lessence_manual_order_test_" + uuid.uuid4().hex
+    banco = client[nome_banco]
+    try:
+        pedido_ok = ObjectId()
+        pedido_rollback = ObjectId()
+        base = {
+            "status": "pendente",
+            "itens": [],
+            "pagamento": {
+                "provedor": "infinitepay",
+                "status": "aguardando_pagamento",
+                "checkoutUrl": "https://checkout.infinitepay.com.br/teste-isolado",
+            },
+        }
+        await banco.pedidos.insert_many([
+            {"_id": pedido_ok, **base},
+            {"_id": pedido_rollback, **base},
+        ])
+        monkeypatch.setattr(pedidos_router, "get_db", lambda: banco)
+
+        await pedidos_router.ajustar_status_manual(
+            str(pedido_ok),
+            pedidos_router.AjusteStatusIn(
+                status="entregue",
+                statusAnterior="pendente",
+                motivo="Conferência transacional no MongoDB isolado",
+                pagamento="pago",
+            ),
+            "admin-teste",
+        )
+        confirmado = await banco.pedidos.find_one({"_id": pedido_ok})
+        assert confirmado["status"] == "entregue"
+        assert confirmado["pagamento"]["status"] == "pago"
+        assert confirmado["pagamento"]["checkoutUrl"].endswith("teste-isolado")
+        assert confirmado["pagamentoRequerRevisao"] is True
+        assert confirmado["historicoAjustesManuais"][-1]["ator"] == "admin-teste"
+
+        async def falhar_depois_de_escrever(
+            db, pedido_id, _itens, _status, session=None
+        ):
+            await db.movimentos.insert_one(
+                {
+                    "origem": f"pedido:{pedido_id}",
+                    "tipo": "saida",
+                    "quantidadeMl": 30,
+                },
+                session=session,
+            )
+            raise RuntimeError("falha provocada dentro da transação")
+
+        monkeypatch.setattr(
+            pedidos_router,
+            "_sincronizar_movimentos_do_pedido",
+            falhar_depois_de_escrever,
+        )
+        with pytest.raises(RuntimeError, match="falha provocada"):
+            await pedidos_router.ajustar_status_manual(
+                str(pedido_rollback),
+                pedidos_router.AjusteStatusIn(
+                    status="entregue",
+                    statusAnterior="pendente",
+                    motivo="Verificação de rollback integral",
+                    pagamento="pago",
+                ),
+                "admin-teste",
+            )
+        revertido = await banco.pedidos.find_one({"_id": pedido_rollback})
+        assert revertido["status"] == "pendente"
+        assert revertido["pagamento"]["status"] == "aguardando_pagamento"
+        assert await banco.movimentos.count_documents(
+            {"origem": f"pedido:{pedido_rollback}"}
+        ) == 0
+    finally:
+        assert banco.name == nome_banco
+        await client.drop_database(nome_banco)
+        await client.close()
 
 
 async def _ensaio():

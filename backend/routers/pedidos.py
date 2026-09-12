@@ -498,6 +498,11 @@ async def ajustar_status_manual(
                     else:
                         pagamento.pop('pagoEm', None)
                     campos['pagamento'] = pagamento
+                    campos['pagamentoRequerRevisao'] = (
+                        pagamento.get('provedor') == 'infinitepay'
+                    )
+                    if pagamento.get('provedor') == 'infinitepay':
+                        campos['motivoRevisaoPagamento'] = 'ajuste_manual_aguardando_conciliacao'
                 # Não cria entrada fictícia: reconcilia a baixa, mesmo negativa.
                 # A transação inclui movimentos, status e histórico.
                 await _sincronizar_movimentos_do_pedido(

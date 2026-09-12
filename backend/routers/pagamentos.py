@@ -30,6 +30,12 @@ logger = logging.getLogger("atelie.pagamentos")
 _RECONCILIATION_BATCH_SIZE = 20
 _RECONCILIATION_MAX_ATTEMPTS = 8
 _RECONCILIATION_INTERVAL_SECONDS = 20
+_RECONCILIATION_REVIEW_CODES = frozenset(
+    {
+        "PAGAMENTO_DUPLICADO",
+        "VALOR_PAGAMENTO_DIVERGENTE",
+    }
+)
 
 
 class InfinitePayWebhookIn(BaseModel):
@@ -69,6 +75,54 @@ def _webhook_event_id(order_nsu: str, transaction_nsu: str) -> str:
 def _retry_delay(attempt: int) -> int:
     """Backoff curto no inicio e limitado a quinze minutos."""
     return min(15 * (2 ** max(0, attempt - 1)), 900)
+
+
+def _classificar_falha_reconciliacao(
+    exc: HTTPException, tentativas: int
+) -> tuple[str, bool]:
+    codigo = exc.detail.get("code") if isinstance(exc.detail, dict) else None
+    if codigo in _RECONCILIATION_REVIEW_CODES:
+        return "revisao_manual", False
+    if exc.status_code in {409, 502} and tentativas < _RECONCILIATION_MAX_ATTEMPTS:
+        return "repetir", True
+    return "falhou", False
+
+
+async def _marcar_revisao_pagamento(
+    db,
+    *,
+    oid: ObjectId,
+    codigo: str,
+    motivo: str,
+    transaction_nsu: str,
+    slug: str,
+    esperado_centavos: int | None = None,
+    recebido_centavos: int | None = None,
+) -> None:
+    """Expõe a divergência no pedido sem substituir o pagamento já registrado."""
+    agora = datetime.now(timezone.utc)
+    evento = {
+        "codigo": codigo,
+        "motivo": motivo,
+        "transactionNsu": transaction_nsu,
+        "invoiceSlug": slug,
+        "esperadoCentavos": esperado_centavos,
+        "recebidoCentavos": recebido_centavos,
+        "data": agora,
+        "origem": "infinitepay",
+    }
+    await db.pedidos.update_one(
+        {"_id": oid},
+        {
+            "$set": {
+                "pagamentoRequerRevisao": True,
+                "motivoRevisaoPagamento": codigo.lower(),
+                "revisaoPagamento": evento,
+                "atualizadoEm": agora,
+            },
+            "$push": {"historicoConciliacaoPagamento": evento},
+        },
+    )
 
 
 async def _registrar_webhook(payload: InfinitePayWebhookIn) -> str:
@@ -171,9 +225,28 @@ async def _confirmar_pagamento(
     except (TypeError, ValueError):
         recebido = -1
     if recebido != esperado:
+        await _marcar_revisao_pagamento(
+            db,
+            oid=oid,
+            codigo="VALOR_PAGAMENTO_DIVERGENTE",
+            motivo=(
+                "A InfinitePay confirmou um valor diferente do total protegido "
+                "do pedido. Confira a transação antes de prosseguir."
+            ),
+            transaction_nsu=transaction_nsu,
+            slug=slug,
+            esperado_centavos=esperado,
+            recebido_centavos=recebido,
+        )
         raise HTTPException(
             status_code=409,
-            detail="O valor confirmado não corresponde ao total do pedido.",
+            detail={
+                "code": "VALOR_PAGAMENTO_DIVERGENTE",
+                "message": (
+                    "O valor confirmado não corresponde ao total do pedido. "
+                    "A ocorrência foi enviada para revisão manual."
+                ),
+            },
         )
 
     agora = datetime.now(timezone.utc)
@@ -182,19 +255,6 @@ async def _confirmar_pagamento(
     ).strip()
     forma_pagamento = "pix" if captura == "pix" else "cartao"
     parcelas = verificacao.get("installments") or installments or 1
-    pagamento_confirmado = {
-        **pagamento_atual,
-        "metodo": forma_pagamento,
-        "provedor": "infinitepay",
-        "status": "pago",
-        "transactionNsu": transaction_nsu,
-        "invoiceSlug": slug,
-        "captureMethod": captura,
-        "parcelas": int(parcelas),
-        "valorCentavos": esperado,
-        "pagoEm": pagamento_atual.get("pagoEm") or agora,
-    }
-
     # A confirmação disputa a mesma trava do cancelamento. Assim um pagamento
     # confirmado nunca perde sua reserva por uma atualização simultânea.
     async with stock_lock(db):
@@ -202,25 +262,73 @@ async def _confirmar_pagamento(
         if not atual:
             raise HTTPException(status_code=404, detail="Pedido não encontrado.")
         pagamento_mais_recente = atual.get("pagamento") or {}
+        pagamento_confirmado = {
+            **pagamento_mais_recente,
+            "metodo": forma_pagamento,
+            "provedor": "infinitepay",
+            "status": "pago",
+            "transactionNsu": transaction_nsu,
+            "invoiceSlug": slug,
+            "captureMethod": captura,
+            "parcelas": int(parcelas),
+            "valorCentavos": esperado,
+            "pagoEm": pagamento_mais_recente.get("pagoEm") or agora,
+        }
         if pagamento_mais_recente.get("status") == "pago":
             if pagamento_mais_recente.get("transactionNsu") == transaction_nsu:
                 return atual
-            logger.error(
-                "duplicate_paid_transaction order_nsu=%s current=%s received=%s",
-                order_nsu,
-                pagamento_mais_recente.get("transactionNsu"),
-                transaction_nsu,
+            confirmacao_manual_sem_transacao = bool(
+                pagamento_mais_recente.get("confirmacaoManual")
+                and not pagamento_mais_recente.get("transactionNsu")
             )
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "code": "PAGAMENTO_DUPLICADO",
-                    "message": (
-                        "O pedido já possui outro pagamento confirmado. "
-                        "A transação adicional precisa de conferência e eventual estorno."
+            if confirmacao_manual_sem_transacao:
+                pagamento_confirmado["historico"] = [
+                    *(pagamento_mais_recente.get("historico") or []),
+                    {
+                        "operacao": "reconciliar_confirmacao_provedor",
+                        "statusAnterior": "pago_manual",
+                        "status": "pago",
+                        "motivo": (
+                            "Confirmação manual substituída pela confirmação "
+                            "verificada diretamente na InfinitePay."
+                        ),
+                        "referencia": transaction_nsu,
+                        "ator": "sistema",
+                        "data": agora,
+                    },
+                ]
+                pagamento_confirmado["confirmadoPeloProvedorEm"] = agora
+                pagamento_confirmado.pop("confirmacaoManual", None)
+            else:
+                await _marcar_revisao_pagamento(
+                    db,
+                    oid=oid,
+                    codigo="PAGAMENTO_DUPLICADO",
+                    motivo=(
+                        "A InfinitePay confirmou uma transação diferente da que "
+                        "já estava registrada neste pedido."
                     ),
-                },
-            )
+                    transaction_nsu=transaction_nsu,
+                    slug=slug,
+                    esperado_centavos=esperado,
+                    recebido_centavos=recebido,
+                )
+                logger.error(
+                    "duplicate_paid_transaction order_nsu=%s current=%s received=%s",
+                    order_nsu,
+                    pagamento_mais_recente.get("transactionNsu"),
+                    transaction_nsu,
+                )
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "code": "PAGAMENTO_DUPLICADO",
+                        "message": (
+                            "O pedido já possui outro pagamento confirmado. "
+                            "A transação adicional foi enviada para revisão e eventual estorno."
+                        ),
+                    },
+                )
         if atual.get("status") == "cancelado":
             pagamento_confirmado["observacao"] = (
                 "Pagamento recebido após o cancelamento. Confira a transação e "
@@ -251,31 +359,62 @@ async def _confirmar_pagamento(
             "pagamento": pagamento_confirmado,
             "formaPagamento": forma_pagamento,
             "estoquePendente": estoque_pendente,
+            "pagamentoRequerRevisao": atual.get("status") == "cancelado",
         }
+        evento_revisao = None
         if atual.get("status") == "cancelado":
+            evento_revisao = {
+                "codigo": "PAGO_APOS_CANCELAMENTO",
+                "motivo": pagamento_confirmado["observacao"],
+                "transactionNsu": transaction_nsu,
+                "invoiceSlug": slug,
+                "esperadoCentavos": esperado,
+                "recebidoCentavos": recebido,
+                "data": agora,
+                "origem": "infinitepay",
+            }
             campos_confirmados.update(
                 {
                     "pagamentoRequerRevisao": True,
                     "motivoRevisaoPagamento": "pago_apos_cancelamento",
+                    "revisaoPagamento": evento_revisao,
                 }
             )
+        unset_revisao = (
+            {}
+            if atual.get("status") == "cancelado"
+            else {
+                "motivoRevisaoPagamento": "",
+                "revisaoPagamento": "",
+            }
+        )
         if atual.get("status") == "pendente":
+            atualizacao = {
+                "$set": {**campos_confirmados, "status": "pagamento_confirmado"},
+                "$push": {
+                    "historicoStatus": {
+                        "status": "pagamento_confirmado",
+                        "data": agora,
+                    }
+                },
+            }
+            if unset_revisao:
+                atualizacao["$unset"] = unset_revisao
             await db.pedidos.update_one(
                 {"_id": oid, "status": "pendente"},
-                {
-                    "$set": {**campos_confirmados, "status": "pagamento_confirmado"},
-                    "$push": {
-                        "historicoStatus": {
-                            "status": "pagamento_confirmado",
-                            "data": agora,
-                        }
-                    },
-                },
+                atualizacao,
             )
         else:
+            atualizacao = {"$set": campos_confirmados}
+            if evento_revisao:
+                atualizacao["$push"] = {
+                    "historicoConciliacaoPagamento": evento_revisao,
+                }
+            if unset_revisao:
+                atualizacao["$unset"] = unset_revisao
             await db.pedidos.update_one(
                 {"_id": oid, "status": atual.get("status")},
-                {"$set": campos_confirmados},
+                atualizacao,
             )
 
         atualizado = await db.pedidos.find_one({"_id": oid})
@@ -322,19 +461,11 @@ async def processar_evento_pagamento(event_id: str) -> bool:
         )
     except HTTPException as exc:
         tentativas = int(evento.get("tentativas", 1))
-        codigo = exc.detail.get("code") if isinstance(exc.detail, dict) else None
-        requer_revisao = codigo == "PAGAMENTO_DUPLICADO"
-        deve_repetir = (
-            not requer_revisao
-            and exc.status_code in {409, 502}
-            and tentativas < _RECONCILIATION_MAX_ATTEMPTS
+        status_falha, deve_repetir = _classificar_falha_reconciliacao(
+            exc, tentativas
         )
         atualizacao = {
-            "status": (
-                "revisao_manual"
-                if requer_revisao
-                else ("repetir" if deve_repetir else "falhou")
-            ),
+            "status": status_falha,
             "ultimoErro": str(exc.detail)[:500],
             "ultimaTentativaEm": datetime.now(timezone.utc),
         }

@@ -104,12 +104,19 @@ class FrontendErrorsFalsos:
         return type("Resultado", (), {"matched_count": 1})()
 
 
+class PedidosFalsos:
+    async def count_documents(self, filtro):
+        assert filtro == {"pagamentoRequerRevisao": True}
+        return 2
+
+
 class BancoOperacionalFalso:
     def __init__(self):
         self.eventos_pagamento = EventosPagamentoFalsos()
         self.operacoes_sistema = OperacoesFalsas()
         self.configuracoes = ConfiguracoesFalsas()
         self.frontend_errors = FrontendErrorsFalsos()
+        self.pedidos = PedidosFalsos()
 
 
 def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
@@ -125,6 +132,8 @@ def test_resumo_operacional_expoe_fila_sem_dados_do_cliente(monkeypatch):
     assert resumo["status"] == "atencao"
     assert resumo["pagamentosFalhos"] == 1
     assert resumo["pagamentosRevisaoManual"] == 3
+    assert resumo["pagamentosRevisaoEventos"] == 3
+    assert resumo["pagamentosRevisaoPedidos"] == 2
     assert resumo["pagamentosEmEspera"] == 3
     assert resumo["pagamentosProcessando"] == 2
     assert resumo["ultimoBackupEm"] == "2026-08-10T10:00:00+00:00"

@@ -400,7 +400,8 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
     }
     (
         falhos,
-        revisao_manual,
+        revisao_manual_eventos,
+        revisao_manual_pedidos,
         em_espera,
         processando,
         eventos,
@@ -413,6 +414,7 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
     ) = await asyncio.gather(
         db.eventos_pagamento.count_documents({"status": "falhou"}),
         db.eventos_pagamento.count_documents({"status": "revisao_manual"}),
+        db.pedidos.count_documents({"pagamentoRequerRevisao": True}),
         db.eventos_pagamento.count_documents({"status": {"$in": ["pendente", "repetir"]}}),
         db.eventos_pagamento.count_documents({"status": "processando"}),
         db.eventos_pagamento.find({"status": {"$in": ["falhou", "revisao_manual"]}})
@@ -455,14 +457,21 @@ async def resumo_operacional(_: str = Depends(require_atelie_auth)):
     return {
         "status": "atencao" if (
             falhos
-            or revisao_manual
+            or revisao_manual_eventos
+            or revisao_manual_pedidos
             or erros_frontend_24h
             or estoques_negativos
             or not banco_pronto
             or not integracoes_prontas
         ) else "ok",
         "pagamentosFalhos": falhos,
-        "pagamentosRevisaoManual": revisao_manual,
+        # O pedido é a fonte de verdade da pendência; max preserva eventos
+        # antigos ainda não associados ao campo de revisão do pedido.
+        "pagamentosRevisaoManual": max(
+            int(revisao_manual_eventos), int(revisao_manual_pedidos)
+        ),
+        "pagamentosRevisaoEventos": int(revisao_manual_eventos),
+        "pagamentosRevisaoPedidos": int(revisao_manual_pedidos),
         "pagamentosEmEspera": em_espera,
         "pagamentosProcessando": processando,
         "ultimoBackupEm": (ultimo_backup or {}).get("data"),

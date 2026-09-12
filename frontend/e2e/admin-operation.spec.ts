@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import catalogImages from '../src/data/catalogImages.json';
 
 
-async function mockAdminApi(page: Page, options: { manualPayment?: boolean; divergentPayment?: boolean; backupWarning?: boolean } = {}) {
+async function mockAdminApi(page: Page, options: { manualPayment?: boolean; divergentPayment?: boolean; paymentReview?: boolean; backupWarning?: boolean } = {}) {
   let frontendErrorOpen = true;
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -64,6 +64,17 @@ async function mockAdminApi(page: Page, options: { manualPayment?: boolean; dive
       subtotalTabela: 50,
       ajusteManual: 0,
       total: 50,
+      ...(options.paymentReview ? {
+        pagamentoRequerRevisao: true,
+        motivoRevisaoPagamento: 'valor_pagamento_divergente',
+        revisaoPagamento: {
+          codigo: 'VALOR_PAGAMENTO_DIVERGENTE',
+          motivo: 'A InfinitePay confirmou um valor diferente do total protegido do pedido.',
+          esperadoCentavos: 5000,
+          recebidoCentavos: 4000,
+          data: '2026-08-11T12:05:00Z',
+        },
+      } : {}),
       pagamento: {
         status: 'pago',
         metodo: 'cartao',
@@ -439,6 +450,18 @@ test('protege valor online, avisa divergência e preserva edição do cliente', 
   const saved = page.waitForRequest((request) => request.url().endsWith('/api/pedidos/pedido-e2e') && request.method() === 'PUT');
   await page.getByTestId('pedido-save').click();
   expect((await saved).postDataJSON()).toMatchObject({ total: 50, cliente: 'Cliente Atualizado' });
+});
+
+test('destaca conciliação financeira e os valores divergentes no pedido', async ({ page }) => {
+  await mockAdminApi(page, { paymentReview: true });
+  await openAdminSystem(page);
+  await page.getByTestId('tab-pedidos').click();
+  await page.getByTestId('kanban-pedido-pedido-e2e').getByText('Detalhes').click();
+
+  const review = page.getByTestId('pedido-revisao-pagamento');
+  await expect(review).toBeVisible();
+  await expect(review.getByText('Conciliação financeira necessária')).toBeVisible();
+  await expect(review.getByText('Pedido: R$ 50,00 · Recebido: R$ 40,00')).toBeVisible();
 });
 
 test('registra solicitação de estorno com motivo auditável', async ({ page }) => {

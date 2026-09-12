@@ -56,6 +56,9 @@ def test_pagamento_manual_preserva_checkout(monkeypatch, payment):
     assert result['provedor'] == 'infinitepay'
     assert result['checkoutUrl'] == 'https://example.test/pay'
     assert result['historico'][-1]['status'] == payment
+    change = db.pedidos.update_one.await_args.args[1]['$set']
+    assert change['pagamentoRequerRevisao'] is True
+    assert change['motivoRevisaoPagamento'] == 'ajuste_manual_aguardando_conciliacao'
 
 
 def test_conflito_nao_movimenta(monkeypatch):

@@ -549,6 +549,27 @@ export function PedidoForm({
           )}
         </View>
       )}
+      {initial?.pagamentoRequerRevisao && (
+        <View style={styles.paymentReviewCard} testID="pedido-revisao-pagamento">
+          <Feather name="alert-triangle" size={20} color={COLORS.rust} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.paymentReviewTitle}>Conciliação financeira necessária</Text>
+            <Text style={styles.paymentReviewText}>
+              {initial.revisaoPagamento?.motivo
+                || (initial.motivoRevisaoPagamento === 'ajuste_manual_aguardando_conciliacao'
+                  ? 'O pagamento foi ajustado manualmente. Confira a situação na InfinitePay antes de concluir ou estornar.'
+                  : 'Confira a situação no provedor antes de continuar o atendimento.')}
+            </Text>
+            {initial.revisaoPagamento?.esperadoCentavos != null
+              && initial.revisaoPagamento?.recebidoCentavos != null
+              && initial.revisaoPagamento.esperadoCentavos !== initial.revisaoPagamento.recebidoCentavos && (
+                <Text style={styles.paymentReviewAmounts}>
+                  Pedido: {brl(initial.revisaoPagamento.esperadoCentavos / 100)} · Recebido: {brl(initial.revisaoPagamento.recebidoCentavos / 100)}
+                </Text>
+              )}
+          </View>
+        </View>
+      )}
       {initial?.estoqueRevisaoManual && <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.body }}>Pedido ajustado manualmente: confira as baixas e o saldo físico do estoque.</Text>}
       {initial?.historicoAjustesManuais?.map((entry, index) => <Text key={`${entry.data}-${index}`} style={{ color: COLORS.muted, fontSize: FONT_SIZES.body }}>
         Ajuste manual · {new Date(entry.data).toLocaleString('pt-BR')} · {entry.ator}: {entry.statusAnterior} → {entry.status}. Pagamento: {entry.pagamentoSolicitado}. Motivo: {entry.motivo}
@@ -717,6 +738,10 @@ const styles = StyleSheet.create({
   manualValueTotal: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, paddingTop: 9, marginTop: 9, borderTopWidth: 1, borderTopColor: COLORS.border },
   manualValueTotalLabel: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '600' },
   manualValueTotalAmount: { color: COLORS.gold, fontSize: FONT_SIZES.heading, fontWeight: '800' },
+  paymentReviewCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginBottom: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.rust + '12' },
+  paymentReviewTitle: { color: COLORS.rust, fontSize: FONT_SIZES.label, fontWeight: '800' },
+  paymentReviewText: { color: COLORS.bone, fontSize: FONT_SIZES.body, lineHeight: 20, marginTop: 3 },
+  paymentReviewAmounts: { color: COLORS.rust, fontSize: FONT_SIZES.caption, fontWeight: '700', marginTop: 6 },
   orderChoiceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: SPACING.md, paddingTop: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.border },
   orderChoiceLabel: { color: COLORS.muted, fontSize: FONT_SIZES.caption, letterSpacing: 0.8, marginBottom: 3 },
   orderChoiceValue: { color: COLORS.gold, fontSize: FONT_SIZES.bodyLarge, fontWeight: '600' },

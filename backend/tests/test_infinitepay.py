@@ -96,6 +96,8 @@ class FakeCollection:
         self.document.update(update.get("$set", {}))
         for key, value in update.get("$push", {}).items():
             self.document.setdefault(key, []).append(value)
+        for key in update.get("$unset", {}):
+            self.document.pop(key, None)
 
 
 class FakeDb:
@@ -200,6 +202,25 @@ def test_backoff_de_reconciliacao_e_limitado():
     assert pagamentos._retry_delay(20) == 900
 
 
+@pytest.mark.parametrize(
+    ("status_code", "detail", "tentativas", "esperado"),
+    [
+        (409, {"code": "PAGAMENTO_DUPLICADO"}, 1, ("revisao_manual", False)),
+        (409, {"code": "VALOR_PAGAMENTO_DIVERGENTE"}, 1, ("revisao_manual", False)),
+        (409, "Pagamento ainda não confirmado", 1, ("repetir", True)),
+        (502, "Provedor temporariamente indisponível", 2, ("repetir", True)),
+        (409, "Pagamento ainda não confirmado", 8, ("falhou", False)),
+        (400, "Referência inválida", 1, ("falhou", False)),
+    ],
+)
+def test_classificacao_da_fila_financeira(
+    status_code, detail, tentativas, esperado
+):
+    assert pagamentos._classificar_falha_reconciliacao(
+        HTTPException(status_code=status_code, detail=detail), tentativas
+    ) == esperado
+
+
 def test_confirmacao_valida_valor_e_e_idempotente(monkeypatch):
     oid = ObjectId()
     pedido = {
@@ -269,7 +290,55 @@ def test_confirmacao_rejeita_valor_diferente(monkeypatch):
             )
         )
     assert erro.value.status_code == 409
-    assert not db.pedidos.updates
+    assert erro.value.detail["code"] == "VALOR_PAGAMENTO_DIVERGENTE"
+    assert pedido["pagamentoRequerRevisao"] is True
+    assert pedido["revisaoPagamento"]["esperadoCentavos"] == 2500
+    assert pedido["revisaoPagamento"]["recebidoCentavos"] == 1
+
+
+def test_confirmacao_do_provedor_substitui_confirmacao_manual(monkeypatch):
+    oid = ObjectId()
+    pedido = {
+        "_id": oid,
+        "status": "entregue",
+        "total": 25.0,
+        "totalCentavos": 2500,
+        "pagamentoRequerRevisao": True,
+        "motivoRevisaoPagamento": "ajuste_manual_aguardando_conciliacao",
+        "pagamento": {
+            "provedor": "infinitepay",
+            "status": "pago",
+            "confirmacaoManual": True,
+            "historico": [],
+        },
+    }
+    db = FakeDb(pedido)
+
+    async def fake_verificar(**_kwargs):
+        return {
+            "success": True,
+            "paid": True,
+            "amount": 2500,
+            "capture_method": "pix",
+        }
+
+    monkeypatch.setattr(pagamentos, "get_db", lambda: db)
+    monkeypatch.setattr(pagamentos, "verificar_pagamento", fake_verificar)
+    asyncio.run(
+        pagamentos._confirmar_pagamento(
+            order_nsu=str(oid),
+            transaction_nsu="transaction-confirmada",
+            slug="invoice-confirmada",
+        )
+    )
+
+    assert pedido["status"] == "entregue"
+    assert pedido["pagamento"]["transactionNsu"] == "transaction-confirmada"
+    assert pedido["pagamento"]["status"] == "pago"
+    assert "confirmacaoManual" not in pedido["pagamento"]
+    assert pedido["pagamento"]["historico"][-1]["operacao"] == "reconciliar_confirmacao_provedor"
+    assert pedido["pagamentoRequerRevisao"] is False
+    assert "motivoRevisaoPagamento" not in pedido
 
 
 def test_confirmacao_rejeita_segunda_transacao_paga(monkeypatch):
@@ -309,6 +378,8 @@ def test_confirmacao_rejeita_segunda_transacao_paga(monkeypatch):
     assert erro.value.status_code == 409
     assert erro.value.detail["code"] == "PAGAMENTO_DUPLICADO"
     assert pedido["pagamento"]["transactionNsu"] == "transaction-original"
+    assert pedido["pagamentoRequerRevisao"] is True
+    assert pedido["revisaoPagamento"]["codigo"] == "PAGAMENTO_DUPLICADO"
 
 
 def test_confirmacao_publica_oculta_nsu_e_slug():

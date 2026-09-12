@@ -127,7 +127,7 @@ export type PaymentOperation =
   | 'resolver_chargeback';
 
 export type PaymentHistoryItem = {
-  operacao: PaymentOperation | 'confirmar_pagamento_manual';
+  operacao: PaymentOperation | 'confirmar_pagamento_manual' | 'reconciliar_confirmacao_provedor';
   statusAnterior: string;
   status: string;
   motivo: string;
@@ -138,6 +138,22 @@ export type PaymentHistoryItem = {
 
 export type Pedido = {
   estoqueRevisaoManual?: boolean;
+  pagamentoRequerRevisao?: boolean;
+  motivoRevisaoPagamento?: string;
+  revisaoPagamento?: {
+    codigo: string;
+    motivo: string;
+    esperadoCentavos?: number | null;
+    recebidoCentavos?: number | null;
+    data: string;
+  };
+  historicoConciliacaoPagamento?: {
+    codigo: string;
+    motivo: string;
+    esperadoCentavos?: number | null;
+    recebidoCentavos?: number | null;
+    data: string;
+  }[];
   historicoAjustesManuais?: { status: OrderStatus; statusAnterior: string; motivo: string; ator: string; data: string; pagamentoSolicitado: string }[];
   id: string;
   seq: number;
