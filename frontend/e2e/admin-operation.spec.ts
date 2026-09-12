@@ -356,6 +356,26 @@ test('mantém dashboard e catálogo navegáveis após a modularização', async 
 });
 
 
+test('ajuste manual exige motivo e senha sem usar edição normal', async ({ page }) => {
+  await mockAdminApi(page);
+  await page.route('**/api/pedidos/pedido-e2e/ajuste-manual', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: 'pedido-e2e' }) }));
+  await openAdminSystem(page);
+  await page.getByTestId('tab-pedidos').click();
+  await page.getByTestId('kanban-pedido-pedido-e2e').getByText('Detalhes').click();
+  await page.getByText('Ajuste manual do pedido', { exact: true }).click();
+  await expect(page.getByText('Confirmar ajuste manual', { exact: true })).toBeDisabled();
+  await page.getByText('Registrar como pago manualmente', { exact: true }).click();
+  await page.getByTestId('manual-order-reason').fill('Recebimento conferido fora do aplicativo');
+  await page.getByTestId('manual-order-password').fill('senha-ficticia-e2e');
+  const sent = page.waitForRequest(request => request.url().endsWith('/ajuste-manual'));
+  await page.getByText('Confirmar ajuste manual', { exact: true }).click();
+  const request = await sent;
+  expect(request.headers()['x-atelie-step-up']).toBe('stepup-e2e');
+  expect(request.postDataJSON()).toMatchObject({ pagamento: 'pago', motivo: 'Recebimento conferido fora do aplicativo' });
+  expect(request.postData()).not.toContain('senha-ficticia');
+  await expect(page.getByText(/Ajuste manual registrado no histórico/)).toBeVisible();
+});
+
 test('move pedido pelo Kanban mantendo a transição esperada', async ({ page }) => {
   await mockAdminApi(page);
   await openAdminSystem(page);

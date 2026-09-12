@@ -15,7 +15,7 @@ from label_service import gerar_etiquetas_producao
 from order_status import validar_transicao_status
 from money import centavos_em_valor, subtotal_em_centavos, valor_em_centavos
 from payment_status import PAYMENT_STATUSES_THAT_BLOCK_CANCELLATION
-from security import require_atelie_auth
+from security import require_atelie_auth, require_step_up_auth
 from stock import quantidades_por_perfume, validar_estoque
 from utils import next_seq, serialize
 
@@ -62,6 +62,13 @@ class PedidoIn(BaseModel):
     subtotalTabela: Optional[float] = Field(default=None, ge=0)
     ajusteManual: float = 0
     total: float = Field(default=0, ge=0)
+
+
+class AjusteStatusIn(BaseModel):
+    status: Literal['pendente', 'pagamento_confirmado', 'preparando', 'pronto', 'enviado', 'entregue', 'cancelado']
+    statusAnterior: str
+    motivo: str = Field(min_length=5, max_length=1000)
+    pagamento: Literal['manter', 'pago', 'aguardando_pagamento'] = 'manter'
 
 
 def _oid(pedido_id: str) -> ObjectId:
@@ -167,12 +174,14 @@ async def _sincronizar_movimentos_do_pedido(
     pedido_id: str,
     itens: list[Any],
     status: str,
+    session=None,
 ) -> None:
     """Concilia a baixa do pedido com escritas repetíveis e recuperáveis."""
     origem = f"pedido:{pedido_id}"
     movimentos_atuais = await db.movimentos.find(
         {"origem": origem},
         {"perfumeId": 1, "tipo": 1, "quantidadeMl": 1},
+        **({"session": session} if session is not None else {}),
     ).to_list(5000)
     consumo_atual: dict[str, int] = {}
     for movimento in movimentos_atuais:
@@ -209,7 +218,7 @@ async def _sincronizar_movimentos_do_pedido(
             "data": agora,
         })
     if ajustes:
-        await db.movimentos.insert_many(ajustes)
+        await db.movimentos.insert_many(ajustes, **({"session": session} if session is not None else {}))
 
 
 async def _persistir_pedido_e_estoque(
@@ -443,6 +452,68 @@ async def criar_pedido(payload: PedidoIn, _: str = Depends(require_atelie_auth))
         return serialize(novo)
 
 
+@router.post("/{pedido_id}/ajuste-manual")
+async def ajustar_status_manual(
+    pedido_id: str, payload: AjusteStatusIn,
+    usuario: str = Depends(require_step_up_auth),
+):
+    """Exceção administrativa explícita; nunca chama o provedor de pagamento."""
+    motivo = payload.motivo.strip()
+    if len(motivo) < 5:
+        raise HTTPException(status_code=422, detail="Informe o motivo do ajuste (ao menos 5 caracteres).")
+    db = get_db()
+    oid = _oid(pedido_id)
+    async with stock_lock(db):
+        async with db.client.start_session() as session:
+            async with await session.start_transaction():
+                anterior = await db.pedidos.find_one({"_id": oid}, session=session)
+                if not anterior:
+                    raise HTTPException(status_code=404, detail="Pedido não encontrado.")
+                if anterior.get('status') != payload.statusAnterior:
+                    raise HTTPException(status_code=409, detail="O pedido mudou. Reabra o pedido antes de ajustar.")
+                agora = datetime.now(timezone.utc)
+                pagamento = dict(anterior.get('pagamento') or {})
+                evento = {
+                    'status': payload.status, 'statusAnterior': anterior.get('status'),
+                    'data': agora, 'motivo': motivo, 'ator': usuario,
+                    'operacao': 'ajuste_manual',
+                    'pagamentoAnterior': pagamento.get('status'),
+                    'pagamentoSolicitado': payload.pagamento,
+                }
+                campos = {
+                    'status': payload.status, 'atualizadoEm': agora,
+                    'ajusteAdministrativo': evento,
+                }
+                if payload.pagamento != 'manter':
+                    pagamento.update({
+                        'status': payload.pagamento,
+                        'confirmacaoManual': True,
+                        'historico': [*(pagamento.get('historico') or []), {
+                            **evento, 'status': payload.pagamento,
+                            'statusAnterior': pagamento.get('status'),
+                        }],
+                    })
+                    if payload.pagamento == 'pago':
+                        pagamento['pagoEm'] = agora
+                    else:
+                        pagamento.pop('pagoEm', None)
+                    campos['pagamento'] = pagamento
+                # Não cria entrada fictícia: reconcilia a baixa, mesmo negativa.
+                # A transação inclui movimentos, status e histórico.
+                await _sincronizar_movimentos_do_pedido(
+                    db, pedido_id, anterior.get('itens', []), payload.status, session=session,
+                )
+                campos['estoqueRevisaoManual'] = True
+                await db.pedidos.update_one(
+                    {'_id': oid}, {'$set': campos, '$push': {
+                        'historicoAjustesManuais': evento,
+                        'historicoStatus': {'status': payload.status, 'data': agora},
+                    }}, session=session,
+                )
+        invalidate_catalog_cache()
+        return serialize(await db.pedidos.find_one({'_id': oid}))
+
+
 @router.put("/{pedido_id}")
 async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(require_atelie_auth)):
     db = get_db()
@@ -451,13 +522,20 @@ async def atualizar_pedido(pedido_id: str, payload: PedidoIn, _: str = Depends(r
         if not existente:
             raise HTTPException(status_code=404, detail="Pedido não encontrado.")
         itens = await _itens_com_atendimento(db, payload.itens)
-        await _validar_status_estoque(
-            db,
-            itens=itens,
-            status=payload.status,
-            pedido_id=pedido_id,
-            pedido_anterior=existente,
+        # Corrigir contato/endereço/observações não exige recomprar estoque.
+        mesmos_itens = all(
+            quantidades_por_perfume(itens, somente_reservaveis=reservaveis)
+            == quantidades_por_perfume(existente.get('itens', []), somente_reservaveis=reservaveis)
+            for reservaveis in (False, True)
         )
+        if payload.status != existente.get('status') or not mesmos_itens:
+            await _validar_status_estoque(
+                db,
+                itens=itens,
+                status=payload.status,
+                pedido_id=pedido_id,
+                pedido_anterior=existente,
+            )
         # Campos opcionais não enviados pelo painel (como endereço de pedidos
         # antigos) não devem ser apagados durante uma simples troca de status.
         atualizacao = payload.model_dump(exclude_unset=True)

@@ -1936,6 +1936,7 @@ export function Atelie({
             onDelete={requestDeletePedido}
             onGenerateLabels={doGenerateLabels}
             onPaymentOperation={(pedido) => setSheet({ type: 'payment-operation', data: pedido })}
+            onManualSaved={() => { setSheet({ type: 'info', label: 'Ajuste manual registrado no histórico. Confira o saldo físico e a cobrança no provedor; nenhuma cobrança ou devolução foi realizada por esta ação.' }); void load(); }}
           />
         )}
         {sheet?.type === 'payment-operation' && (

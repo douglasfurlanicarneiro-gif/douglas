@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
 import { COLORS, FONT_SIZES, RADIUS, SPACING, STATUS, brl, padSeq, statusPermitidosNoPainel } from '../theme';
-import { getClientePorContato } from '../api';
+import { getClientePorContato, adjustOrderManually, reauthenticateCriticalAction } from '../api';
 import type { PaymentOperation, Pedido, PedidoItem, Perfume } from '../types';
 import { AccessiblePressable as Pressable } from './AccessiblePressable';
 import { AppText as Text, AppTextInput as TextInput } from './Typography';
@@ -135,6 +135,59 @@ export function PaymentOperationForm({
   );
 }
 
+function ManualOrderAdjustment({ pedido, onSaved }: { pedido: Pedido; onSaved: (pedido: Pedido) => void }) {
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState(pedido.status);
+  const [payment, setPayment] = useState<'manter' | 'pago' | 'aguardando_pagamento'>('manter');
+  const [reason, setReason] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const save = async () => {
+    if (busy || reason.trim().length < 5 || !password) return;
+    setBusy(true);
+    setError('');
+    try {
+      await reauthenticateCriticalAction(password);
+      setPassword('');
+      const saved = await adjustOrderManually(pedido.id, {
+        status, statusAnterior: pedido.status, motivo: reason.trim(), pagamento: payment,
+      });
+      onSaved(saved);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível confirmar o ajuste. Reabra o pedido para conferir antes de tentar novamente.');
+    } finally {
+      setPassword('');
+      setBusy(false);
+    }
+  };
+  return <View style={{ gap: SPACING.sm, marginVertical: SPACING.md }}>
+    <SecondaryButton label={open ? 'Fechar ajuste manual' : 'Ajuste manual do pedido'} onPress={() => { if (!busy) setOpen(!open); }} />
+    {open && <>
+      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.body }}>
+        Ajuste excepcional com histórico. Não cobra, não estorna e não modifica o checkout da InfinitePay. Alterações não salvas no formulário não serão incluídas.
+      </Text>
+      <Field label="Etapa do pedido">
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm }}>
+          {STATUS.map(s => <Pressable key={s.id} disabled={busy} accessibilityRole="button" accessibilityState={{ selected: status === s.id }} onPress={() => setStatus(s.id)} style={[styles.miniChip, status === s.id && { borderColor: COLORS.gold }]}>
+            <Text style={{ color: status === s.id ? COLORS.gold : COLORS.muted, fontSize: FONT_SIZES.body }}>{s.label}</Text>
+          </Pressable>)}
+        </View>
+      </Field>
+      <Field label="Registro do pagamento (independente da etapa)">
+        {(['manter', 'pago', 'aguardando_pagamento'] as const).map(value => <SecondaryButton key={value} label={`${payment === value ? '✓ ' : ''}${value === 'manter' ? 'Manter pagamento atual' : value === 'pago' ? 'Registrar como pago manualmente' : 'Registrar como aguardando pagamento'}`} onPress={() => { if (!busy) setPayment(value); }} />)}
+      </Field>
+      <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.body }}>
+        Ao avançar para preparação ou etapas seguintes, a baixa será registrada mesmo sem saldo, podendo deixar o estoque negativo. Ao voltar ou cancelar, a baixa será estornada. Confira o estoque físico depois. A confirmação automática do provedor continua ativa.
+      </Text>
+      <Field label="Motivo obrigatório"><TInput testID="manual-order-reason" accessibilityLabel="Motivo obrigatório" value={reason} onChangeText={setReason} maxLength={1000} /></Field>
+      <Field label="Confirme sua senha administrativa"><TInput testID="manual-order-password" accessibilityLabel="Confirme sua senha administrativa" value={password} onChangeText={setPassword} secureTextEntry /></Field>
+      {!!error && <Text accessibilityRole="alert" style={{ color: COLORS.wine, fontSize: FONT_SIZES.body }}>{error}</Text>}
+      <PrimaryButton label={busy ? 'Confirmando…' : 'Confirmar ajuste manual'} disabled={busy || reason.trim().length < 5 || !password} onPress={save} />
+    </>}
+  </View>;
+}
+
 export function PedidoForm({
   perfumes,
   initial,
@@ -143,6 +196,7 @@ export function PedidoForm({
   onDelete,
   onGenerateLabels,
   onPaymentOperation,
+  onManualSaved,
 }: {
   perfumes: Perfume[];
   initial?: Pedido;
@@ -151,6 +205,7 @@ export function PedidoForm({
   onDelete?: (pedido: Pedido) => void | Promise<void>;
   onGenerateLabels?: (pedido: Pedido) => void | Promise<void>;
   onPaymentOperation?: (pedido: Pedido) => void;
+  onManualSaved?: (pedido: Pedido) => void;
 }) {
   const [f, setF] = useState<PedidoFormState>(initial || {
     cliente: '', contato: '', status: 'pendente', observacoes: '', itens: [],
@@ -494,6 +549,11 @@ export function PedidoForm({
           )}
         </View>
       )}
+      {initial?.estoqueRevisaoManual && <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.body }}>Pedido ajustado manualmente: confira as baixas e o saldo físico do estoque.</Text>}
+      {initial?.historicoAjustesManuais?.map((entry, index) => <Text key={`${entry.data}-${index}`} style={{ color: COLORS.muted, fontSize: FONT_SIZES.body }}>
+        Ajuste manual · {new Date(entry.data).toLocaleString('pt-BR')} · {entry.ator}: {entry.statusAnterior} → {entry.status}. Pagamento: {entry.pagamentoSolicitado}. Motivo: {entry.motivo}
+      </Text>)}
+      {initial?.id && onManualSaved && <ManualOrderAdjustment pedido={initial} onSaved={onManualSaved} />}
       <Field label="Status">
         <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
           {STATUS.filter((s) => statusPermitidosNoPainel(initial?.status).includes(s.id)).map((s) => (

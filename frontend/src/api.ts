@@ -334,6 +334,7 @@ export const getClientePorContato = (contato: string) => request<{
 export const listPedidos = () => request<Pedido[]>('/pedidos', {}, true);
 export const createPedido = (data: Omit<Pedido, 'id' | 'seq' | 'criadoEm'>) => request<Pedido>('/pedidos', { method: 'POST', body: JSON.stringify(data) }, true);
 export const updatePedido = (id: string, data: Partial<Pedido>) => request<Pedido>(`/pedidos/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
+export const adjustOrderManually = (id: string, data: { status: Pedido['status']; statusAnterior: string; motivo: string; pagamento: 'manter' | 'pago' | 'aguardando_pagamento' }) => request<Pedido>(`/pedidos/${id}/ajuste-manual`, { method: 'POST', headers: criticalHeaders(), body: JSON.stringify(data) }, true);
 export const deletePedido = (id: string) => request<{ status: string }>(`/pedidos/${id}`, { method: 'DELETE' }, true);
 export const registerPaymentOperation = (
   id: string,

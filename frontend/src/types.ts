@@ -137,6 +137,8 @@ export type PaymentHistoryItem = {
 };
 
 export type Pedido = {
+  estoqueRevisaoManual?: boolean;
+  historicoAjustesManuais?: { status: OrderStatus; statusAnterior: string; motivo: string; ator: string; data: string; pagamentoSolicitado: string }[];
   id: string;
   seq: number;
   cliente: string;
