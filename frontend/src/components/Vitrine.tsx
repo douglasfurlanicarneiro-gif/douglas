@@ -50,7 +50,7 @@ const FAQ_ITEMS: { question: string; answer: string; icon: FeatherIconName }[] =
   },
   {
     question: 'Qual é o prazo de preparação e envio?',
-    answer: 'Cada perfume é preparado com cuidado para garantir qualidade e desempenho. O prazo de produção é de até 3 dias úteis. Após a postagem, o prazo de entrega depende da transportadora e do CEP informado. Em períodos promocionais ou datas comemorativas, a produção poderá levar mais tempo.',
+    answer: 'Produtos marcados como Pronta entrega são preparados para postagem em até 3 dias úteis. Produtos Sob encomenda podem levar até 14 dias para disponibilidade, preparação e maturação. Após a postagem, acrescente o prazo da transportadora exibido no checkout.',
     icon: 'clock',
   },
   {
@@ -70,7 +70,7 @@ const FAQ_ITEMS: { question: string; answer: string; icon: FeatherIconName }[] =
   },
   {
     question: 'Quais formas de pagamento são aceitas?',
-    answer: 'Aceitamos PIX e os cartões disponíveis no checkout. As condições de pagamento e parcelamento serão exibidas antes da confirmação do pedido.',
+    answer: 'Aceitamos Pix e os cartões disponíveis no checkout. As condições de pagamento e parcelamento serão exibidas antes da confirmação do pedido.',
     icon: 'credit-card',
   },
   {
@@ -1626,22 +1626,24 @@ export function Vitrine({
           </Text>
           <Text style={styles.successTitle}>
             {pagamentoConfirmado
-              ? 'Tudo certo com seu pagamento!'
+              ? 'Pagamento confirmado!'
               : pagamentoAutomaticoPendente
-                ? 'Finalize seu pagamento'
+                ? 'Falta concluir o pagamento'
                 : manualPixCode
-                  ? 'Agora, conclua o pagamento'
-                  : 'Seu pedido foi recebido!'}
+                  ? 'Conclua o pagamento por Pix'
+                  : 'Pedido registrado'}
           </Text>
           {!!successOrder?.seq && (
             <Text style={styles.successOrderNumber}>PEDIDO Nº {padSeq(successOrder.seq)}</Text>
           )}
           <Text style={styles.successText}>
             {pagamentoAutomaticoPendente
-              ? 'Escolha Pix ou cartão na InfinitePay. A confirmação do pedido será automática.'
+              ? 'Pague com Pix ou cartão na InfinitePay. Após a aprovação, o pedido será confirmado automaticamente.'
               : pagamentoConfirmado
-                ? `A ${currentStore.nomeLoja} já recebeu a confirmação e dará continuidade ao pedido.`
-                : `A ${currentStore.nomeLoja} agradece por fazer parte deste momento.`}
+                ? `Recebemos o pagamento e iniciaremos a preparação do seu pedido na ${currentStore.nomeLoja}.`
+                : manualPixCode
+                  ? 'Use o QR Code ou o Pix Copia e Cola abaixo. Confirmaremos o pedido após o recebimento.'
+                  : 'Seu pedido foi registrado. Confira abaixo os próximos passos.'}
           </Text>
           {!!manualPixCode && (
             <View style={styles.pixCard}>
@@ -1694,10 +1696,10 @@ export function Vitrine({
               style={[styles.copyPixButton, styles.paymentContinueButton]}
               testID="continue-infinitepay"
               accessibilityRole="link"
-              accessibilityLabel="Pagar na InfinitePay"
+              accessibilityLabel="Continuar pagamento na InfinitePay"
             >
               <Feather name="external-link" size={16} color={COLORS.ink} />
-              <Text style={styles.copyPixText}>Pagar na InfinitePay</Text>
+              <Text style={styles.copyPixText}>Continuar pagamento</Text>
             </Pressable>
           )}
           {!!successTrackingCode && !pagamentoAutomaticoPendente && !pagamentoConfirmado && (
@@ -1762,7 +1764,7 @@ export function Vitrine({
               />
             ) : (
               <PrimaryButton
-                label={pagamentoConfirmado ? 'Fechar agora' : 'Voltar à vitrine'}
+                label="Voltar à vitrine"
                 onPress={() => {
                   setOrderSuccess(null);
                   setTrackingCodeOpen(false);

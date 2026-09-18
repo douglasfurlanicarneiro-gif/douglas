@@ -644,7 +644,7 @@ export function CheckoutSheet({
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: SPACING.lg }}>
               {([
                 { id: 'entrega' as const, icon: 'truck' as const, title: 'Receber', meta: 'No endereço' },
-                { id: 'retirada' as const, icon: 'shopping-bag' as const, title: 'Retirada Combinada', meta: 'Grátis' },
+                { id: 'retirada' as const, icon: 'shopping-bag' as const, title: 'Retirada combinada', meta: 'Grátis' },
               ]).map((method) => {
                 const active = tipoEntrega === method.id;
                 return (
@@ -688,7 +688,7 @@ export function CheckoutSheet({
                   <Feather name="check" size={19} color={COLORS.ink} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ ...TYPOGRAPHY.body, color: COLORS.bone, fontWeight: '600' }}>Retirada Combinada · Grátis</Text>
+                  <Text style={{ ...TYPOGRAPHY.body, color: COLORS.bone, fontWeight: '600' }}>Retirada combinada · Grátis</Text>
                   <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.muted, marginTop: 3 }}>Combine o local e o horário pelo WhatsApp.</Text>
                 </View>
               </View>
@@ -767,9 +767,9 @@ export function CheckoutSheet({
                 <Text style={[styles.securePaymentTitle, isWide && styles.securePaymentTitleWide]}>Pagamento seguro</Text>
                 <Text style={[styles.securePaymentText, isWide && styles.securePaymentTextWide]}>
                   {cartaoOnlineAtivo
-                    ? 'Você será direcionado para concluir o pagamento em um ambiente seguro. Assim que o pagamento for aprovado, seu pedido será confirmado automaticamente.'
+                    ? 'Você será direcionado à InfinitePay para pagar com Pix ou cartão. Após a aprovação, seu pedido será confirmado automaticamente.'
                     : pixManualAtivo
-                      ? 'Finalize o pagamento por Pix usando o QR Code ou o código copia e cola. Depois do recebimento, confirmaremos o pedido.'
+                      ? 'Use o QR Code ou o Pix Copia e Cola. Após o recebimento, confirmaremos o pagamento e iniciaremos o preparo.'
                       : 'O pagamento está temporariamente indisponível. Entre em contato com a loja para concluir seu pedido.'}
                 </Text>
               </View>
@@ -935,10 +935,10 @@ export function CheckoutSheet({
                   <Feather name="clock" size={19} color={COLORS.gold} />
                   <View style={{ flex: 1 }}>
                     <Text style={styles.orderDeadlineTitle}>
-                      Prazo para itens sob encomenda
+                      Preparação: até 14 dias
                     </Text>
                     <Text style={styles.orderDeadlineText}>
-                      A disponibilidade, preparação e maturação podem levar até 14 dias antes da postagem ou retirada. Em caso de envio, depois desse período soma-se o prazo da transportadora escolhido na etapa anterior.
+                      Esse prazo inclui disponibilidade, preparação e maturação antes da postagem ou retirada. Para entrega, acrescente o prazo da transportadora exibido acima.
                     </Text>
                   </View>
                 </View>
@@ -963,7 +963,7 @@ export function CheckoutSheet({
                     color={prazoEncomendaAceito ? COLORS.gold : COLORS.muted}
                   />
                   <Text style={{ ...TYPOGRAPHY.label, color: COLORS.bone, flex: 1, lineHeight: 18 }}>
-                    Li e estou de acordo com esse prazo.
+                    Li e concordo com o prazo de até 14 dias.
                   </Text>
                 </Pressable>
               </View>

@@ -137,6 +137,17 @@ test('mostra uma alternativa elegante quando a foto externa falha', async ({ pag
   await expect(page.getByText('Imagem indisponível')).toBeVisible();
 });
 
+test('explica com clareza os prazos de pronta entrega e sob encomenda', async ({ page }) => {
+  await mockApi(page);
+  await openStore(page);
+  await page.getByTestId('contact-fab').click();
+  await page.getByTestId('contact-faq').click();
+  await page.getByTestId('faq-item-1').click();
+  await expect(page.getByTestId('faq-sheet')).toContainText('Pronta entrega são preparados para postagem em até 3 dias úteis');
+  await expect(page.getByTestId('faq-sheet')).toContainText('Sob encomenda podem levar até 14 dias');
+  await expect(page.getByTestId('faq-sheet')).toContainText('acrescente o prazo da transportadora exibido no checkout');
+});
+
 test('calcula frete, total e envia checkout completo', async ({ page }) => {
   const state = await mockApi(page);
   await openStore(page);
@@ -159,6 +170,7 @@ test('calcula frete, total e envia checkout completo', async ({ page }) => {
   await expect(page.getByTestId('shipping-option-prioritaria')).toBeVisible();
   await page.getByTestId('shipping-option-padrao').click();
   await page.getByTestId('checkout-to-payment').click();
+  await expect(page.getByTestId('checkout-sheet')).toContainText('Você será direcionado à InfinitePay para pagar com Pix ou cartão.');
   await expect(page.getByTestId('checkout-sheet')).toContainText('Perfume Pronta Entrega');
   await expect(page.getByTestId('checkout-sheet')).toContainText('R$ 109,90');
   const paymentDetailsBox = await page.getByTestId('checkout-payment-details-column').boundingBox();
@@ -192,6 +204,9 @@ test('exige aceite do prazo para produto sob encomenda', async ({ page }) => {
   await page.getByTestId('delivery-method-retirada').click();
   await page.getByTestId('checkout-to-payment').click();
   await expect(page.getByTestId('made-to-order-deadline-notice')).toBeVisible();
+  await expect(page.getByTestId('made-to-order-deadline-notice')).toContainText('Preparação: até 14 dias');
+  await expect(page.getByTestId('made-to-order-deadline-notice')).toContainText('acrescente o prazo da transportadora exibido acima');
+  await expect(page.getByTestId('made-to-order-deadline-notice')).toContainText('Li e concordo com o prazo de até 14 dias.');
   await page.getByTestId('accept-privacy-notice').click();
   await expect(page.getByTestId('checkout-submit')).toBeDisabled();
   await page.getByTestId('accept-made-to-order-deadline').click();
@@ -205,6 +220,7 @@ test('aplica cupom somente nos perfumes e envia o código no checkout', async ({
   await fillCustomer(page);
   await page.getByTestId('delivery-method-retirada').click();
   await page.getByTestId('checkout-to-payment').click();
+  await expect(page.getByTestId('checkout-payment-summary')).toContainText('Retirada combinada');
   await page.getByTestId('checkout-coupon-toggle').click();
   await page.getByTestId('checkout-coupon-input').fill('bemvindo10');
   await page.getByTestId('checkout-coupon-apply').click();

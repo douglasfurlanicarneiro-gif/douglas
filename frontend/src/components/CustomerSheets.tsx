@@ -605,13 +605,13 @@ export function OrdersSheet({
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bodyText}>
                     {order.entrega.tipo === 'retirada'
-                      ? 'Retirada Combinada · Grátis'
+                      ? 'Retirada combinada · Grátis'
                       : (order.entrega.nomeExibicao || 'Entrega')}
                   </Text>
                   <Text style={styles.orderItemMeta}>
                     {order.entrega.tipo === 'retirada'
                       ? 'Combinaremos o horário pelo WhatsApp'
-                      : `${brl(order.entrega.preco)} · previsão de ${order.entrega.prazoDias} ${
+                      : `${brl(order.entrega.preco)} · prazo estimado: ${order.entrega.prazoDias} ${
                           order.entrega.prazoDias === 1 ? 'dia útil' : 'dias úteis'
                         }`}
                   </Text>
@@ -626,7 +626,7 @@ export function OrdersSheet({
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bodyText}>Cupom {order.cupom.codigo}</Text>
                   <Text style={styles.orderItemMeta}>
-                    {order.cupom.percentual}% nos perfumes · desconto de {brl(order.desconto || 0)}
+                    {order.cupom.percentual}% de desconto
                   </Text>
                 </View>
                 <Text style={styles.couponSummaryValue}>− {brl(order.desconto || 0)}</Text>
@@ -666,7 +666,7 @@ export function OrdersSheet({
                   <Text style={styles.continuePaymentTitle}>
                     {paymentOpeningCode === order.codigoAcompanhamento ? 'Abrindo pagamento…' : 'Continuar pagamento'}
                   </Text>
-                  <Text style={styles.continuePaymentSubtitle}>Concluir com Pix ou cartão na InfinitePay</Text>
+                  <Text style={styles.continuePaymentSubtitle}>Pague com Pix ou cartão na InfinitePay</Text>
                 </View>
                 <Feather name="arrow-up-right" size={18} color={COLORS.ink} />
               </Pressable>
