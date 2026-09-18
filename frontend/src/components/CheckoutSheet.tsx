@@ -1009,9 +1009,6 @@ export function CheckoutSheet({
               >
                 <View style={styles.paymentActionSpacer} />
                 <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.72}
                   style={[styles.paymentSubmitText, isWide && styles.paymentActionTextWide]}
                 >
                   {loading ? 'Abrindo pagamento…' : `Ir para pagamento · ${brl(total)}`}
@@ -1173,7 +1170,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   securePaymentTitleWide: {
-    ...TYPOGRAPHY.heading,
+    ...TYPOGRAPHY.subtitle,
     color: COLORS.bone,
     marginBottom: SPACING.sm,
   },
@@ -1268,7 +1265,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.gold,
   },
   couponApplyDisabled: { opacity: 0.5 },
-  couponApplyText: { ...TYPOGRAPHY.label, color: COLORS.ink },
+  couponApplyText: { ...TYPOGRAPHY.button, color: COLORS.ink },
   couponSuccess: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1487,13 +1484,14 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   paymentBackText: {
-    ...TYPOGRAPHY.subtitle,
+    ...TYPOGRAPHY.button,
     color: COLORS.muted,
   },
   paymentSubmitButton: {
     flex: 1.45,
     minWidth: 0,
     minHeight: 54,
+    paddingVertical: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1515,13 +1513,13 @@ const styles = StyleSheet.create({
     width: 20,
   },
   paymentSubmitText: {
-    ...TYPOGRAPHY.label,
+    ...TYPOGRAPHY.button,
     flex: 1,
     color: COLORS.ink,
     textAlign: 'center',
   },
   paymentActionTextWide: {
-    ...TYPOGRAPHY.subtitle,
+    ...TYPOGRAPHY.button,
   },
   paymentBrand: {
     alignItems: 'center',

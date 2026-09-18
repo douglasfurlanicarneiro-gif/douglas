@@ -54,10 +54,7 @@ export function PrimaryButton({ label, onPress, disabled, testID }: { label: str
       ]}
     >
       <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.78}
-        style={{ ...TYPOGRAPHY.label, width: '100%', color: COLORS.ink, textAlign: 'center' }}
+        style={{ ...TYPOGRAPHY.button, width: '100%', color: COLORS.ink, textAlign: 'center' }}
       >
         {label}
       </Text>
@@ -77,10 +74,7 @@ export function SecondaryButton({ label, onPress, testID }: { label: string; onP
       ]}
     >
       <Text
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        minimumFontScale={0.78}
-        style={{ ...TYPOGRAPHY.label, width: '100%', color: COLORS.muted, textAlign: 'center' }}
+        style={{ ...TYPOGRAPHY.button, width: '100%', color: COLORS.muted, textAlign: 'center' }}
       >
         {label}
       </Text>

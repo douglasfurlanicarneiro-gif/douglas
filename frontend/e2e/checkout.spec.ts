@@ -199,7 +199,7 @@ test('aplica cupom somente nos perfumes e envia o código no checkout', async ({
   await page.getByTestId('checkout-coupon-input').fill('bemvindo10');
   await page.getByTestId('checkout-coupon-apply').click();
 
-  await expect(page.getByTestId('checkout-discount-row')).toContainText('10% somente nos perfumes');
+  await expect(page.getByTestId('checkout-discount-row')).toContainText('10% de desconto');
   await expect(page.getByTestId('checkout-discount-row')).toContainText('R$ 8,50');
   await expect(page.getByTestId('checkout-sheet')).toContainText('R$ 76,50');
 

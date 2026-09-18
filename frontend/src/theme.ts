@@ -53,6 +53,7 @@ export const FONT_SIZES = {
 } as const;
 
 export const TYPOGRAPHY = {
+  button: { fontSize: FONT_SIZES.bodySmall, lineHeight: 18, fontWeight: '600' as const },
   display: { fontSize: FONT_SIZES.display, lineHeight: 32, fontWeight: '700' as const },
   title: { fontSize: FONT_SIZES.title, lineHeight: 26, fontWeight: '700' as const },
   subtitle: { fontSize: FONT_SIZES.subtitle, lineHeight: 22, fontWeight: '600' as const },
