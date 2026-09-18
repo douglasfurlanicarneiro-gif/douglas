@@ -161,6 +161,16 @@ test('calcula frete, total e envia checkout completo', async ({ page }) => {
   await page.getByTestId('checkout-to-payment').click();
   await expect(page.getByTestId('checkout-sheet')).toContainText('Perfume Pronta Entrega');
   await expect(page.getByTestId('checkout-sheet')).toContainText('R$ 109,90');
+  const paymentDetailsBox = await page.getByTestId('checkout-payment-details-column').boundingBox();
+  const paymentSummaryBox = await page.getByTestId('checkout-payment-summary-column').boundingBox();
+  expect(paymentDetailsBox).not.toBeNull();
+  expect(paymentSummaryBox).not.toBeNull();
+  if ((viewport?.width || 0) >= 768) {
+    expect(paymentSummaryBox?.x || 0).toBeGreaterThan((paymentDetailsBox?.x || 0) + (paymentDetailsBox?.width || 0));
+    expect(Math.abs((paymentSummaryBox?.y || 0) - (paymentDetailsBox?.y || 0))).toBeLessThanOrEqual(2);
+  } else {
+    expect(paymentSummaryBox?.y || 0).toBeGreaterThanOrEqual((paymentDetailsBox?.y || 0) + (paymentDetailsBox?.height || 0));
+  }
   await page.getByTestId('accept-privacy-notice').click();
   await expect(page.getByTestId('checkout-submit')).toBeEnabled();
   await page.getByTestId('checkout-submit').click();

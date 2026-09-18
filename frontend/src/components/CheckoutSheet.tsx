@@ -758,9 +758,9 @@ export function CheckoutSheet({
             </Text>
             <View style={[styles.securePaymentCard, isWide && styles.securePaymentCardWide]}>
               <View style={[styles.securePaymentIcon, isWide && styles.securePaymentIconWide]}>
-                <Feather name="shield" size={isWide ? 62 : 38} color={COLORS.gold} />
+                <Feather name="shield" size={isWide ? 44 : 38} color={COLORS.gold} />
                 <View style={styles.securePaymentLock}>
-                  <Feather name="lock" size={isWide ? 21 : 14} color={COLORS.muted} />
+                  <Feather name="lock" size={isWide ? 16 : 14} color={COLORS.muted} />
                 </View>
               </View>
               <View style={styles.securePaymentCopy}>
@@ -785,6 +785,8 @@ export function CheckoutSheet({
                 <Text style={styles.paymentUnavailableText}>Entre em contato com a loja para combinar o pagamento.</Text>
               </View>
             )}
+            <View style={[styles.paymentColumns, isWide && styles.paymentColumnsWide]} testID="checkout-payment-columns">
+              <View style={[styles.paymentColumn, isWide && styles.paymentColumnDetailsWide]} testID="checkout-payment-details-column">
             <View style={styles.couponCard}>
               <Pressable
                 onPress={() => setNotesOpen((current) => !current)}
@@ -874,8 +876,10 @@ export function CheckoutSheet({
                 </View>
               )}
             </View>
+              </View>
 
-            <View style={[styles.paymentSummary, isWide && styles.paymentSummaryWide]}>
+              <View style={[styles.paymentColumn, isWide && styles.paymentColumnSummaryWide]} testID="checkout-payment-summary-column">
+            <View style={[styles.paymentSummary, isWide && styles.paymentSummaryWide]} testID="checkout-payment-summary">
               <Text style={styles.paymentSummaryLabel}>Produtos</Text>
               <View style={styles.paymentProductList}>
                 {items.map((item) => (
@@ -996,6 +1000,8 @@ export function CheckoutSheet({
                 <Text style={styles.privacyNoticeLinkText}>Ler aviso de privacidade</Text>
                 <Feather name="chevron-right" size={15} color={COLORS.gold} />
               </Pressable>
+            </View>
+              </View>
             </View>
 
             {!!error && <Text style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
@@ -1127,6 +1133,27 @@ const styles = StyleSheet.create({
   paymentStep: {
     width: '100%',
   },
+  paymentColumns: {
+    width: '100%',
+  },
+  paymentColumnsWide: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.xl,
+  },
+  paymentColumn: {
+    width: '100%',
+  },
+  paymentColumnDetailsWide: {
+    flex: 0.86,
+    width: 'auto',
+    minWidth: 0,
+  },
+  paymentColumnSummaryWide: {
+    flex: 1.14,
+    width: 'auto',
+    minWidth: 0,
+  },
   paymentEyebrow: {
     ...TYPOGRAPHY.eyebrow,
     color: COLORS.gold,
@@ -1156,10 +1183,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   securePaymentCardWide: {
-    minHeight: 164,
-    gap: 36,
-    paddingHorizontal: 34,
-    paddingVertical: 24,
+    minHeight: 128,
+    gap: SPACING.xl,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
     marginBottom: SPACING.xl,
   },
   securePaymentIcon: {
@@ -1171,9 +1198,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceRaised,
   },
   securePaymentIconWide: {
-    width: 116,
-    height: 116,
-    borderRadius: 58,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
   },
   securePaymentLock: {
     position: 'absolute',
