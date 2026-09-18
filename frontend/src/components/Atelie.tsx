@@ -39,6 +39,7 @@ import {
   type ConfirmSheet,
 } from './AdminSystemComponents';
 import { AdminAvailabilityManager } from './AdminAvailabilityManager';
+import { AdminCoupons } from './AdminCoupons';
 import {
   type AdminPedido as PedidoPainel,
 } from './AdminOrderCards';
@@ -1524,6 +1525,8 @@ export function Atelie({
               <SystemAction icon="external-link" title="Conectar Melhor Envio" subtitle="Autorize a conta responsável pelas cotações." onPress={connectMelhorEnvio} />
             )}
           </SystemCard>
+
+          <AdminCoupons />
 
           <SystemCard icon="dollar-sign" title="Custos & Rentabilidade" subtitle="Custo real por frasco, lucro estimado e margem por perfume.">
             <SystemAction icon="trending-up" title="Abrir custos" subtitle="Configure base, frascos, embalagem e acompanhe rentabilidade." onPress={() => setSystemView('custos')} badge="NOVO" />

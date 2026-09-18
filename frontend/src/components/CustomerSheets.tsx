@@ -618,6 +618,20 @@ export function OrdersSheet({
                 </View>
               </View>
             )}
+            {!!order.cupom && Number(order.desconto || 0) > 0 && (
+              <View style={styles.couponSummary} testID={`order-coupon-${order.codigoAcompanhamento}`}>
+                <View style={styles.deliveryIcon}>
+                  <Feather name="tag" size={16} color={COLORS.gold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.bodyText}>Cupom {order.cupom.codigo}</Text>
+                  <Text style={styles.orderItemMeta}>
+                    {order.cupom.percentual}% nos perfumes · desconto de {brl(order.desconto || 0)}
+                  </Text>
+                </View>
+                <Text style={styles.couponSummaryValue}>− {brl(order.desconto || 0)}</Text>
+              </View>
+            )}
             <View style={styles.orderTotal}>
               <Text style={styles.detailMeta}>Total</Text>
               <Text style={styles.resultName}>{brl(order.total)}</Text>
@@ -824,6 +838,8 @@ const styles = StyleSheet.create({
   orderItemMeta: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
   deliveryCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.md, backgroundColor: COLORS.surface, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border },
   deliveryIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface },
+  couponSummary: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SPACING.md, marginTop: SPACING.sm, backgroundColor: COLORS.sage + '20', borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.sage + '66' },
+  couponSummaryValue: { color: COLORS.sageText, fontSize: FONT_SIZES.label, fontWeight: '700' },
   orderTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.md },
   timeline: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   timelineDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },

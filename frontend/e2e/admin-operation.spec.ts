@@ -4,6 +4,7 @@ import catalogImages from '../src/data/catalogImages.json';
 
 async function mockAdminApi(page: Page, options: { manualPayment?: boolean; divergentPayment?: boolean; paymentReview?: boolean; backupWarning?: boolean } = {}) {
   let frontendErrorOpen = true;
+  let coupons: Record<string, unknown>[] = [];
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -25,6 +26,21 @@ async function mockAdminApi(page: Page, options: { manualPayment?: boolean; dive
       pixManualAtivo: false,
     });
     if (path === '/api/admin/pedidos/reset-version') return json({ version: 1 });
+    if (path === '/api/admin/cupons' && request.method() === 'GET') return json(coupons);
+    if (path === '/api/admin/cupons' && request.method() === 'POST') {
+      const coupon = { id: 'coupon-e2e', criadoEm: '2026-09-17T12:00:00Z', ...request.postDataJSON() };
+      coupons = [coupon];
+      return json(coupon, 201);
+    }
+    if (path === '/api/admin/cupons/coupon-e2e' && request.method() === 'PUT') {
+      const coupon = { id: 'coupon-e2e', criadoEm: '2026-09-17T12:00:00Z', ...request.postDataJSON() };
+      coupons = [coupon];
+      return json(coupon);
+    }
+    if (path === '/api/admin/cupons/coupon-e2e' && request.method() === 'DELETE') {
+      coupons = [];
+      return json({ status: 'Cupom arquivado.' });
+    }
     if (path === '/api/auth/login') return json({ ok: true, token: 'sessao-e2e' });
     if (path === '/api/auth/step-up') return json({ ok: true, token: 'stepup-e2e', expiresInSeconds: 300 });
     if (path === '/api/perfumes' && request.method() === 'GET') return json([
@@ -364,6 +380,26 @@ test('mantém dashboard e catálogo navegáveis após a modularização', async 
   await expect(page.getByTestId('perfume-card-perfume-b')).toBeVisible();
   await page.getByTestId('edit-perfume-b').click();
   await expect(page.getByTestId('perfume-nome')).toHaveValue('Brisa Dourada');
+});
+
+test('cria e controla cupom percentual pelo painel', async ({ page }) => {
+  await mockAdminApi(page);
+  await openAdminSystem(page);
+
+  await page.getByTestId('coupon-code-input').fill('bemvindo15');
+  await page.getByTestId('coupon-percent-input').fill('15');
+  const createRequest = page.waitForRequest((request) => (
+    request.url().endsWith('/api/admin/cupons') && request.method() === 'POST'
+  ));
+  await page.getByTestId('coupon-save').click();
+  const request = await createRequest;
+  expect(request.postDataJSON()).toMatchObject({
+    codigo: 'BEMVINDO15',
+    percentual: 15,
+    ativo: true,
+  });
+  await expect(page.getByTestId('coupon-row-BEMVINDO15')).toContainText('15% nos perfumes');
+  await expect(page.getByTestId('coupon-row-BEMVINDO15')).toContainText('ATIVO');
 });
 
 

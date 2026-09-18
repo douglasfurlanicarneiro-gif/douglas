@@ -19,6 +19,7 @@ from money import centavos_em_valor, subtotal_em_centavos, valor_em_centavos
 from payments.base import PaymentProviderError
 from payments.service import iniciar_pagamento
 from rate_limit import checkout_rate_limit
+from routers.cupons import calcular_desconto_cupom, obter_cupom_ativo
 from routers.pedidos import _persistir_pedido_e_estoque, _validar_status_estoque
 from security import require_atelie_auth
 from shipping.melhor_envio import MelhorEnvioError, cotar_frete
@@ -77,6 +78,7 @@ class CompraIn(BaseModel):
     salvarDadosParaProximaCompra: bool = False
     tipoEntrega: Literal["entrega", "retirada"] = "entrega"
     freteEscolhido: Optional[FreteEscolhidoIn] = None
+    cupomCodigo: Optional[str] = Field(default=None, max_length=32)
 
     @model_validator(mode="after")
     def validar_formato(self):
@@ -165,6 +167,11 @@ def _configuracao_pagamento_do_pedido(pedido: dict, config_loja: dict) -> dict:
         "infinitePayHandle": config_loja.get("infinitePayHandle", ""),
         "itens": list(pedido.get("itens") or []),
         "frete": pedido.get("frete", 0),
+        "subtotalComDesconto": pedido.get(
+            "subtotalComDesconto", pedido.get("subtotal", 0)
+        ),
+        "desconto": pedido.get("desconto", 0),
+        "cupom": pedido.get("cupom"),
         "cliente": {
             "nome": pedido.get("nomeCompleto") or pedido.get("cliente", ""),
             "email": str(pedido.get("email") or ""),
@@ -395,6 +402,13 @@ async def _criar_compra(
         payload.aceitePrazoEncomenda,
     )
 
+    cupom = await obter_cupom_ativo(db, payload.cupomCodigo)
+    percentual_cupom = int(cupom.get("percentual", 0)) if cupom else 0
+    desconto_centavos = calcular_desconto_cupom(
+        subtotal_centavos, percentual_cupom
+    )
+    subtotal_com_desconto_centavos = subtotal_centavos - desconto_centavos
+
     doc = payload.model_dump(
         exclude={
             "perfumeId",
@@ -403,11 +417,27 @@ async def _criar_compra(
             "preco",
             "itens",
             "freteEscolhido",
+            "cupomCodigo",
         }
     )
     doc["itens"] = itens_doc
     doc["subtotal"] = centavos_em_valor(subtotal_centavos)
     doc["subtotalCentavos"] = subtotal_centavos
+    doc["desconto"] = centavos_em_valor(desconto_centavos)
+    doc["descontoCentavos"] = desconto_centavos
+    doc["subtotalComDesconto"] = centavos_em_valor(
+        subtotal_com_desconto_centavos
+    )
+    doc["subtotalComDescontoCentavos"] = subtotal_com_desconto_centavos
+    doc["cupom"] = (
+        {
+            "codigo": cupom["codigo"],
+            "percentual": percentual_cupom,
+            "descricao": cupom.get("descricao", ""),
+        }
+        if cupom
+        else None
+    )
     doc["frete"] = 0.0
     doc["freteCentavos"] = 0
     doc["entrega"] = None
@@ -469,9 +499,9 @@ async def _criar_compra(
             "prazoDias": 0,
         }
     doc["total"] = centavos_em_valor(
-        subtotal_centavos + valor_em_centavos(doc["frete"])
+        subtotal_com_desconto_centavos + valor_em_centavos(doc["frete"])
     )
-    doc["totalCentavos"] = subtotal_centavos + int(doc["freteCentavos"])
+    doc["totalCentavos"] = subtotal_com_desconto_centavos + int(doc["freteCentavos"])
     agora = datetime.now(timezone.utc)
     doc["data"] = agora
     doc["criadoEm"] = agora

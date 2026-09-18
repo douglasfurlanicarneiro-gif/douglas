@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
-import { ApiError, buscarCep, cotarFrete, createCompra } from '../api';
+import { ApiError, buscarCep, cotarFrete, createCompra, validateCoupon } from '../api';
 import { storage } from '../utils/storage';
 import { openInfinitePayCheckout } from '../utils/paymentCheckout';
-import type { CheckoutPayload, Compra, OpcaoFrete, Perfume, PriceOption } from '../types';
+import type { CheckoutPayload, Compra, CupomSnapshot, OpcaoFrete, Perfume, PriceOption } from '../types';
 import { brl, COLORS, SPACING, FONT_SIZES, RADIUS, TYPOGRAPHY } from '../theme';
 import { BottomSheet } from './BottomSheet';
 import { Field, PrimaryButton, SecondaryButton, TInput } from './atoms';
@@ -31,7 +31,7 @@ export type CartItem = {
 
 type CustomerForm = Omit<
   CheckoutPayload,
-  'itens' | 'cliente' | 'contato' | 'observacoes' | 'freteEscolhido' | 'tipoEntrega' | 'endereco' | 'aceitePrazoEncomenda' | 'aceitePoliticaPrivacidade' | 'salvarDadosParaProximaCompra'
+  'itens' | 'cliente' | 'contato' | 'observacoes' | 'freteEscolhido' | 'tipoEntrega' | 'endereco' | 'aceitePrazoEncomenda' | 'aceitePoliticaPrivacidade' | 'salvarDadosParaProximaCompra' | 'cupomCodigo'
 > & {
   endereco: NonNullable<CheckoutPayload['endereco']>;
   observacoes: string;
@@ -99,6 +99,11 @@ export function CheckoutSheet({
   const [prazoEncomendaAceito, setPrazoEncomendaAceito] = useState(false);
   const [privacidadeAceita, setPrivacidadeAceita] = useState(false);
   const [lembrarDados, setLembrarDados] = useState(false);
+  const [couponOpen, setCouponOpen] = useState(false);
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<CupomSnapshot | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [couponError, setCouponError] = useState('');
   const checkoutAttemptRef = useRef<CheckoutAttempt | null>(null);
   const contemSobEncomenda = useMemo(
     () => items.some((item) => item.perfume.prontaEntrega !== true),
@@ -108,8 +113,13 @@ export function CheckoutSheet({
     () => items.reduce((sum, item) => sum + item.option.preco * item.quantidade, 0),
     [items],
   );
+  const subtotalCentavos = Math.round(subtotal * 100);
+  const descontoCentavos = appliedCoupon
+    ? Math.round(subtotalCentavos * appliedCoupon.percentual / 100)
+    : 0;
+  const desconto = descontoCentavos / 100;
   const valorEntrega = tipoEntrega === 'entrega' ? (freteSelecionado?.preco || 0) : 0;
-  const total = subtotal + valorEntrega;
+  const total = (subtotalCentavos - descontoCentavos + Math.round(valorEntrega * 100)) / 100;
   const pagamentoDisponivel = cartaoOnlineAtivo || pixManualAtivo;
   const nomeEntregaSelecionada = tipoEntrega === 'retirada'
     ? 'Retirada combinada'
@@ -187,6 +197,14 @@ export function CheckoutSheet({
     setPrazoEncomendaAceito(false);
     setPrivacidadeAceita(false);
   }, [visible]);
+
+  useEffect(() => {
+    if (items.length > 0) return;
+    setCouponInput('');
+    setAppliedCoupon(null);
+    setCouponError('');
+    setCouponOpen(false);
+  }, [items.length]);
 
   useEffect(() => {
     if (!contemSobEncomenda) setPrazoEncomendaAceito(false);
@@ -317,6 +335,32 @@ export function CheckoutSheet({
     setFreteError('');
   };
 
+  const applyCoupon = async () => {
+    const codigo = couponInput.trim().toUpperCase();
+    if (!codigo) {
+      setCouponError('Digite o código do cupom.');
+      return;
+    }
+    setCouponLoading(true);
+    setCouponError('');
+    try {
+      const coupon = await validateCoupon(codigo);
+      setAppliedCoupon(coupon);
+      setCouponInput(coupon.codigo);
+    } catch (cause) {
+      setAppliedCoupon(null);
+      setCouponError(cause instanceof ApiError ? cause.message : 'Não foi possível validar o cupom.');
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setCouponError('');
+  };
+
   const submit = async () => {
     if (!complete) return;
     setLoading(true);
@@ -336,6 +380,7 @@ export function CheckoutSheet({
         aceitePoliticaPrivacidade: privacidadeAceita,
         salvarDadosParaProximaCompra: lembrarDados,
         tipoEntrega,
+        ...(appliedCoupon ? { cupomCodigo: appliedCoupon.codigo } : {}),
         ...(tipoEntrega === 'entrega'
           ? {
               endereco: {
@@ -748,6 +793,69 @@ export function CheckoutSheet({
               />
             </Field>
 
+            <View style={styles.couponCard} testID="checkout-coupon-section">
+              <Pressable
+                onPress={() => setCouponOpen((current) => !current)}
+                accessibilityRole="button"
+                accessibilityLabel="Cupom de desconto"
+                accessibilityState={{ expanded: couponOpen }}
+                style={styles.couponHeader}
+                testID="checkout-coupon-toggle"
+              >
+                <View style={styles.couponHeaderIcon}>
+                  <Feather name="tag" size={18} color={COLORS.gold} />
+                </View>
+                <View style={styles.couponHeaderCopy}>
+                  <Text style={styles.couponTitle}>Cupom de desconto</Text>
+                  <Text style={styles.couponHint}>O desconto vale somente para os perfumes, nunca para o frete.</Text>
+                </View>
+                <Feather name={couponOpen ? 'chevron-up' : 'chevron-down'} size={20} color={COLORS.muted} />
+              </Pressable>
+              {couponOpen && (
+                <View style={styles.couponBody}>
+                  <View style={styles.couponInputRow}>
+                    <TInput
+                      value={couponInput}
+                      onChangeText={(value) => {
+                        setCouponInput(value.toUpperCase().replace(/\s/g, ''));
+                        setAppliedCoupon(null);
+                        setCouponError('');
+                      }}
+                      placeholder="Digite o código"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      maxLength={24}
+                      editable={!couponLoading}
+                      style={styles.couponInput}
+                      testID="checkout-coupon-input"
+                    />
+                    <Pressable
+                      onPress={() => void applyCoupon()}
+                      disabled={couponLoading || !couponInput.trim()}
+                      accessibilityRole="button"
+                      accessibilityLabel="Aplicar cupom"
+                      style={[styles.couponApplyButton, (couponLoading || !couponInput.trim()) && styles.couponApplyDisabled]}
+                      testID="checkout-coupon-apply"
+                    >
+                      <Text style={styles.couponApplyText}>{couponLoading ? 'Validando…' : 'Aplicar'}</Text>
+                    </Pressable>
+                  </View>
+                  {!!appliedCoupon && (
+                    <View style={styles.couponSuccess}>
+                      <Feather name="check-circle" size={17} color={COLORS.sageText} />
+                      <Text style={styles.couponSuccessText}>
+                        {appliedCoupon.codigo} aplicado · {appliedCoupon.percentual}% de desconto
+                      </Text>
+                      <Pressable onPress={removeCoupon} accessibilityLabel="Remover cupom" hitSlop={8}>
+                        <Text style={styles.couponRemoveText}>Remover</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                  {!!couponError && <Text style={styles.couponError}>{couponError}</Text>}
+                </View>
+              )}
+            </View>
+
             <View style={[styles.paymentSummary, isWide && styles.paymentSummaryWide]}>
               <Text style={styles.paymentSummaryLabel}>Produtos</Text>
               <View style={styles.paymentProductList}>
@@ -770,6 +878,15 @@ export function CheckoutSheet({
                   </View>
                 ))}
               </View>
+              {!!appliedCoupon && (
+                <View style={styles.paymentDiscountRow} testID="checkout-discount-row">
+                  <View style={styles.paymentDiscountCopy}>
+                    <Text style={styles.paymentDiscountLabel}>Cupom {appliedCoupon.codigo}</Text>
+                    <Text style={styles.paymentDiscountMeta}>{appliedCoupon.percentual}% somente nos perfumes</Text>
+                  </View>
+                  <Text style={styles.paymentDiscountValue}>− {brl(desconto)}</Text>
+                </View>
+              )}
               <View style={styles.paymentSummaryDivider} />
               <View style={[styles.paymentSummaryRow, styles.paymentSummaryDelivery]}>
                 <View style={styles.paymentDeliveryCopy}>
@@ -1104,6 +1221,68 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
+  couponCard: {
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.surface,
+    overflow: 'hidden',
+  },
+  couponHeader: {
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    padding: SPACING.md,
+  },
+  couponHeaderIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceRaised,
+  },
+  couponHeaderCopy: { flex: 1, minWidth: 0 },
+  couponTitle: { ...TYPOGRAPHY.label, color: COLORS.bone },
+  couponHint: { ...TYPOGRAPHY.caption, color: COLORS.muted, marginTop: 2 },
+  couponBody: {
+    padding: SPACING.md,
+    paddingTop: 0,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  couponInputRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: SPACING.sm,
+    paddingTop: SPACING.md,
+  },
+  couponInput: { flex: 1, minWidth: 0 },
+  couponApplyButton: {
+    minWidth: 92,
+    minHeight: 44,
+    paddingHorizontal: SPACING.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: RADIUS.md,
+    backgroundColor: COLORS.gold,
+  },
+  couponApplyDisabled: { opacity: 0.5 },
+  couponApplyText: { ...TYPOGRAPHY.label, color: COLORS.ink },
+  couponSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+    padding: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.sage + '2E',
+  },
+  couponSuccessText: { ...TYPOGRAPHY.caption, color: COLORS.sageText, flex: 1 },
+  couponRemoveText: { ...TYPOGRAPHY.caption, color: COLORS.rust, textDecorationLine: 'underline' },
+  couponError: { ...TYPOGRAPHY.caption, color: COLORS.rust, marginTop: SPACING.sm },
   paymentSummary: {
     padding: SPACING.lg,
     borderRadius: RADIUS.md,
@@ -1158,6 +1337,20 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.label,
     color: COLORS.bone,
   },
+  paymentDiscountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.md,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  paymentDiscountCopy: { flex: 1, minWidth: 0 },
+  paymentDiscountLabel: { ...TYPOGRAPHY.label, color: COLORS.sageText },
+  paymentDiscountMeta: { ...TYPOGRAPHY.caption, color: COLORS.muted, marginTop: 2 },
+  paymentDiscountValue: { ...TYPOGRAPHY.label, color: COLORS.sageText },
   paymentSummaryDelivery: {
     alignItems: 'flex-start',
   },

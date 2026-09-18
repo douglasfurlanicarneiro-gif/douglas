@@ -166,6 +166,9 @@ export type Pedido = {
   observacoes: string;
   itens: PedidoItem[];
   subtotal?: number;
+  desconto?: number;
+  subtotalComDesconto?: number;
+  cupom?: CupomSnapshot | null;
   frete?: number;
   entrega?: OpcaoFrete | null;
   subtotalTabela?: number;
@@ -248,6 +251,9 @@ export type Compra = {
   ml?: number;
   preco?: number;
   subtotal?: number;
+  desconto?: number;
+  subtotalComDesconto?: number;
+  cupom?: CupomSnapshot | null;
   frete?: number;
   entrega?: OpcaoFrete | null;
   total?: number;
@@ -268,6 +274,9 @@ export type Acompanhamento = {
   status: OrderStatus;
   itens: CompraItem[];
   subtotal: number;
+  desconto?: number;
+  subtotalComDesconto?: number;
+  cupom?: CupomSnapshot | null;
   frete: number;
   entrega?: OpcaoFrete | null;
   total: number;
@@ -454,6 +463,20 @@ export type CheckoutPayload = {
     serviceId: number;
     categoriaFrete?: 'padrao' | 'prioritaria';
   };
+  cupomCodigo?: string;
+};
+
+export type CupomSnapshot = {
+  codigo: string;
+  percentual: number;
+  descricao?: string;
+};
+
+export type Cupom = CupomSnapshot & {
+  id: string;
+  ativo: boolean;
+  criadoEm?: string;
+  atualizadoEm?: string;
 };
 
 export type ConfiguracaoFrete = {

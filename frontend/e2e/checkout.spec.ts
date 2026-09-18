@@ -59,6 +59,11 @@ async function mockApi(
       { categoriaFrete: 'padrao', nomeExibicao: 'Entrega Padrão', serviceId: 1, transportadora: 'Jadlog', servico: 'Package', precoTransportadora: 18.9, taxaEmbalagem: 6, preco: 24.9, prazoDias: 6 },
       { categoriaFrete: 'prioritaria', nomeExibicao: 'Entrega Prioritária', serviceId: 1, transportadora: 'Jadlog', servico: 'Package', precoTransportadora: 18.9, taxaEmbalagem: 6, preco: 27.9, prazoDias: 4 },
     ] });
+    if (path === '/api/cupons/validar' && request.method() === 'POST') {
+      const { codigo } = request.postDataJSON() as { codigo: string };
+      if (codigo !== 'BEMVINDO10') return json({ detail: 'Cupom inválido ou indisponível.' }, 400);
+      return json({ codigo: 'BEMVINDO10', percentual: 10, descricao: 'Boas-vindas' });
+    }
     if (path === '/api/compras' && request.method() === 'POST') {
       state.checkout = request.postDataJSON();
       return json({
@@ -181,4 +186,29 @@ test('exige aceite do prazo para produto sob encomenda', async ({ page }) => {
   await expect(page.getByTestId('checkout-submit')).toBeDisabled();
   await page.getByTestId('accept-made-to-order-deadline').click();
   await expect(page.getByTestId('checkout-submit')).toBeEnabled();
+});
+
+test('aplica cupom somente nos perfumes e envia o código no checkout', async ({ page }) => {
+  const state = await mockApi(page);
+  await openStore(page);
+  await page.getByTestId('buy-ready-50').click();
+  await fillCustomer(page);
+  await page.getByTestId('delivery-method-retirada').click();
+  await page.getByTestId('checkout-to-payment').click();
+  await page.getByTestId('checkout-coupon-toggle').click();
+  await page.getByTestId('checkout-coupon-input').fill('bemvindo10');
+  await page.getByTestId('checkout-coupon-apply').click();
+
+  await expect(page.getByTestId('checkout-discount-row')).toContainText('10% somente nos perfumes');
+  await expect(page.getByTestId('checkout-discount-row')).toContainText('R$ 8,50');
+  await expect(page.getByTestId('checkout-sheet')).toContainText('R$ 76,50');
+
+  await page.getByTestId('accept-privacy-notice').click();
+  await page.getByTestId('checkout-submit').click();
+  await expect.poll(() => state.checkout).not.toBeNull();
+  expect(state.checkout).toMatchObject({
+    cupomCodigo: 'BEMVINDO10',
+    tipoEntrega: 'retirada',
+    itens: [{ perfumeId: 'ready', ml: 50, quantidade: 1 }],
+  });
 });

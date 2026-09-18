@@ -72,6 +72,7 @@ def rate_limit(scope: str, *, max_requests: int, window_seconds: int):
 
 
 checkout_rate_limit = rate_limit("checkout", max_requests=12, window_seconds=3600)
+coupon_rate_limit = rate_limit("coupon", max_requests=40, window_seconds=3600)
 login_rate_limit = rate_limit("login", max_requests=20, window_seconds=900)
 step_up_rate_limit = rate_limit("step-up", max_requests=10, window_seconds=900)
 shipping_rate_limit = rate_limit("shipping", max_requests=80, window_seconds=3600)

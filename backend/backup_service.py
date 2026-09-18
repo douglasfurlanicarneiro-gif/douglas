@@ -21,6 +21,7 @@ BACKUP_COLLECTIONS = (
     "movimentos",
     "pedidos",
     "clientes",
+    "cupons",
     "opinioes",
     "sugestoes",
     "compras",

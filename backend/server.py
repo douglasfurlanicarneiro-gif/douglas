@@ -25,7 +25,7 @@ from database import close_client, get_db
 from database_integrity import ensure_database_schema
 from locks import distributed_lock, stock_lock
 from routers import (acompanhamento, admin, auth, catalogo_estoque, cep,
-                     clientes, compras, custos, fornecedores, frete, insumos,
+                     clientes, compras, cupons, custos, fornecedores, frete, insumos,
                      movimentos, observabilidade, opinioes, pagamentos, pedidos, perfumes,
                      privacidade, sugestoes, vitrine)
 from security import hash_password, verify_password
@@ -298,6 +298,7 @@ app.include_router(observabilidade.router)
 app.include_router(pagamentos.router)
 app.include_router(sugestoes.router)
 app.include_router(compras.router)
+app.include_router(cupons.router)
 app.include_router(custos.router)
 app.include_router(fornecedores.router)
 app.include_router(insumos.router)

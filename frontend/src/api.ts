@@ -21,6 +21,8 @@ import type {
   CotacaoFornecedor,
   Insumo,
   PlanoProducao,
+  Cupom,
+  CupomSnapshot,
 } from './types';
 import { withOptimizedPerfumeImages } from './utils/perfumeImages';
 
@@ -412,6 +414,19 @@ export const createCompra = (data: CheckoutPayload, idempotencyKey: string) => r
   headers: { 'Idempotency-Key': idempotencyKey },
   body: JSON.stringify(data),
 });
+export const validateCoupon = (codigo: string) => request<CupomSnapshot>('/cupons/validar', {
+  method: 'POST',
+  body: JSON.stringify({ codigo }),
+});
+export const listCoupons = () => request<Cupom[]>('/admin/cupons', {}, true);
+export const createCoupon = (data: Omit<Cupom, 'id' | 'criadoEm' | 'atualizadoEm'>) =>
+  request<Cupom>('/admin/cupons', { method: 'POST', body: JSON.stringify(data) }, true);
+export const updateCoupon = (
+  id: string,
+  data: Omit<Cupom, 'id' | 'criadoEm' | 'atualizadoEm'>,
+) => request<Cupom>(`/admin/cupons/${id}`, { method: 'PUT', body: JSON.stringify(data) }, true);
+export const archiveCoupon = (id: string) =>
+  request<{ status: string }>(`/admin/cupons/${id}`, { method: 'DELETE' }, true);
 export const confirmarPagamentoInfinitePay = (data: {
   orderNsu: string;
   transactionNsu: string;

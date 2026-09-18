@@ -12,6 +12,7 @@ PUBLIC_ROUTES = {
     ("POST", "/api/pagamentos/infinitepay/confirmar"),
     ("POST", "/api/sugestoes"),
     ("POST", "/api/compras"),
+    ("POST", "/api/cupons/validar"),
     ("POST", "/api/frete/cotar"),
     ("GET", "/api/integracoes/melhor-envio/callback"),
     ("GET", "/api/vitrine"),

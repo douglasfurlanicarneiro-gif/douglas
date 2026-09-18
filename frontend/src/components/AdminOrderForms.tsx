@@ -275,7 +275,10 @@ export function PedidoForm({
     return p?.precos.find((pr) => pr.ml === Number(it.ml))?.preco || 0;
   };
   const totalProdutos = f.itens.reduce((sum, item) => sum + precoDo(item) * item.quantidade, 0);
-  const totalCalculado = Math.round((totalProdutos + Number(f.frete || 0)) * 100) / 100;
+  const descontoCupom = initial?.cupom
+    ? Math.round(totalProdutos * initial.cupom.percentual) / 100
+    : Number(initial?.desconto || 0);
+  const totalCalculado = Math.round((totalProdutos - descontoCupom + Number(f.frete || 0)) * 100) / 100;
   const valorDigitado = Number(valorFinalInput.replace(',', '.'));
   const valorDigitadoValido = valorFinalInput.trim().length > 0
     && Number.isFinite(valorDigitado)
@@ -428,6 +431,20 @@ export function PedidoForm({
                 </Text>
               </>
             )}
+          </View>
+        </View>
+      )}
+      {pedidoRecebido && initial?.cupom && descontoCupom > 0 && (
+        <View style={styles.orderDeliveryCard}>
+          <View style={styles.orderDeliveryIcon}>
+            <Feather name="tag" size={17} color={COLORS.gold} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.orderDeliveryTitle}>Cupom {initial.cupom.codigo}</Text>
+            <Text style={styles.orderDeliveryMeta}>
+              {initial.cupom.percentual}% somente nos perfumes · desconto de {brl(descontoCupom)}
+            </Text>
+            <Text style={styles.orderDeliveryMeta}>O frete foi cobrado integralmente.</Text>
           </View>
         </View>
       )}

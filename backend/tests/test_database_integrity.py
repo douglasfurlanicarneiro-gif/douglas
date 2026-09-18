@@ -126,6 +126,7 @@ def test_indices_criticos_preservam_unicidade():
     assert ("pedidos", "checkoutIdempotencyKey_1") in unique
     assert ("pedidos", "pagamento_transaction_nsu_unico") in unique
     assert ("pedidos", "codigoAcompanhamento_1") in unique
+    assert ("cupons", "cupons_codigo_unico") in unique
     assert ("solicitacoes_privacidade", "protocolo_1") in unique
 
 
@@ -134,7 +135,7 @@ def test_migracao_v2_converte_datas_e_valores_sem_processar_documentos_em_memori
 
     result = asyncio.run(ensure_database_schema(db))
 
-    assert DATABASE_SCHEMA_VERSION == 3
+    assert DATABASE_SCHEMA_VERSION == 4
     assert [migration.version for migration in MIGRATIONS] == [2]
     assert result["migracoesAplicadas"] == [2]
     assert db.pedidos.bulk_updates

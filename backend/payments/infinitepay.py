@@ -102,21 +102,40 @@ def _itens_checkout(
     configuracao: dict[str, Any], total_centavos: int
 ) -> list[dict[str, Any]]:
     itens: list[dict[str, Any]] = []
-    for item in configuracao.get("itens", []):
-        quantidade = max(1, int(item.get("quantidade", 1)))
-        preco = valor_em_centavos(item.get("precoUnitario", 0))
-        if preco <= 0:
-            continue
-        descricao = f"{item.get('perfumeNome', 'Perfume')} - {item.get('ml', '')}ml"
-        itens.append(
-            {
-                "quantity": quantidade,
-                "price": preco,
-                "description": descricao[:120],
-            }
-        )
-
     frete = valor_em_centavos(configuracao.get("frete", 0))
+    desconto = valor_em_centavos(configuracao.get("desconto", 0))
+    if desconto > 0:
+        # O provedor recebe o frete em uma linha separada e o desconto somente
+        # no total dos produtos. Assim, nem a exibição nem a conciliação
+        # financeira podem interpretar o cupom como abatimento do frete.
+        produtos_com_desconto = total_centavos - frete
+        codigo = str((configuracao.get("cupom") or {}).get("codigo", "")).strip()
+        if produtos_com_desconto > 0:
+            descricao = "Perfumes com desconto"
+            if codigo:
+                descricao += f" - cupom {codigo}"
+            itens.append(
+                {
+                    "quantity": 1,
+                    "price": produtos_com_desconto,
+                    "description": descricao[:120],
+                }
+            )
+    else:
+        for item in configuracao.get("itens", []):
+            quantidade = max(1, int(item.get("quantidade", 1)))
+            preco = valor_em_centavos(item.get("precoUnitario", 0))
+            if preco <= 0:
+                continue
+            descricao = f"{item.get('perfumeNome', 'Perfume')} - {item.get('ml', '')}ml"
+            itens.append(
+                {
+                    "quantity": quantidade,
+                    "price": preco,
+                    "description": descricao[:120],
+                }
+            )
+
     if frete > 0:
         itens.append({"quantity": 1, "price": frete, "description": "Frete"})
 

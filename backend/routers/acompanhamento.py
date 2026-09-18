@@ -26,6 +26,11 @@ def _resposta_publica(pedido: dict):
         "status": pedido.get("status", "pendente"),
         "itens": pedido.get("itens", []),
         "subtotal": pedido.get("subtotal", pedido.get("total", 0)),
+        "desconto": pedido.get("desconto", 0),
+        "subtotalComDesconto": pedido.get(
+            "subtotalComDesconto", pedido.get("subtotal", pedido.get("total", 0))
+        ),
+        "cupom": pedido.get("cupom"),
         "frete": pedido.get("frete", 0),
         "entrega": pedido.get("entrega"),
         "total": pedido.get("total", 0),

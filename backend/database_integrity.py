@@ -13,7 +13,7 @@ from typing import Any
 from pymongo.errors import OperationFailure
 
 
-DATABASE_SCHEMA_VERSION = 3
+DATABASE_SCHEMA_VERSION = 4
 DATABASE_SCHEMA_DOCUMENT_ID = "database_schema"
 
 
@@ -109,6 +109,7 @@ INDEX_SPECS = (
     IndexSpec("sugestoes", [("arquivadoEm", 1), ("data", -1)], "arquivadoEm_1_data_-1"),
     IndexSpec("compras", [("arquivadoEm", 1), ("data", -1)], "arquivadoEm_1_data_-1"),
     IndexSpec("clientes", "contato", "contato_1"),
+    IndexSpec("cupons", "codigo", "cupons_codigo_unico", {"unique": True}),
     IndexSpec("fornecedores", "nome", "nome_1"),
     IndexSpec(
         "cotacoes_fornecedores",
@@ -169,6 +170,7 @@ DATE_FIELDS_BY_COLLECTION: dict[str, tuple[str, ...]] = {
     "opinioes": ("data", "atualizadoEm", "moderadaEm", "arquivadoEm"),
     "sugestoes": ("data", "arquivadoEm"),
     "clientes": ("atualizadoEm", "consentimentoCadastroEm"),
+    "cupons": ("criadoEm", "atualizadoEm", "arquivadoEm"),
     "fornecedores": ("criadoEm", "atualizadoEm", "arquivadoEm"),
     "cotacoes_fornecedores": ("data",),
     "insumos": ("criadoEm", "atualizadoEm", "arquivadoEm"),
