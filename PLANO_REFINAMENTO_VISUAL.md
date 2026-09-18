@@ -9,3 +9,10 @@ Preservar a paleta atual, o formato compacto dos cards e as regras de negócio.
 5. Pendente: transições, feedback de ações, teclado e acessibilidade; preservar o brilho inicial.
 
 Cada etapa deve terminar com testes de celular/computador e registro do que foi realmente validado. Nenhuma alteração de regra de pagamento, estoque ou frete está incluída neste plano visual.
+
+## Revisão corretiva de 18/09/2026
+
+- Substitui as conclusões anteriores dos tópicos 3 e 4: a promessa antiga de postagem em três dias foi retirada por não ter confirmação operacional; o prazo de 14 dias sob encomenda permanece.
+- Filtros passam a duas linhas em telas estreitas, mantendo os nomes completos. Atendimento passa para Ajuda na navegação inferior e não exige comprimir as ações dos cards. Banner de descoberta cresce quando o texto quebra.
+- Confirmação usa apenas um título de status. Pedido confirmado não exibe cobrança, QR Pix ou redirecionamento automático mesmo com status do provedor desatualizado; ofertas de pagamento exigem pedido pendente.
+- 22 testes do fluxo aprovados e capturas inspecionadas em 320px, 393px e 1440px no Chromium. Isso não equivale a teste físico no Safari/iPhone.

@@ -50,7 +50,7 @@ const FAQ_ITEMS: { question: string; answer: string; icon: FeatherIconName }[] =
   },
   {
     question: 'Qual é o prazo de preparação e envio?',
-    answer: 'Produtos marcados como Pronta entrega são preparados para postagem em até 3 dias úteis. Produtos Sob encomenda podem levar até 14 dias para disponibilidade, preparação e maturação. Após a postagem, acrescente o prazo da transportadora exibido no checkout.',
+    answer: 'Produtos marcados como Pronta entrega estão disponíveis em estoque. Produtos Sob encomenda podem levar até 14 dias para disponibilidade, preparação e maturação. Após a postagem, acrescente o prazo da transportadora exibido no checkout. Para confirmar a previsão de postagem, fale com a loja.',
     icon: 'clock',
   },
   {
@@ -147,7 +147,6 @@ function VitrineCard({
   onReview,
   onDetails,
   onToggleFavorite,
-  reserveFloatingActionSpace,
 }: {
   item: VitrineItem;
   favorite: boolean;
@@ -155,7 +154,6 @@ function VitrineCard({
   onReview: () => void;
   onDetails: () => void;
   onToggleFavorite: () => void;
-  reserveFloatingActionSpace: boolean;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const notas = perfumeNotes(item);
@@ -272,7 +270,7 @@ function VitrineCard({
         </View>
       )}
 
-      <View style={[styles.cardActions, reserveFloatingActionSpace && styles.cardActionsFabSafe]}>
+      <View style={styles.cardActions}>
         <Pressable
           onPress={onReview}
           style={styles.reviewButton}
@@ -380,18 +378,18 @@ export function Vitrine({
   });
   const [reviewForm, setReviewForm] = useState({ cliente: '', nota: 5, comentario: '' });
   const [enviando, setEnviando] = useState(false);
-  const manualPixCode = successOrder?.pagamento?.metodo === 'pix'
+  const pagamentoConfirmado = Boolean(
+    successOrder?.pagamento?.status === 'pago'
+    || successOrder?.status === 'pagamento_confirmado'
+  );
+  const podePagar = successOrder?.status === 'pendente' && !pagamentoConfirmado;
+  const manualPixCode = podePagar && successOrder?.pagamento?.metodo === 'pix'
     ? successOrder.pagamento.pixCopiaECola || ''
     : '';
   const automaticCheckoutUrl = successOrder?.pagamento?.checkoutUrl || '';
   const successTrackingCode = successOrder?.codigoAcompanhamento || '';
   const pagamentoAutomaticoPendente = Boolean(
-    automaticCheckoutUrl
-    && successOrder?.pagamento?.status !== 'pago'
-  );
-  const pagamentoConfirmado = Boolean(
-    successOrder?.pagamento?.status === 'pago'
-    || successOrder?.status === 'pagamento_confirmado'
+    automaticCheckoutUrl && podePagar
   );
 
   useEffect(() => {
@@ -953,7 +951,6 @@ export function Vitrine({
               onReview={() => setReviewItem(item)}
               onDetails={() => setDetailItem(item)}
               onToggleFavorite={() => toggleFavorite(item.id)}
-              reserveFloatingActionSpace={phoneViewport}
             />
           </View>
         )}
@@ -1065,7 +1062,7 @@ export function Vitrine({
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && styles.quickFilterTextActive,
-                      ]} numberOfLines={1}>{ultraNarrowViewport ? 'Pronta' : 'Pronta entrega'}</Text>
+                      ]}>Pronta entrega</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1107,7 +1104,7 @@ export function Vitrine({
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && styles.quickFilterTextActive,
-                      ]} numberOfLines={1}>{ultraNarrowViewport ? 'Encomenda' : 'Sob encomenda'}</Text>
+                      ]}>Sob encomenda</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1191,17 +1188,6 @@ export function Vitrine({
         />
       </View>
 
-      <Pressable
-        onPress={() => setContactOpen(true)}
-        style={[styles.fabSuggestion, { bottom: 82 + Math.max(insets.bottom, 12) }]}
-        hitSlop={6}
-        testID="contact-fab"
-        accessibilityRole="button"
-        accessibilityLabel="Abrir atendimento"
-      >
-        <Feather name="message-circle" size={22} color={COLORS.ink} />
-      </Pressable>
-
       <View style={styles.bottomNavShell} pointerEvents="box-none">
       <View style={[
         styles.bottomNav,
@@ -1239,6 +1225,11 @@ export function Vitrine({
             )}
           </View>
           <Text style={styles.navText}>Pedidos</Text>
+        </Pressable>
+        <Pressable onPress={() => setContactOpen(true)} style={styles.navItem}
+          testID="contact-fab" accessibilityRole="button" accessibilityLabel="Abrir atendimento">
+          <Feather name="message-circle" size={22} color={COLORS.goldText} />
+          <Text style={styles.navText}>Ajuda</Text>
         </Pressable>
       </View>
       </View>
@@ -1607,11 +1598,7 @@ export function Vitrine({
           setOrderSuccess(null);
           setTrackingCodeOpen(false);
         }}
-        title={pagamentoConfirmado
-          ? 'Pagamento confirmado'
-          : pagamentoAutomaticoPendente
-            ? 'Pagamento pendente'
-            : 'Pedido recebido'}
+        title="Seu pedido"
         compact
         contentContainerStyle={styles.successSheetBody}
         testID="order-success-sheet"
@@ -1620,15 +1607,6 @@ export function Vitrine({
           <View style={styles.successIcon}>
             <Feather name={pagamentoAutomaticoPendente ? 'credit-card' : 'check'} size={30} color={COLORS.ink} />
           </View>
-          <Text style={styles.successEyebrow}>
-            {pagamentoConfirmado
-              ? 'PAGAMENTO APROVADO'
-              : pagamentoAutomaticoPendente
-                ? 'PAGAMENTO PENDENTE'
-                : manualPixCode
-                  ? 'PEDIDO REGISTRADO'
-                  : 'OBRIGADO PELA SUA COMPRA'}
-          </Text>
           <Text style={styles.successTitle}>
             {pagamentoConfirmado
               ? 'Pagamento confirmado!'
@@ -1835,20 +1813,20 @@ const styles = StyleSheet.create({
   searchBox: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 64, paddingHorizontal: 20, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.lg, marginBottom: 14 },
   searchBoxPhone: { height: 64 },
   searchInput: { ...TYPOGRAPHY.body, flex: 1, color: STOREFRONT_COLORS.ink, paddingVertical: 15 },
-  quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 13, height: 68, paddingHorizontal: 18, paddingVertical: 8, borderRadius: RADIUS.lg, backgroundColor: STOREFRONT_COLORS.surfaceRaised, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold + '88', marginBottom: 14 },
-  quizBannerPhone: { height: 72 },
+  quizBanner: { flexDirection: 'row', alignItems: 'center', gap: 13, minHeight: 68, paddingHorizontal: 18, paddingVertical: 12, borderRadius: RADIUS.lg, backgroundColor: STOREFRONT_COLORS.surfaceRaised, borderWidth: 1, borderColor: STOREFRONT_COLORS.gold + '88', marginBottom: 14 },
+  quizBannerPhone: { minHeight: 72 },
   quizIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'transparent', borderWidth: 1, borderColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
   quizIconPhone: { width: 44, height: 44, borderRadius: 22 },
   quizTitle: { ...TYPOGRAPHY.subtitle, color: STOREFRONT_COLORS.ink },
   quizSubtitle: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, marginTop: 2 },
   quickFilters: { paddingVertical: 8, marginBottom: SPACING.md },
-  quickFilterRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  quickFilterRow: { flexDirection: 'row', alignItems: 'stretch', flexWrap: 'wrap', gap: 8 },
   quickFilterButton: { minHeight: 44, minWidth: 0, paddingHorizontal: 5, borderRadius: RADIUS.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
   quickFilterButtonNarrow: { paddingHorizontal: 2, gap: 2 },
-  quickFilterReady: { flex: 1.25 },
-  quickFilterOrder: { flex: 1.25 },
-  quickFilterSecondary: { flex: 0.9 },
-  quickFilterCompact: { flex: 0.7 },
+  quickFilterReady: { flexGrow: 1, flexBasis: 140 },
+  quickFilterOrder: { flexGrow: 1, flexBasis: 140 },
+  quickFilterSecondary: { flexGrow: 1, flexBasis: 140 },
+  quickFilterCompact: { flexGrow: 1, flexBasis: 140 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, fontWeight: '500' },
   quickFilterTextNarrow: { ...TYPOGRAPHY.caption, lineHeight: 14 },
@@ -1925,7 +1903,6 @@ const styles = StyleSheet.create({
   notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
   notesEmptyText: { ...TYPOGRAPHY.bodySmall, color: PRODUCT_CARD_COLORS.muted, fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
-  cardActionsFabSafe: { paddingRight: 72 },
   reviewButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 },
   reviewText: { ...TYPOGRAPHY.caption, color: COLORS.goldText },
   detailsButton: { minHeight: 44, flexShrink: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingHorizontal: 4 },

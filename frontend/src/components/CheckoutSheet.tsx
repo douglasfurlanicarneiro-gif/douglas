@@ -434,7 +434,7 @@ export function CheckoutSheet({
       await onSuccess(order, paymentMessage);
       checkoutAttemptRef.current = null;
       await storage.removeItem(CHECKOUT_ATTEMPT_KEY);
-      if (order.pagamento?.checkoutUrl) {
+      if (order.status === 'pendente' && order.pagamento?.status !== 'pago' && order.pagamento?.checkoutUrl) {
         await openInfinitePayCheckout(order.pagamento.checkoutUrl);
       }
     } catch (cause) {

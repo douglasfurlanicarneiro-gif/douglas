@@ -24,7 +24,7 @@ const catalog = {
 
 async function mockApi(
   page: Page,
-  options: { catalogDelayMs?: number; catalogFailures?: number; brokenImage?: boolean } = {},
+  options: { catalogDelayMs?: number; catalogFailures?: number; brokenImage?: boolean; confirmedOrder?: boolean } = {},
 ) {
   const state: { checkout: Record<string, unknown> | null } = { checkout: null };
   let catalogRequests = 0;
@@ -67,7 +67,7 @@ async function mockApi(
     if (path === '/api/compras' && request.method() === 'POST') {
       state.checkout = request.postDataJSON();
       return json({
-        id: 'order-1', seq: 1, codigoAcompanhamento: 'TESTE123', status: 'pendente',
+        id: 'order-1', seq: 1, codigoAcompanhamento: 'TESTE123', status: options.confirmedOrder ? 'pagamento_confirmado' : 'pendente',
         cliente: 'Cliente Teste', contato: '11999999999', total: 109.9,
         pagamento: { provedor: 'infinitepay', status: 'aguardando_pagamento', checkoutUrl: 'https://checkout.infinitepay.com.br/teste' },
       });
@@ -114,7 +114,7 @@ async function fillCustomer(page: Page) {
   await page.getByTestId('checkout-to-delivery').click();
 }
 
-test('mantém filtros e catálogo legíveis', async ({ page }) => {
+test('mantém filtros e catálogo legíveis', async ({ page }, testInfo) => {
   await mockApi(page);
   await openStore(page);
   await expect(page.getByTestId('filter-ready-delivery')).toContainText(/Pronta(?: entrega)?/);
@@ -141,27 +141,30 @@ test('mantém filtros e catálogo legíveis', async ({ page }) => {
     expect(box?.x || 0).toBeGreaterThanOrEqual(0);
     expect((box?.x || 0) + (box?.width || 0)).toBeLessThanOrEqual(viewport?.width || 0);
   }
-  if ((viewport?.width || 0) < 900) {
-    const detailsBox = await page.getByTestId('details-ready').boundingBox();
-    const contactBox = await page.getByTestId('contact-fab').boundingBox();
-    expect(detailsBox).not.toBeNull();
-    expect(contactBox).not.toBeNull();
-    expect((detailsBox?.x || 0) + (detailsBox?.width || 0)).toBeLessThanOrEqual(contactBox?.x || 0);
-  }
+  await expect(page.getByTestId('contact-fab')).toContainText('Ajuda');
+  await expect(page.getByTestId('launch-intro')).toBeHidden();
+  await expect(page.locator('#brand-preloader')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('vitrine.png') });
+  await page.getByTestId('details-ready').scrollIntoViewIfNeeded();
+  await page.getByTestId('details-ready').click();
+  await expect(page.getByText('ESCOLHA O TAMANHO')).toBeVisible();
 });
 
-test('adapta os filtros sem vazamento em telefones estreitos', async ({ page }) => {
+test('adapta os filtros sem vazamento em telefones estreitos', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 320, height: 700 });
   await mockApi(page);
   await openStore(page);
   await expect(page.getByTestId('filter-ready-delivery')).toContainText('Pronta');
-  await expect(page.getByTestId('filter-made-to-order')).toContainText('Encomenda');
+  await expect(page.getByTestId('filter-made-to-order')).toContainText('Sob encomenda');
   for (const testId of ['filter-ready-delivery', 'filter-made-to-order', 'filter-favorites', 'filter-open']) {
     const box = await page.getByTestId(testId).boundingBox();
     expect(box).not.toBeNull();
     expect(box?.x || 0).toBeGreaterThanOrEqual(0);
     expect((box?.x || 0) + (box?.width || 0)).toBeLessThanOrEqual(320);
   }
+  await expect(page.getByTestId('launch-intro')).toBeHidden();
+  await expect(page.locator('#brand-preloader')).toHaveCount(0);
+  await page.screenshot({ path: testInfo.outputPath('vitrine-320.png') });
 });
 
 test('mostra uma alternativa elegante quando a foto externa falha', async ({ page }) => {
@@ -176,7 +179,7 @@ test('explica com clareza os prazos de pronta entrega e sob encomenda', async ({
   await page.getByTestId('contact-fab').click();
   await page.getByTestId('contact-faq').click();
   await page.getByTestId('faq-item-1').click();
-  await expect(page.getByTestId('faq-sheet')).toContainText('Pronta entrega são preparados para postagem em até 3 dias úteis');
+  await expect(page.getByTestId('faq-sheet')).toContainText('Pronta entrega estão disponíveis em estoque');
   await expect(page.getByTestId('faq-sheet')).toContainText('Sob encomenda podem levar até 14 dias');
   await expect(page.getByTestId('faq-sheet')).toContainText('acrescente o prazo da transportadora exibido no checkout');
 });
@@ -244,6 +247,21 @@ test('exige aceite do prazo para produto sob encomenda', async ({ page }) => {
   await expect(page.getByTestId('checkout-submit')).toBeDisabled();
   await page.getByTestId('accept-made-to-order-deadline').click();
   await expect(page.getByTestId('checkout-submit')).toBeEnabled();
+});
+
+test('pedido confirmado não oferece cobrança mesmo com gateway desatualizado', async ({ page }) => {
+  await mockApi(page, { confirmedOrder: true });
+  await openStore(page);
+  await page.getByTestId('buy-ready-50').click();
+  await fillCustomer(page);
+  await page.getByTestId('delivery-method-retirada').click();
+  await page.getByTestId('checkout-to-payment').click();
+  await page.getByTestId('accept-privacy-notice').click();
+  await page.getByTestId('checkout-submit').click();
+  await expect(page.getByTestId('order-success-sheet')).toContainText('Pagamento confirmado!');
+  await expect(page.getByTestId('continue-infinitepay')).toHaveCount(0);
+  await expect(page.getByTestId('copy-pix-code')).toHaveCount(0);
+  await expect(page).not.toHaveURL(/checkout\.infinitepay/);
 });
 
 test('aplica cupom somente nos perfumes e envia o código no checkout', async ({ page }) => {
