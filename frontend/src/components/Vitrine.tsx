@@ -200,7 +200,10 @@ function VitrineCard({
               source={{ uri: item.imagemUrl }}
               style={styles.productImage}
               contentFit="contain"
-              transition={180}
+              contentPosition="center"
+              cachePolicy="memory-disk"
+              recyclingKey={item.imagemUrl || item.id}
+              transition={140}
               accessible={false}
               accessibilityLabel=""
               onError={() => setImageFailed(true)}
@@ -283,6 +286,7 @@ function VitrineCard({
       <Pressable
         onPress={onDetails}
         style={styles.detailsButton}
+        testID={`details-${item.id}`}
         accessibilityRole="button"
         accessibilityLabel={`Conhecer a fragrância ${item.nome}`}
       >
@@ -1061,7 +1065,7 @@ export function Vitrine({
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && styles.quickFilterTextActive,
-                      ]} numberOfLines={1}>{narrowViewport ? 'Pronta' : 'Pronta entrega'}</Text>
+                      ]} numberOfLines={1}>{ultraNarrowViewport ? 'Pronta' : 'Pronta entrega'}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1103,7 +1107,7 @@ export function Vitrine({
                           && familiaAtiva === 'Todas'
                           && ocasiaoAtiva === 'Todas'
                           && styles.quickFilterTextActive,
-                      ]} numberOfLines={1}>{narrowViewport ? 'Encomenda' : 'Sob encomenda'}</Text>
+                      ]} numberOfLines={1}>{ultraNarrowViewport ? 'Encomenda' : 'Sob encomenda'}</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => {
@@ -1190,6 +1194,7 @@ export function Vitrine({
       <Pressable
         onPress={() => setContactOpen(true)}
         style={[styles.fabSuggestion, { bottom: 82 + Math.max(insets.bottom, 12) }]}
+        hitSlop={6}
         testID="contact-fab"
         accessibilityRole="button"
         accessibilityLabel="Abrir atendimento"
@@ -1886,10 +1891,10 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     padding: SPACING.md,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 4,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   cardFavorite: { position: 'absolute', right: 4, top: 3, zIndex: 4, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   cardFavoriteVisual: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
@@ -1920,12 +1925,12 @@ const styles = StyleSheet.create({
   notesEmpty: { borderTopWidth: 1, borderTopColor: PRODUCT_CARD_COLORS.border, marginTop: SPACING.md, paddingTop: 10 },
   notesEmptyText: { ...TYPOGRAPHY.bodySmall, color: PRODUCT_CARD_COLORS.muted, fontStyle: 'italic' },
   cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
-  cardActionsFabSafe: { paddingRight: 48 },
+  cardActionsFabSafe: { paddingRight: 72 },
   reviewButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 },
   reviewText: { ...TYPOGRAPHY.caption, color: COLORS.goldText },
   detailsButton: { minHeight: 44, flexShrink: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingHorizontal: 4 },
   detailsText: { ...TYPOGRAPHY.caption, flexShrink: 1, color: COLORS.goldText, fontWeight: '600' },
-  fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
+  fabSuggestion: { position: 'absolute', right: 12, bottom: 92, width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.28, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   bottomNavShell: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' },
   bottomNav: { width: '100%', flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
   bottomNavDesktop: { maxWidth: 820, marginBottom: 12, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.lg, shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },

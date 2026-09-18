@@ -129,6 +129,39 @@ test('mantém filtros e catálogo legíveis', async ({ page }) => {
     page.getByTestId('filter-open').innerText(),
   ]);
   expect(filterLabels.every((label) => !label.includes('…'))).toBe(true);
+  const viewport = page.viewportSize();
+  if ((viewport?.width || 0) >= 360) {
+    expect(filterLabels.map((label) => label.split('\n').at(-1)?.trim())).toEqual([
+      'Pronta entrega', 'Sob encomenda', 'Favoritos', 'Filtros',
+    ]);
+  }
+  for (const testId of ['filter-ready-delivery', 'filter-made-to-order', 'filter-favorites', 'filter-open']) {
+    const box = await page.getByTestId(testId).boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.x || 0).toBeGreaterThanOrEqual(0);
+    expect((box?.x || 0) + (box?.width || 0)).toBeLessThanOrEqual(viewport?.width || 0);
+  }
+  if ((viewport?.width || 0) < 900) {
+    const detailsBox = await page.getByTestId('details-ready').boundingBox();
+    const contactBox = await page.getByTestId('contact-fab').boundingBox();
+    expect(detailsBox).not.toBeNull();
+    expect(contactBox).not.toBeNull();
+    expect((detailsBox?.x || 0) + (detailsBox?.width || 0)).toBeLessThanOrEqual(contactBox?.x || 0);
+  }
+});
+
+test('adapta os filtros sem vazamento em telefones estreitos', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await mockApi(page);
+  await openStore(page);
+  await expect(page.getByTestId('filter-ready-delivery')).toContainText('Pronta');
+  await expect(page.getByTestId('filter-made-to-order')).toContainText('Encomenda');
+  for (const testId of ['filter-ready-delivery', 'filter-made-to-order', 'filter-favorites', 'filter-open']) {
+    const box = await page.getByTestId(testId).boundingBox();
+    expect(box).not.toBeNull();
+    expect(box?.x || 0).toBeGreaterThanOrEqual(0);
+    expect((box?.x || 0) + (box?.width || 0)).toBeLessThanOrEqual(320);
+  }
 });
 
 test('mostra uma alternativa elegante quando a foto externa falha', async ({ page }) => {
