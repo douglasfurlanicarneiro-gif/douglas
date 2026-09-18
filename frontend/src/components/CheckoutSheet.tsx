@@ -481,14 +481,14 @@ export function CheckoutSheet({
       >
         <Feather name={active ? 'check-circle' : 'circle'} size={18} color={active ? COLORS.gold : COLORS.muted} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '600' }}>
+          <Text style={{ ...TYPOGRAPHY.bodySmall, color: COLORS.bone, fontWeight: '600' }}>
             {displayName}
           </Text>
-          <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 }}>
+          <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.muted, marginTop: 2 }}>
             Prazo estimado: {opcao.prazoDias} {opcao.prazoDias === 1 ? 'dia útil' : 'dias úteis'}
           </Text>
         </View>
-        <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.body, fontWeight: '600' }}>{brl(opcao.preco)}</Text>
+        <Text style={{ ...TYPOGRAPHY.body, color: COLORS.gold, fontWeight: '600' }}>{brl(opcao.preco)}</Text>
       </Pressable>
     );
   };
@@ -553,8 +553,8 @@ export function CheckoutSheet({
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '500' }}>{item.perfume.nome}</Text>
-                    <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.label }}>{item.option.ml}ml · {brl(item.option.preco)}</Text>
+                    <Text style={{ ...TYPOGRAPHY.body, color: COLORS.bone, fontWeight: '500' }}>{item.perfume.nome}</Text>
+                    <Text style={{ ...TYPOGRAPHY.label, color: COLORS.muted }}>{item.option.ml}ml · {brl(item.option.preco)}</Text>
                   </View>
                   <Pressable
                     onPress={() => onChangeQuantity(index, item.quantidade - 1)}
@@ -587,10 +587,10 @@ export function CheckoutSheet({
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginVertical: SPACING.md }}>
               <Text style={{ color: COLORS.muted }}>Produtos</Text>
-              <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.subtitle }}>{brl(subtotal)}</Text>
+              <Text style={{ ...TYPOGRAPHY.subtitle, color: COLORS.bone }}>{brl(subtotal)}</Text>
             </View>
 
-            <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>
+            <Text style={{ ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 1, marginBottom: SPACING.md }}>
               DADOS DO CLIENTE
             </Text>
             <Field label="Nome completo"><TInput accessibilityLabel="Nome completo" testID="checkout-name" autoComplete="name" value={form.nomeCompleto} onChangeText={(nomeCompleto) => setForm({ ...form, nomeCompleto })} /></Field>
@@ -605,7 +605,7 @@ export function CheckoutSheet({
                 onChangeText={(email) => setForm({ ...form, email })}
               />
               {!!form.email && !emailValido && (
-                <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 5 }}>
+                <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.rust, marginTop: 5 }}>
                   Informe um e-mail válido, como nome@exemplo.com.
                 </Text>
               )}
@@ -638,7 +638,7 @@ export function CheckoutSheet({
 
         {step === 'entrega' && (
           <View>
-            <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>
+            <Text style={{ ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 1, marginBottom: SPACING.md }}>
               COMO VOCÊ QUER RECEBER?
             </Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: SPACING.lg }}>
@@ -665,8 +665,8 @@ export function CheckoutSheet({
                     }}
                   >
                     <Feather name={method.icon} size={18} color={active ? COLORS.gold : COLORS.muted} />
-                    <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.bodySmall, fontWeight: '600', marginTop: 8 }}>{method.title}</Text>
-                    <Text style={{ color: active ? COLORS.gold : COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 }}>{method.meta}</Text>
+                    <Text style={{ ...TYPOGRAPHY.bodySmall, color: COLORS.bone, fontWeight: '600', marginTop: 8 }}>{method.title}</Text>
+                    <Text style={{ ...TYPOGRAPHY.caption, color: active ? COLORS.gold : COLORS.muted, marginTop: 2 }}>{method.meta}</Text>
                   </Pressable>
                 );
               })}
@@ -688,17 +688,17 @@ export function CheckoutSheet({
                   <Feather name="check" size={19} color={COLORS.ink} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.body, fontWeight: '600' }}>Retirada Combinada · Grátis</Text>
-                  <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 }}>Combine o local e o horário pelo WhatsApp.</Text>
+                  <Text style={{ ...TYPOGRAPHY.body, color: COLORS.bone, fontWeight: '600' }}>Retirada Combinada · Grátis</Text>
+                  <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.muted, marginTop: 3 }}>Combine o local e o horário pelo WhatsApp.</Text>
                 </View>
               </View>
             ) : (
               <View>
-                <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, letterSpacing: 1, marginBottom: SPACING.md }}>ENDEREÇO</Text>
+                <Text style={{ ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 1, marginBottom: SPACING.md }}>ENDEREÇO</Text>
                 <Field label="CEP">
                   <TInput accessibilityLabel="CEP" testID="checkout-cep" keyboardType="numeric" autoComplete="postal-code" maxLength={9} value={form.endereco.cep} onChangeText={handleCep} />
-                  {cepLoading && <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.caption, marginTop: 5 }}>Buscando endereço…</Text>}
-                  {!!cepError && <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.caption, marginTop: 5 }}>{cepError}</Text>}
+                  {cepLoading && <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.gold, marginTop: 5 }}>Buscando endereço…</Text>}
+                  {!!cepError && <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.rust, marginTop: 5 }}>{cepError}</Text>}
                 </Field>
                 <Field label="Endereço"><TInput accessibilityLabel="Endereço" testID="checkout-street" autoComplete="street-address" value={form.endereco.endereco} onChangeText={(value) => setAddress('endereco', value)} /></Field>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -733,12 +733,12 @@ export function CheckoutSheet({
                     }}
                   >
                     <Feather name="refresh-cw" size={14} color={COLORS.gold} />
-                    <Text style={{ color: COLORS.gold, fontSize: FONT_SIZES.label, fontWeight: '600' }}>Atualizar valores do frete</Text>
+                    <Text style={{ ...TYPOGRAPHY.label, color: COLORS.gold }}>Atualizar valores do frete</Text>
                   </Pressable>
                 )}
                 {!!freteError && (
                   <View style={{ padding: SPACING.md, borderRadius: 12, borderWidth: 1, borderColor: COLORS.rust, backgroundColor: COLORS.surface, marginBottom: SPACING.sm }}>
-                    <Text style={{ color: COLORS.rust, fontSize: FONT_SIZES.label }}>{freteError}</Text>
+                    <Text style={{ ...TYPOGRAPHY.label, color: COLORS.rust }}>{freteError}</Text>
                   </View>
                 )}
               </View>
@@ -962,7 +962,7 @@ export function CheckoutSheet({
                     size={19}
                     color={prazoEncomendaAceito ? COLORS.gold : COLORS.muted}
                   />
-                  <Text style={{ color: COLORS.bone, flex: 1, fontSize: FONT_SIZES.label, lineHeight: 18 }}>
+                  <Text style={{ ...TYPOGRAPHY.label, color: COLORS.bone, flex: 1, lineHeight: 18 }}>
                     Li e estou de acordo com esse prazo.
                   </Text>
                 </Pressable>

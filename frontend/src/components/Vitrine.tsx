@@ -1579,7 +1579,7 @@ export function Vitrine({
       {/* Sugestão sheet */}
       <BottomSheet visible={sugestaoOpen} onClose={() => setSugestaoOpen(false)} title="Enviar sugestão" testID="sugestao-sheet">
         <View>
-          <Text style={{ color: COLORS.muted, fontSize: FONT_SIZES.bodySmall, marginBottom: SPACING.md }}>Que fragrância você gostaria de ver na nossa vitrine? Escreva aqui.</Text>
+          <Text style={{ ...TYPOGRAPHY.bodySmall, color: COLORS.muted, marginBottom: SPACING.md }}>Que fragrância você gostaria de ver na nossa vitrine? Escreva aqui.</Text>
           <Field label="Seu nome (opcional)"><TInput value={sugForm.cliente} onChangeText={(v) => setSugForm({ ...sugForm, cliente: v })} testID="sug-cliente" /></Field>
           <Field label="Contato (opcional)"><TInput value={sugForm.contato} onChangeText={(v) => setSugForm({ ...sugForm, contato: v })} /></Field>
           <Field label="Sugestão"><TInput value={sugForm.mensagem} onChangeText={(v) => setSugForm({ ...sugForm, mensagem: v })} placeholder="Ex: gostaria de um contratipo do..." multiline style={{ minHeight: 100, textAlignVertical: 'top' }} testID="sug-mensagem" /></Field>
@@ -1697,7 +1697,7 @@ export function Vitrine({
               accessibilityLabel="Pagar na InfinitePay"
             >
               <Feather name="external-link" size={16} color={COLORS.ink} />
-              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.copyPixText}>Pagar na InfinitePay</Text>
+              <Text style={styles.copyPixText}>Pagar na InfinitePay</Text>
             </Pressable>
           )}
           {!!successTrackingCode && !pagamentoAutomaticoPendente && !pagamentoConfirmado && (
@@ -1791,7 +1791,7 @@ export function Vitrine({
         {reviewItem && (
           <View>
             <View style={{ padding: SPACING.md, borderRadius: 12, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border, marginBottom: SPACING.md }}>
-              <Text style={{ color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '600', textAlign: 'center' }}>{reviewItem.nome}</Text>
+              <Text style={{ ...TYPOGRAPHY.subtitle, color: COLORS.bone, textAlign: 'center' }}>{reviewItem.nome}</Text>
             </View>
             <Field label="Seu nome (opcional)"><TInput value={reviewForm.cliente} onChangeText={(v) => setReviewForm({ ...reviewForm, cliente: v })} testID="review-cliente" /></Field>
             <Field label="Nota"><Stars value={reviewForm.nota} onChange={(n) => setReviewForm({ ...reviewForm, nota: n })} size={26} /></Field>
@@ -1810,7 +1810,7 @@ export function Vitrine({
 const styles = StyleSheet.create({
   screen: { flex: 1, overflow: 'hidden', backgroundColor: STOREFRONT_COLORS.background },
   pullRefreshIndicator: { position: 'absolute', zIndex: 20, top: 6, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, minHeight: 34, borderRadius: RADIUS.pill, backgroundColor: STOREFRONT_COLORS.surface, borderWidth: 1, borderColor: STOREFRONT_COLORS.border },
-  pullRefreshText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption },
+  pullRefreshText: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted },
   catalogContent: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: SPACING.lg, paddingBottom: 160 },
   catalogContentWide: { maxWidth: 1840, paddingHorizontal: 32 },
   catalogColumns: { gap: SPACING.lg },
@@ -1844,37 +1844,37 @@ const styles = StyleSheet.create({
   quickFilterCompact: { flex: 0.7 },
   quickFilterButtonActive: { backgroundColor: COLORS.gold, borderColor: COLORS.gold },
   quickFilterText: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, fontWeight: '500' },
-  quickFilterTextNarrow: { fontSize: FONT_SIZES.compact, lineHeight: 14 },
+  quickFilterTextNarrow: { ...TYPOGRAPHY.caption, lineHeight: 14 },
   quickFilterTextActive: { color: COLORS.ink },
   storefrontEmpty: { alignItems: 'center', padding: SPACING.xl, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, backgroundColor: STOREFRONT_COLORS.surface },
-  storefrontEmptyTitle: { color: STOREFRONT_COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
-  storefrontEmptyText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 5, textAlign: 'center' },
+  storefrontEmptyTitle: { ...TYPOGRAPHY.body, color: STOREFRONT_COLORS.ink, fontWeight: '700' },
+  storefrontEmptyText: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, marginTop: 5, textAlign: 'center' },
   filterBadge: { minWidth: 17, height: 17, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.ink, alignItems: 'center', justifyContent: 'center' },
-  filterBadgeText: { color: COLORS.gold, fontSize: FONT_SIZES.caption, fontWeight: '700' },
-  filterSheetLabel: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.2, marginBottom: 9 },
+  filterBadgeText: { ...TYPOGRAPHY.caption, color: COLORS.gold, fontWeight: '700' },
+  filterSheetLabel: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.2, marginBottom: 9 },
   filterSheetChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SPACING.lg },
   filterSheetActions: { flexDirection: 'row', gap: 8, marginTop: SPACING.sm },
-  contactIntro: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.md },
+  contactIntro: { ...TYPOGRAPHY.bodySmall, color: COLORS.muted, marginBottom: SPACING.md },
   privacyNoticeCard: { padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.gold, borderRadius: RADIUS.md, backgroundColor: COLORS.surfaceRaised },
   privacyNoticeHeader: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginBottom: SPACING.sm },
   privacyNoticeTitle: { ...TYPOGRAPHY.subtitle, flex: 1, color: COLORS.bone },
   privacyNoticeText: { ...TYPOGRAPHY.bodySmall, color: COLORS.muted, marginBottom: SPACING.sm },
-  formSectionLabel: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, fontWeight: '600', letterSpacing: 1.2, marginBottom: SPACING.sm },
+  formSectionLabel: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.2, marginBottom: SPACING.sm },
   privacyConfirmation: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, padding: SPACING.md, marginBottom: SPACING.md, borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, backgroundColor: COLORS.surface },
-  privacyConfirmationText: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18 },
+  privacyConfirmationText: { ...TYPOGRAPHY.bodySmall, flex: 1, color: COLORS.bone },
   contactAction: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 11, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   contactActionIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
-  contactActionTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
-  contactActionSubtitle: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 13, marginTop: 2 },
-  faqIntro: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.md },
+  contactActionTitle: { ...TYPOGRAPHY.label, color: COLORS.bone, fontWeight: '700' },
+  contactActionSubtitle: { ...TYPOGRAPHY.caption, color: COLORS.muted, marginTop: 2 },
+  faqIntro: { ...TYPOGRAPHY.bodySmall, color: COLORS.muted, marginBottom: SPACING.md },
   faqItem: { padding: 13, marginBottom: 8, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   faqItemExpanded: { borderColor: COLORS.gold + '99', backgroundColor: COLORS.surface },
   faqQuestionRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   faqQuestionIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.surfaceRaised },
-  faqQuestion: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
-  faqAnswer: { color: COLORS.muted, fontSize: FONT_SIZES.caption, lineHeight: 17, marginTop: 10, marginLeft: 42, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
+  faqQuestion: { ...TYPOGRAPHY.label, flex: 1, color: COLORS.bone, fontWeight: '700' },
+  faqAnswer: { ...TYPOGRAPHY.caption, color: COLORS.muted, lineHeight: 17, marginTop: 10, marginLeft: 42, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border },
   faqWhatsapp: { marginTop: SPACING.sm },
-  contactFallbackText: { color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18, marginBottom: SPACING.lg },
+  contactFallbackText: { ...TYPOGRAPHY.bodySmall, color: COLORS.bone, marginBottom: SPACING.lg },
   contactFallbackActions: { flexDirection: 'row', gap: 8 },
   card: {
     backgroundColor: PRODUCT_CARD_COLORS.background,
@@ -1895,7 +1895,7 @@ const styles = StyleSheet.create({
   imageFrame: { width: 108, height: 116, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PRODUCT_CARD_COLORS.imageBackground, borderWidth: 1, borderColor: PRODUCT_CARD_COLORS.border },
   productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  imagePlaceholderText: { color: PRODUCT_CARD_COLORS.muted, fontSize: FONT_SIZES.caption },
+  imagePlaceholderText: { ...TYPOGRAPHY.caption, color: PRODUCT_CARD_COLORS.muted },
   productInfo: { flex: 1, minWidth: 0, paddingTop: 2 },
   inspiredLabel: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.1, marginBottom: 2 },
   cardTitle: { ...TYPOGRAPHY.subtitle, color: PRODUCT_CARD_COLORS.ink, fontWeight: '700' },
@@ -1920,49 +1920,49 @@ const styles = StyleSheet.create({
   cardActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 },
   cardActionsFabSafe: { paddingRight: 48 },
   reviewButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 4 },
-  reviewText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption },
+  reviewText: { ...TYPOGRAPHY.caption, color: COLORS.goldText },
   detailsButton: { minHeight: 44, flexShrink: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 5, paddingHorizontal: 4 },
-  detailsText: { flexShrink: 1, color: COLORS.goldText, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  detailsText: { ...TYPOGRAPHY.caption, flexShrink: 1, color: COLORS.goldText, fontWeight: '600' },
   fabSuggestion: { position: 'absolute', right: 20, bottom: 92, width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   bottomNavShell: { position: 'absolute', bottom: 0, left: 0, right: 0, alignItems: 'center' },
   bottomNav: { width: '100%', flexDirection: 'row', paddingTop: 10, paddingBottom: 18, backgroundColor: STOREFRONT_COLORS.surface, borderTopWidth: 1, borderTopColor: STOREFRONT_COLORS.border },
   bottomNavDesktop: { maxWidth: 820, marginBottom: 12, borderWidth: 1, borderColor: STOREFRONT_COLORS.border, borderRadius: RADIUS.lg, shadowColor: '#000', shadowOpacity: 0.16, shadowRadius: 10, shadowOffset: { width: 0, height: 4 } },
   navItem: { flex: 1, minHeight: 47, alignItems: 'center', justifyContent: 'center' },
-  navTextActive: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, marginTop: 3 },
-  navText: { color: STOREFRONT_COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 3 },
+  navTextActive: { ...TYPOGRAPHY.caption, color: COLORS.goldText, marginTop: 3 },
+  navText: { ...TYPOGRAPHY.caption, color: STOREFRONT_COLORS.muted, marginTop: 3 },
   cartBadge: { position: 'absolute', top: -7, right: -10, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center' },
-  cartBadgeText: { color: COLORS.ink, fontSize: FONT_SIZES.caption, fontWeight: '700' },
+  cartBadgeText: { ...TYPOGRAPHY.caption, color: COLORS.ink, fontWeight: '700' },
   successSheetBody: { paddingTop: SPACING.md, paddingBottom: SPACING.xl },
   successContent: { alignItems: 'center', paddingTop: 0 },
   successIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.md },
-  successEyebrow: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.6, textAlign: 'center' },
-  successTitle: { color: COLORS.bone, fontSize: FONT_SIZES.title, lineHeight: 25, fontWeight: '700', textAlign: 'center', marginTop: 5 },
-  successOrderNumber: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.2, marginTop: 7 },
-  successText: { width: '100%', color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 18, textAlign: 'center', marginTop: 7, marginBottom: SPACING.md },
+  successEyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.6, textAlign: 'center' },
+  successTitle: { ...TYPOGRAPHY.title, color: COLORS.bone, textAlign: 'center', marginTop: 5 },
+  successOrderNumber: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.2, marginTop: 7 },
+  successText: { ...TYPOGRAPHY.bodySmall, width: '100%', color: COLORS.muted, textAlign: 'center', marginTop: 7, marginBottom: SPACING.md },
   successNextStep: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, marginBottom: SPACING.lg },
   pixCard: { width: '100%', padding: SPACING.lg, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: COLORS.gold + '66', backgroundColor: COLORS.surface, marginBottom: SPACING.md },
   pixHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
-  pixEyebrow: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.2 },
-  pixValue: { color: COLORS.bone, fontSize: FONT_SIZES.titleLarge, fontWeight: '700', marginTop: 2 },
+  pixEyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.2 },
+  pixValue: { ...TYPOGRAPHY.titleLarge, color: COLORS.bone, marginTop: 2 },
   pixPendingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: COLORS.gold + '66', borderRadius: RADIUS.pill, paddingHorizontal: 9, paddingVertical: 5 },
   pixPendingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.gold },
-  pixPendingText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption },
+  pixPendingText: { ...TYPOGRAPHY.caption, color: COLORS.goldText },
   qrFrame: { alignSelf: 'center', backgroundColor: COLORS.white, padding: 12, borderRadius: RADIUS.md, marginBottom: SPACING.md },
-  pixHint: { color: COLORS.muted, fontSize: FONT_SIZES.label, lineHeight: 17, textAlign: 'center', marginBottom: SPACING.md },
+  pixHint: { ...TYPOGRAPHY.bodySmall, color: COLORS.muted, textAlign: 'center', marginBottom: SPACING.md },
   copyPixButton: { minHeight: 46, borderRadius: RADIUS.md, backgroundColor: COLORS.gold, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   paymentContinueButton: { width: '100%', minHeight: 50, paddingHorizontal: SPACING.md, marginBottom: SPACING.sm },
-  copyPixText: { color: COLORS.ink, fontSize: FONT_SIZES.body, fontWeight: '700' },
-  manualConfirmation: { color: COLORS.muted, fontSize: FONT_SIZES.caption, textAlign: 'center', marginTop: 10 },
-  successNextText: { flex: 1, color: COLORS.bone, fontSize: FONT_SIZES.label, lineHeight: 18 },
+  copyPixText: { ...TYPOGRAPHY.button, color: COLORS.ink },
+  manualConfirmation: { ...TYPOGRAPHY.caption, color: COLORS.muted, textAlign: 'center', marginTop: 10 },
+  successNextText: { ...TYPOGRAPHY.bodySmall, flex: 1, color: COLORS.bone },
   trackingAccess: { width: '100%', marginBottom: SPACING.lg },
   trackingAccessButton: { width: '100%', minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SPACING.md, paddingVertical: 10, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
   trackingKeyIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: COLORS.gold + '70', backgroundColor: COLORS.surface },
   trackingAccessCopy: { flex: 1 },
-  trackingAccessTitle: { color: COLORS.bone, fontSize: FONT_SIZES.label, fontWeight: '700' },
-  trackingAccessHint: { color: COLORS.muted, fontSize: FONT_SIZES.caption, marginTop: 2 },
+  trackingAccessTitle: { ...TYPOGRAPHY.label, color: COLORS.bone, fontWeight: '700' },
+  trackingAccessHint: { ...TYPOGRAPHY.caption, color: COLORS.muted, marginTop: 2 },
   trackingCodeCard: { width: '100%', alignItems: 'center', padding: SPACING.md, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '55', backgroundColor: COLORS.gold + '0C', marginTop: 8 },
-  trackingCodeLabel: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, letterSpacing: 1.1, textAlign: 'center' },
-  trackingCode: { color: COLORS.bone, fontSize: FONT_SIZES.subtitle, fontWeight: '700', letterSpacing: 1.2, marginTop: 8 },
+  trackingCodeLabel: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.1, textAlign: 'center' },
+  trackingCode: { ...TYPOGRAPHY.subtitle, color: COLORS.bone, fontWeight: '700', letterSpacing: 1.2, marginTop: 8 },
   shareCodeButton: { flexDirection: 'row', alignItems: 'center', gap: 7, minHeight: 36, paddingHorizontal: 12, marginTop: 7 },
-  shareCodeText: { color: COLORS.goldText, fontSize: FONT_SIZES.caption, fontWeight: '600' },
+  shareCodeText: { ...TYPOGRAPHY.caption, color: COLORS.goldText, fontWeight: '600' },
 });

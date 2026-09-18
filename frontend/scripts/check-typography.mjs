@@ -48,6 +48,9 @@ for (const file of files) {
   if (/\bArial\b/i.test(code)) {
     violations.push(`${displayPath}: fallback Arial não permitido.`);
   }
+  if (/adjustsFontSizeToFit/.test(code)) {
+    violations.push(`${displayPath}: não reduza a fonte para caber; adapte o layout ou permita quebra de linha.`);
+  }
 }
 
 if (violations.length) {

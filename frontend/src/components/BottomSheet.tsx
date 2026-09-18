@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Modal, Pressable, ScrollView, KeyboardAvoidingView, Platform, useWindowDimensions, type StyleProp, type ViewStyle } from 'react-native';
 import Feather from '@expo/vector-icons/Feather';
-import { COLORS, SPACING, TYPOGRAPHY, FONT_SIZES } from '../theme';
+import { COLORS, SPACING, TYPOGRAPHY } from '../theme';
 import { AppText as Text } from './Typography';
 import { useReducedMotion } from '../hooks/use-reduced-motion';
 
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   sheetCompactDesktop: { width: '92%', maxWidth: 680, maxHeight: '78%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   headerLight: { borderBottomColor: COLORS.border },
-  title: { ...TYPOGRAPHY.subtitle, color: COLORS.bone, fontSize: FONT_SIZES.heading, lineHeight: 24, flex: 1 },
+  title: { ...TYPOGRAPHY.heading, color: COLORS.bone, flex: 1 },
   titleLight: { color: COLORS.bone },
   body: { flex: 1, minHeight: 0 },
   bodyCompact: { flex: 0 },
