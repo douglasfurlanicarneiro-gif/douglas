@@ -600,8 +600,8 @@ export function CheckoutSheet({
             <Text style={{ ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 1, marginBottom: SPACING.md }}>
               DADOS DO CLIENTE
             </Text>
-            <Field label="Nome completo"><TInput accessibilityLabel="Nome completo" testID="checkout-name" autoComplete="name" value={form.nomeCompleto} onChangeText={(nomeCompleto) => setForm({ ...form, nomeCompleto })} /></Field>
-            <Field label="Celular / WhatsApp"><TInput accessibilityLabel="Celular / WhatsApp" testID="checkout-whatsapp" keyboardType="phone-pad" autoComplete="tel" value={form.whatsapp} onChangeText={(whatsapp) => setForm({ ...form, whatsapp })} /></Field>
+            <Field label="Nome completo"><TInput accessibilityLabel="Nome completo" testID="checkout-name" autoComplete="name" value={form.nomeCompleto} onChangeText={(nomeCompleto) => setForm((current) => ({ ...current, nomeCompleto }))} /></Field>
+            <Field label="Celular / WhatsApp"><TInput accessibilityLabel="Celular / WhatsApp" testID="checkout-whatsapp" keyboardType="phone-pad" autoComplete="tel" value={form.whatsapp} onChangeText={(whatsapp) => setForm((current) => ({ ...current, whatsapp }))} /></Field>
             <Field label="E-mail">
               <TInput
                 accessibilityLabel="E-mail"
@@ -609,7 +609,7 @@ export function CheckoutSheet({
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={form.email}
-                onChangeText={(email) => setForm({ ...form, email })}
+                onChangeText={(email) => setForm((current) => ({ ...current, email }))}
               />
               {!!form.email && !emailValido && (
                 <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.rust, marginTop: 5 }}>
@@ -817,7 +817,7 @@ export function CheckoutSheet({
                 placeholder="Escreva aqui..."
                 style={[styles.orderNotes, isWide && styles.orderNotesWide]}
                 value={form.observacoes}
-                onChangeText={(observacoes) => setForm({ ...form, observacoes })}
+                onChangeText={(observacoes) => setForm((current) => ({ ...current, observacoes }))}
               />
               </View>}
             </View>

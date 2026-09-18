@@ -50,7 +50,10 @@ export function BottomSheet({
       scrollRef.current?.scrollTo({ y: 0, animated: false });
       if (Platform.OS === 'web' && openSheets.at(-1) === sheetId) {
         const target = closeRef.current as unknown as HTMLElement | null;
-        target?.focus?.();
+        const sheet = sheetRef.current as unknown as HTMLElement | null;
+        // Do not steal focus if the user already started interacting during opening.
+        const active = document.activeElement;
+        if (!sheet?.contains(active) || active === sheet) target?.focus?.();
       }
     }, 50);
     const handleKeyDown = (event: KeyboardEvent) => {
