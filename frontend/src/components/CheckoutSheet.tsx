@@ -850,6 +850,7 @@ export function CheckoutSheet({
                         setCouponError('');
                       }}
                       placeholder="Digite o código"
+                      accessibilityLabel="Código do cupom de desconto"
                       autoCapitalize="characters"
                       autoCorrect={false}
                       maxLength={24}
@@ -1138,7 +1139,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.sm,
   },
   stepLabelActive: {
-    color: COLORS.gold,
+    color: COLORS.goldText,
   },
   paymentStep: {
     width: '100%',
@@ -1166,12 +1167,12 @@ const styles = StyleSheet.create({
   },
   paymentEyebrow: {
     ...TYPOGRAPHY.eyebrow,
-    color: COLORS.gold,
+    color: COLORS.goldText,
     marginBottom: SPACING.md,
   },
   paymentEyebrowWide: {
     ...TYPOGRAPHY.body,
-    color: COLORS.gold,
+    color: COLORS.goldText,
     fontWeight: '600',
     letterSpacing: 1.2,
   },
@@ -1425,7 +1426,7 @@ const styles = StyleSheet.create({
     color: COLORS.bone,
   },
   paymentSummaryFree: {
-    color: COLORS.sage,
+    color: COLORS.sageText,
   },
   paymentSummaryDivider: {
     height: 1,
@@ -1447,7 +1448,7 @@ const styles = StyleSheet.create({
   },
   paymentSummaryTotal: {
     ...TYPOGRAPHY.title,
-    color: COLORS.gold,
+    color: COLORS.goldText,
   },
   paymentSummaryTotalWide: {
     fontSize: FONT_SIZES.display,
@@ -1488,7 +1489,7 @@ const styles = StyleSheet.create({
   privacyNoticeLinkText: {
     ...TYPOGRAPHY.label,
     flex: 1,
-    color: COLORS.gold,
+    color: COLORS.goldText,
     textDecorationLine: 'underline',
   },
   orderDeadlineNotice: {

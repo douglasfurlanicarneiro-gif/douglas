@@ -182,6 +182,21 @@ test('bloqueia reenvio enquanto o pedido está sendo processado', async ({ page 
   await expect(submit).toBeEnabled();
 });
 
+test('campos de toque legíveis e cupom com nome acessível', async ({ page }, testInfo) => {
+  await mockApi(page);
+  await openStore(page);
+  await page.getByTestId('buy-ready-50').click();
+  if (testInfo.project.name === 'celular') {
+    const size = await page.getByTestId('checkout-name').evaluate((element) => parseFloat(getComputedStyle(element).fontSize));
+    expect(size).toBeGreaterThanOrEqual(16);
+  }
+  await fillCustomer(page);
+  await page.getByTestId('delivery-method-retirada').click();
+  await page.getByTestId('checkout-to-payment').click();
+  await page.getByTestId('checkout-coupon-toggle').click();
+  await expect(page.getByRole('textbox', { name: 'Código do cupom de desconto', exact: true })).toBeVisible();
+});
+
 test('mantém filtros e catálogo legíveis', async ({ page }, testInfo) => {
   await mockApi(page);
   await openStore(page);

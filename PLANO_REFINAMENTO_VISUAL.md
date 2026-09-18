@@ -12,6 +12,8 @@ Cada etapa deve terminar com testes de celular/computador e registro do que foi 
 
 ## Revisão corretiva de 18/09/2026
 
+- Continuação do tópico 5: textos dourados do checkout e valor de retirada gratuita usam as variantes escuras da paleta; cor de erro escurecida; campo de cupom nomeado para tecnologia assistiva; inputs web de toque com 16px para reduzir zoom automático ao focar no iOS. Testes automatizados não substituem teclado virtual/VoiceOver em iPhone físico. A revisão global de contraste continua pendente; esta entrega cobre o checkout.
+
 - Substitui as conclusões anteriores dos tópicos 3 e 4: a promessa antiga de postagem em três dias foi retirada por não ter confirmação operacional; o prazo de 14 dias sob encomenda permanece.
 - Filtros passam a duas linhas em telas estreitas, mantendo os nomes completos. Atendimento passa para Ajuda na navegação inferior e não exige comprimir as ações dos cards. Banner de descoberta cresce quando o texto quebra.
 - Confirmação usa apenas um título de status. Pedido confirmado não exibe cobrança, QR Pix ou redirecionamento automático mesmo com status do provedor desatualizado; ofertas de pagamento exigem pedido pendente.

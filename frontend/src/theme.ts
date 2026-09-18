@@ -15,7 +15,7 @@ export const COLORS = {
   muted: '#5F5549',
   sage: '#8FA07A',
   sageText: '#4E6041',
-  rust: '#C1552F',
+  rust: '#9C3F20',
   topNote: '#C9A227',
   heartNote: '#C06E7E',
   baseNote: '#8A6438',
