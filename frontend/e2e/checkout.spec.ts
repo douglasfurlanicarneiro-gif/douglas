@@ -114,6 +114,74 @@ async function fillCustomer(page: Page) {
   await page.getByTestId('checkout-to-delivery').click();
 }
 
+test('mantém checkout aberto ao fechar privacidade por teclado', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mockApi(page);
+  await openStore(page);
+  await page.getByTestId('buy-ready-50').click();
+  await fillCustomer(page);
+  await page.getByTestId('delivery-method-retirada').click();
+  await page.getByTestId('checkout-to-payment').click();
+  const privacyLink = page.getByTestId('open-privacy-notice');
+  await privacyLink.click();
+  const close = page.getByRole('button', { name: 'Fechar Privacidade e seus dados', exact: true });
+  await expect(close).toBeVisible();
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(close).toHaveCount(0);
+  await expect(privacyLink).toBeVisible();
+  await expect(privacyLink).toBeFocused();
+  await expect(page.getByTestId('checkout-submit')).toBeVisible();
+});
+
+test('anuncia erro de cupom e permite corrigir sem perder os dados', async ({ page }) => {
+  await mockApi(page);
+  await openStore(page);
+  await page.getByTestId('buy-ready-50').click();
+  await fillCustomer(page);
+  await page.getByTestId('delivery-method-retirada').click();
+  await page.getByTestId('checkout-to-payment').click();
+  await page.getByTestId('checkout-coupon-toggle').click();
+  await page.getByTestId('checkout-coupon-input').fill('INVALIDO');
+  await page.getByTestId('checkout-coupon-apply').click();
+  await expect(page.getByRole('alert')).toContainText('Cupom inválido');
+  await page.getByTestId('checkout-coupon-input').fill('BEMVINDO10');
+  await page.getByTestId('checkout-coupon-apply').click();
+  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByTestId('checkout-coupon-section')).toContainText('10% de desconto');
+});
+
+test('bloqueia reenvio enquanto o pedido está sendo processado', async ({ page }) => {
+  await mockApi(page);
+  let requests = 0;
+  let release: () => void = () => {};
+  const pending = new Promise<void>((resolve) => { release = resolve; });
+  await page.route('**/api/compras', async (route) => {
+    requests += 1;
+    await pending;
+    await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'Tente novamente em instantes.' }) });
+  });
+  await openStore(page);
+  await page.getByTestId('buy-ready-50').click();
+  await fillCustomer(page);
+  await page.getByTestId('delivery-method-retirada').click();
+  await page.getByTestId('checkout-to-payment').click();
+  await page.getByTestId('accept-privacy-notice').click();
+  const submit = page.getByTestId('checkout-submit');
+  try {
+    await submit.click();
+    await expect(submit).toBeDisabled();
+    await expect(submit).toHaveAttribute('aria-busy', 'true');
+    await page.keyboard.press('Enter');
+    await expect.poll(() => requests).toBe(1);
+  } finally { release(); }
+  await expect(page.getByRole('alert')).toContainText('Tente novamente');
+  await expect(submit).toBeEnabled();
+});
+
 test('mantém filtros e catálogo legíveis', async ({ page }, testInfo) => {
   await mockApi(page);
   await openStore(page);

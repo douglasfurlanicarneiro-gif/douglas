@@ -3,7 +3,11 @@ import { AccessibilityInfo } from 'react-native';
 
 /** Mantém as animações alinhadas à preferência de acessibilidade do aparelho. */
 export function useReducedMotion() {
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false,
+  );
 
   useEffect(() => {
     let mounted = true;

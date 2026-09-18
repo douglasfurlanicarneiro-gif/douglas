@@ -5,6 +5,9 @@ import { COLORS, SPACING, TYPOGRAPHY } from '../theme';
 import { AppText as Text } from './Typography';
 import { useReducedMotion } from '../hooks/use-reduced-motion';
 
+// Only the topmost sheet handles keyboard navigation (for example privacy over checkout).
+const openSheets: symbol[] = [];
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -34,31 +37,33 @@ export function BottomSheet({
   const sheetRef = useRef<React.ElementRef<typeof Pressable>>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const onCloseRef = useRef(onClose);
+  const sheetId = useRef(Symbol('sheet')).current;
   onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!visible) return;
+    openSheets.push(sheetId);
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       previousFocusRef.current = document.activeElement as HTMLElement | null;
     }
     const timer = setTimeout(() => {
       scrollRef.current?.scrollTo({ y: 0, animated: false });
-      if (Platform.OS === 'web') {
+      if (Platform.OS === 'web' && openSheets.at(-1) === sheetId) {
         const target = closeRef.current as unknown as HTMLElement | null;
         target?.focus?.();
       }
     }, 50);
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onCloseRef.current();
-        return;
-      }
+      if (openSheets.at(-1) !== sheetId) return;
       if (event.key !== 'Tab') return;
       const sheet = sheetRef.current as unknown as HTMLElement | null;
       if (!sheet) return;
       const focusable = Array.from(sheet.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-      )).filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true');
+      )).filter((element) => element.tabIndex >= 0 && !element.hasAttribute('disabled')
+        && element.getAttribute('aria-disabled') !== 'true'
+        && !element.closest('[aria-hidden="true"], [inert]')
+        && element.getClientRects().length > 0);
       if (!focusable.length) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
@@ -74,18 +79,34 @@ export function BottomSheet({
         first.focus();
       }
     };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || openSheets.at(-1) !== sheetId) return;
+      // RN Web also handles Escape on keyup. Consume it once, before that listener.
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      onCloseRef.current();
+    };
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
       document.addEventListener('keydown', handleKeyDown);
+      document.addEventListener('keyup', handleKeyUp, true);
     }
     return () => {
       clearTimeout(timer);
+      const wasTopmost = openSheets.at(-1) === sheetId;
+      const index = openSheets.indexOf(sheetId);
+      if (index !== -1) openSheets.splice(index, 1);
       if (Platform.OS === 'web' && typeof document !== 'undefined') {
         document.removeEventListener('keydown', handleKeyDown);
-        previousFocusRef.current?.focus?.();
+        document.removeEventListener('keyup', handleKeyUp, true);
+        const previousFocus = previousFocusRef.current;
+        const remainingTop = openSheets.at(-1);
+        if (wasTopmost) setTimeout(() => {
+          if (previousFocus?.isConnected && openSheets.at(-1) === remainingTop) previousFocus.focus();
+        }, 0);
         previousFocusRef.current = null;
       }
     };
-  }, [visible]);
+  }, [visible, sheetId]);
 
   return (
     <Modal
@@ -127,6 +148,7 @@ export function BottomSheet({
                 hitSlop={12}
                 testID="bottom-sheet-close"
                 accessibilityRole="button"
+                style={styles.closeButton}
                 accessibilityLabel={`Fechar ${title}`}
                 accessibilityHint="Fecha esta janela e volta para a tela anterior"
               >
@@ -162,6 +184,7 @@ const styles = StyleSheet.create({
   sheetCompactDesktop: { width: '92%', maxWidth: 680, maxHeight: '78%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SPACING.lg, borderBottomWidth: 1, borderBottomColor: COLORS.border },
   headerLight: { borderBottomColor: COLORS.border },
+  closeButton: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   title: { ...TYPOGRAPHY.heading, color: COLORS.bone, flex: 1 },
   titleLight: { color: COLORS.bone },
   body: { flex: 1, minHeight: 0 },

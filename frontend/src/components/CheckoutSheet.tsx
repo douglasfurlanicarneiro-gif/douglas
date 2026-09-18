@@ -106,6 +106,8 @@ export function CheckoutSheet({
   const [couponLoading, setCouponLoading] = useState(false);
   const [couponError, setCouponError] = useState('');
   const checkoutAttemptRef = useRef<CheckoutAttempt | null>(null);
+  const submittingRef = useRef(false);
+  const validatingCouponRef = useRef(false);
   const contemSobEncomenda = useMemo(
     () => items.some((item) => item.perfume.prontaEntrega !== true),
     [items],
@@ -338,11 +340,13 @@ export function CheckoutSheet({
   };
 
   const applyCoupon = async () => {
+    if (validatingCouponRef.current) return;
     const codigo = couponInput.trim().toUpperCase();
     if (!codigo) {
       setCouponError('Digite o código do cupom.');
       return;
     }
+    validatingCouponRef.current = true;
     setCouponLoading(true);
     setCouponError('');
     try {
@@ -353,6 +357,7 @@ export function CheckoutSheet({
       setAppliedCoupon(null);
       setCouponError(cause instanceof ApiError ? cause.message : 'Não foi possível validar o cupom.');
     } finally {
+      validatingCouponRef.current = false;
       setCouponLoading(false);
     }
   };
@@ -364,7 +369,8 @@ export function CheckoutSheet({
   };
 
   const submit = async () => {
-    if (!complete) return;
+    if (!complete || submittingRef.current) return;
+    submittingRef.current = true;
     setLoading(true);
     setError('');
     try {
@@ -443,6 +449,7 @@ export function CheckoutSheet({
       }
       setError(cause instanceof ApiError ? cause.message : 'Não foi possível finalizar o pedido.');
     } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };
@@ -855,6 +862,8 @@ export function CheckoutSheet({
                       disabled={couponLoading || !couponInput.trim()}
                       accessibilityRole="button"
                       accessibilityLabel="Aplicar cupom"
+                      accessibilityState={{ busy: couponLoading, disabled: couponLoading || !couponInput.trim() }}
+                      aria-busy={couponLoading}
                       style={[styles.couponApplyButton, (couponLoading || !couponInput.trim()) && styles.couponApplyDisabled]}
                       testID="checkout-coupon-apply"
                     >
@@ -862,7 +871,7 @@ export function CheckoutSheet({
                     </Pressable>
                   </View>}
                   {!!appliedCoupon && (
-                    <View style={styles.couponSuccess}>
+                    <View style={styles.couponSuccess} accessibilityLiveRegion="polite">
                       <Feather name="check-circle" size={17} color={COLORS.sageText} />
                       <Text style={styles.couponSuccessText}>
                         {appliedCoupon.percentual}% de desconto
@@ -872,7 +881,7 @@ export function CheckoutSheet({
                       </Pressable>
                     </View>
                   )}
-                  {!!couponError && <Text style={styles.couponError}>{couponError}</Text>}
+                  {!!couponError && <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.couponError}>{couponError}</Text>}
                 </View>
               )}
             </View>
@@ -1004,7 +1013,7 @@ export function CheckoutSheet({
               </View>
             </View>
 
-            {!!error && <Text style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
+            {!!error && <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: COLORS.rust, marginBottom: SPACING.md }}>{error}</Text>}
             <View style={[styles.paymentActions, isWide && styles.paymentActionsWide]}>
               <Pressable
                 onPress={() => setStep('entrega')}
@@ -1024,7 +1033,8 @@ export function CheckoutSheet({
                 disabled={!complete || loading}
                 accessibilityRole="button"
                 accessibilityLabel={`${loading ? 'Abrindo pagamento' : 'Ir para pagamento'}, total ${brl(total)}`}
-                accessibilityState={{ disabled: !complete || loading }}
+                accessibilityState={{ disabled: !complete || loading, busy: loading }}
+                aria-busy={loading}
                 testID="checkout-submit"
                 style={({ pressed }) => [
                   styles.paymentSubmitButton,
