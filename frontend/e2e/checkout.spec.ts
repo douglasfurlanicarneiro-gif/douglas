@@ -114,6 +114,24 @@ async function fillCustomer(page: Page) {
   await page.getByTestId('checkout-to-delivery').click();
 }
 
+test('falha na consulta de pedidos não parece ausência de compras', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => localStorage.setItem('customer-orders-v2', JSON.stringify(JSON.stringify(['SALVO123']))));
+  let requests = 0;
+  await page.route('**/api/acompanhamento/SALVO123', (route) => {
+    requests += 1;
+    return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'Indisponível' }) });
+  });
+  await openStore(page);
+  await page.getByTestId('orders-button').click();
+  await expect(page.getByTestId('orders-load-error')).toContainText('Seus códigos continuam salvos');
+  await expect(page.getByText('Seu próximo perfume está aqui! ✨', { exact: true })).toHaveCount(0);
+  const before = requests;
+  await page.getByTestId('orders-retry').click();
+  await expect.poll(() => requests).toBeGreaterThan(before);
+  expect(await page.evaluate(() => localStorage.getItem('customer-orders-v2'))).toContain('SALVO123');
+});
+
 test('recuperação de pedido tem campo identificado e alvo de toque confortável', async ({ page }) => {
   await mockApi(page);
   await openStore(page);

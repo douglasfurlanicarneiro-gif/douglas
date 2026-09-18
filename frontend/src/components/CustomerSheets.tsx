@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, Linking, PanResponder, Platform, Pressable
 import Feather from '@expo/vector-icons/Feather';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Image } from 'expo-image';
-import { acompanharPedido, cancelarPedidoCliente } from '../api';
+import { ApiError, acompanharPedido, cancelarPedidoCliente } from '../api';
 import { brl, COLORS, familiasDoPerfume, fmtDate, nomeConcentracao, OCASIOES, RADIUS, SPACING, STATUS, TYPOGRAPHY } from '../theme';
 import type { Acompanhamento, Perfume } from '../types';
 import { BottomSheet } from './BottomSheet';
@@ -389,6 +389,8 @@ export function OrdersSheet({
   storeName?: string;
 }) {
   const [orders, setOrders] = useState<Acompanhamento[]>([]);
+  const [loadError, setLoadError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [loading, setLoading] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState('');
@@ -404,15 +406,26 @@ export function OrdersSheet({
   const currentStoreName = storeName.trim() || DEFAULT_STORE_CONFIG.nomeLoja;
 
   useEffect(() => {
-    if (!visible || !codes.length) return;
+    if (!visible) return;
+    if (!codes.length) {
+      setOrders([]);
+      setLoadError('');
+      setLoading(false);
+      return;
+    }
+    let active = true;
     setLoading(true);
+    setLoadError('');
     Promise.all(codes.map((code) => acompanharPedido(code).catch(() => null)))
-      .then((result) => setOrders(
-        result.filter((item): item is Acompanhamento => !!item)
-          .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()),
-      ))
-      .finally(() => setLoading(false));
-  }, [codes, visible]);
+      .then((result) => {
+        if (!active) return;
+        setOrders(result.filter((item): item is Acompanhamento => !!item)
+          .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime()));
+        if (result.some((item) => !item)) setLoadError('Não foi possível consultar todos os pedidos. Seus códigos continuam salvos neste aparelho. Tente novamente.');
+      })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [codes, visible, retry]);
 
   const recoverOrder = async () => {
     const code = recoveryCode.trim();
@@ -427,8 +440,10 @@ export function OrdersSheet({
       onAddCode(code);
       setRecoveryCode('');
       setRecoveryOpen(false);
-    } catch {
-      setRecoveryError('Código não encontrado. Confira os caracteres e tente novamente.');
+    } catch (cause) {
+      setRecoveryError(cause instanceof ApiError && cause.status === 404
+        ? 'Código não encontrado. Confira os caracteres e tente novamente.'
+        : 'Não foi possível consultar o pedido agora. Confira sua conexão e tente novamente.');
     } finally {
       setRecovering(false);
     }
@@ -468,7 +483,7 @@ export function OrdersSheet({
             accessibilityLabel="Código de acompanhamento do pedido"
             testID="order-recovery-code"
           />
-          {!!recoveryError && <Text style={styles.recoveryError}>{recoveryError}</Text>}
+          {!!recoveryError && <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.recoveryError}>{recoveryError}</Text>}
           <View style={styles.recoveryActions}>
             <SecondaryButton
               label="Cancelar"
@@ -542,10 +557,14 @@ export function OrdersSheet({
       visible={visible}
       onClose={onClose}
       title="Meus pedidos"
-      contentContainerStyle={!loading && orders.length === 0 ? styles.emptyOrdersContent : undefined}
+      contentContainerStyle={!loading && !loadError && orders.length === 0 ? styles.emptyOrdersContent : undefined}
     >
       {loading && <ActivityIndicator color={COLORS.gold} style={{ margin: 30 }} accessibilityLabel="Carregando pedidos" />}
-      {!loading && orders.length === 0 && (
+      {!loading && !!loadError && <View testID="orders-load-error">
+        <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.recoveryError}>{loadError}</Text>
+        <SecondaryButton label="Tentar novamente" testID="orders-retry" onPress={() => setRetry((value) => value + 1)} />
+      </View>}
+      {!loading && !loadError && orders.length === 0 && (
         <View style={styles.emptyOrders}>
           <View style={styles.emptyOrdersGlow}>
             <View style={styles.emptyOrdersIcon}>
@@ -566,7 +585,7 @@ export function OrdersSheet({
           {recovery}
         </View>
       )}
-      {!loading && orders.length > 0 && recovery}
+      {!loading && (orders.length > 0 || !!loadError) && recovery}
       {!loading && orders.map((order) => {
         const status = STATUS.find((item) => item.id === order.status) || STATUS[0];
         const canContinuePayment = Boolean(
@@ -716,7 +735,7 @@ export function OrdersSheet({
                 <Text style={styles.cancelConfirmText}>
                   O atendimento será interrompido, mas o pedido continuará visível no seu histórico.
                 </Text>
-                {!!cancelError && <Text style={styles.cancelError}>{cancelError}</Text>}
+                {!!cancelError && <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={styles.cancelError}>{cancelError}</Text>}
                 <View style={styles.cancelConfirmActions}>
                   <SecondaryButton
                     label="Manter pedido"

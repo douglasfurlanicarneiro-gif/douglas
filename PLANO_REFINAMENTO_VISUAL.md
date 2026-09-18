@@ -12,6 +12,8 @@ Cada etapa deve terminar com testes de celular/computador e registro do que foi 
 
 ## Revisão corretiva de 18/09/2026
 
+- Estados de pedidos: falha parcial/total de consulta deixa de mostrar falsa ausência de compras; aviso acessível e tentativa manual mantêm códigos salvos. Consultas antigas são ignoradas após fechar/trocar códigos. Recuperação distingue 404 de indisponibilidade; erros de recuperação e cancelamento são anunciáveis. Teste de falha/repetição preservando códigos adicionado em ambas as larguras. Não altera pagamento, estoque nem cancelamento no servidor.
+
 - Detalhes, descoberta e pedidos: rótulos e links dourados usam goldText; disponibilidade usa sageText/goldText; texto de status do pedido usa bone, preservando a borda colorida. Recuperação de pedidos tem área mínima de 44px e nome acessível para o código. Teste de recuperação em celular/computador adicionado. Restam validação física no iPhone/VoiceOver e auditoria abrangente de todos os estados, sem declarar conformidade integral.
 
 - Continuação do tópico 5: textos dourados do checkout e valor de retirada gratuita usam as variantes escuras da paleta; cor de erro escurecida; campo de cupom nomeado para tecnologia assistiva; inputs web de toque com 16px para reduzir zoom automático ao focar no iOS. Testes automatizados não substituem teclado virtual/VoiceOver em iPhone físico. A revisão global de contraste continua pendente; esta entrega cobre o checkout.
