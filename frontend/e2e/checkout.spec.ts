@@ -199,6 +199,20 @@ test('aplica cupom somente nos perfumes e envia o código no checkout', async ({
   await page.getByTestId('checkout-coupon-input').fill('bemvindo10');
   await page.getByTestId('checkout-coupon-apply').click();
 
+  await expect(page.getByTestId('checkout-coupon-input')).toBeHidden();
+  await page.getByTestId('checkout-coupon-remove').click();
+  await expect(page.getByTestId('checkout-coupon-input')).toBeVisible();
+  await expect(page.getByTestId('checkout-discount-row')).toBeHidden();
+  await page.getByTestId('checkout-coupon-input').fill('bemvindo10');
+  await page.getByTestId('checkout-coupon-apply').click();
+
+  await expect(page.getByTestId('checkout-notes-input')).toBeHidden();
+  await page.getByTestId('checkout-notes-toggle').click();
+  await page.getByTestId('checkout-notes-input').fill('Embrulhar para presente');
+  await page.getByTestId('checkout-notes-toggle').click();
+  await page.getByTestId('checkout-notes-toggle').click();
+  await expect(page.getByTestId('checkout-notes-input')).toHaveValue('Embrulhar para presente');
+
   await expect(page.getByTestId('checkout-discount-row')).toContainText('10% de desconto');
   await expect(page.getByTestId('checkout-discount-row')).toContainText('R$ 8,50');
   await expect(page.getByTestId('checkout-sheet')).toContainText('R$ 76,50');
@@ -208,6 +222,7 @@ test('aplica cupom somente nos perfumes e envia o código no checkout', async ({
   await expect.poll(() => state.checkout).not.toBeNull();
   expect(state.checkout).toMatchObject({
     cupomCodigo: 'BEMVINDO10',
+    observacoes: 'Embrulhar para presente',
     tipoEntrega: 'retirada',
     itens: [{ perfumeId: 'ready', ml: 50, quantidade: 1 }],
   });

@@ -100,6 +100,7 @@ export function CheckoutSheet({
   const [privacidadeAceita, setPrivacidadeAceita] = useState(false);
   const [lembrarDados, setLembrarDados] = useState(false);
   const [couponOpen, setCouponOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState<CupomSnapshot | null>(null);
   const [couponLoading, setCouponLoading] = useState(false);
@@ -204,6 +205,7 @@ export function CheckoutSheet({
     setAppliedCoupon(null);
     setCouponError('');
     setCouponOpen(false);
+    setNotesOpen(false);
   }, [items.length]);
 
   useEffect(() => {
@@ -783,15 +785,33 @@ export function CheckoutSheet({
                 <Text style={styles.paymentUnavailableText}>Entre em contato com a loja para combinar o pagamento.</Text>
               </View>
             )}
-            <Field label="Observações do pedido (opcional)">
+            <View style={styles.couponCard}>
+              <Pressable
+                onPress={() => setNotesOpen((current) => !current)}
+                accessibilityRole="button"
+                accessibilityLabel="Observações do pedido (opcional)"
+                accessibilityState={{ expanded: notesOpen }}
+                style={styles.couponHeader}
+                testID="checkout-notes-toggle"
+              >
+                <Feather name="edit-3" size={18} color={COLORS.gold} />
+                <Text style={[styles.couponTitle, styles.couponHeaderCopy]}>
+                  Observações do pedido (opcional){form.observacoes.trim() ? ' · Adicionadas' : ''}
+                </Text>
+                <Feather name={notesOpen ? 'chevron-up' : 'chevron-down'} size={20} color={COLORS.muted} />
+              </Pressable>
+              {notesOpen && <View style={{ padding: SPACING.md, paddingTop: 0 }}>
               <TInput
+                accessibilityLabel="Observações do pedido"
+                testID="checkout-notes-input"
                 multiline
                 placeholder="Escreva aqui..."
                 style={[styles.orderNotes, isWide && styles.orderNotesWide]}
                 value={form.observacoes}
                 onChangeText={(observacoes) => setForm({ ...form, observacoes })}
               />
-            </Field>
+              </View>}
+            </View>
 
             <View style={styles.couponCard} testID="checkout-coupon-section">
               <Pressable
@@ -806,13 +826,13 @@ export function CheckoutSheet({
                   <Feather name="tag" size={18} color={COLORS.gold} />
                 </View>
                 <View style={styles.couponHeaderCopy}>
-                  <Text style={styles.couponTitle}>Cupom de desconto</Text>
+                  <Text style={styles.couponTitle}>{appliedCoupon ? `Cupom ${appliedCoupon.codigo} aplicado` : 'Cupom de desconto'}</Text>
                 </View>
                 <Feather name={couponOpen ? 'chevron-up' : 'chevron-down'} size={20} color={COLORS.muted} />
               </Pressable>
               {couponOpen && (
                 <View style={styles.couponBody}>
-                  <View style={styles.couponInputRow}>
+                  {!appliedCoupon && <View style={styles.couponInputRow}>
                     <TInput
                       value={couponInput}
                       onChangeText={(value) => {
@@ -838,14 +858,14 @@ export function CheckoutSheet({
                     >
                       <Text style={styles.couponApplyText}>{couponLoading ? 'Validando…' : 'Aplicar'}</Text>
                     </Pressable>
-                  </View>
+                  </View>}
                   {!!appliedCoupon && (
                     <View style={styles.couponSuccess}>
                       <Feather name="check-circle" size={17} color={COLORS.sageText} />
                       <Text style={styles.couponSuccessText}>
-                        {appliedCoupon.codigo} aplicado · {appliedCoupon.percentual}% de desconto
+                        {appliedCoupon.percentual}% de desconto
                       </Text>
-                      <Pressable onPress={removeCoupon} accessibilityLabel="Remover cupom" hitSlop={8}>
+                      <Pressable onPress={removeCoupon} accessibilityRole="button" accessibilityLabel="Remover cupom" hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }} testID="checkout-coupon-remove">
                         <Text style={styles.couponRemoveText}>Remover</Text>
                       </Pressable>
                     </View>
