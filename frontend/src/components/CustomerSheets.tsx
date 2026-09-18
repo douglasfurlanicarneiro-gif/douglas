@@ -217,7 +217,7 @@ export function PerfumeDetailSheet({
             ]} />
             <Text style={[
               styles.availabilityText,
-              { color: perfume.prontaEntrega ? (perfume.disponivel ? COLORS.sage : COLORS.rust) : COLORS.gold },
+              { color: perfume.prontaEntrega ? (perfume.disponivel ? COLORS.sageText : COLORS.rust) : COLORS.goldText },
             ]}>
               {perfume.prontaEntrega ? (perfume.disponivel ? 'Pronta entrega' : 'Indisponível') : 'Sob encomenda'}
             </Text>
@@ -465,6 +465,7 @@ export function OrdersSheet({
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="Código do pedido"
+            accessibilityLabel="Código de acompanhamento do pedido"
             testID="order-recovery-code"
           />
           {!!recoveryError && <Text style={styles.recoveryError}>{recoveryError}</Text>}
@@ -588,7 +589,7 @@ export function OrdersSheet({
                 <Text style={styles.orderDate}>{fmtDate(order.criadoEm)}</Text>
               </View>
               <View style={[styles.statusPill, { borderColor: status.color }]}>
-                <Text style={{ ...TYPOGRAPHY.caption, color: status.color }}>{status.label}</Text>
+                <Text style={{ ...TYPOGRAPHY.caption, color: COLORS.bone }}>{status.label}</Text>
               </View>
             </View>
             {order.itens.map((item, index) => (
@@ -795,7 +796,7 @@ const styles = StyleSheet.create({
   detailImage: { width: '100%', height: '100%' },
   placeholder: { alignItems: 'center', justifyContent: 'center' },
   heartButton: { position: 'absolute', right: 12, top: 12, width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
-  eyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 1.5 },
+  eyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.5 },
   detailTitle: { ...TYPOGRAPHY.display, color: COLORS.bone, marginTop: 4 },
   perfumeMeta: { ...TYPOGRAPHY.bodySmall, color: COLORS.muted, marginTop: 3 },
   availabilityPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 9, paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface },
@@ -803,8 +804,8 @@ const styles = StyleSheet.create({
   availabilityText: { ...TYPOGRAPHY.caption, fontWeight: '700' },
   detailMeta: { ...TYPOGRAPHY.bodySmall, color: COLORS.muted, marginTop: 3 },
   occasionBox: { backgroundColor: COLORS.surfaceRaised, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, padding: SPACING.md, marginVertical: SPACING.lg },
-  sectionLabel: { ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 1.3, marginBottom: 8 },
-  detailSectionLabel: { color: COLORS.gold },
+  sectionLabel: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.3, marginBottom: 8 },
+  detailSectionLabel: { color: COLORS.goldText },
   bodyText: { ...TYPOGRAPHY.bodySmall, color: COLORS.bone },
   detailBodyText: { color: COLORS.bone },
   noteRow: { flexDirection: 'row', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: COLORS.border },
@@ -874,13 +875,13 @@ const styles = StyleSheet.create({
   emptyOrders: { width: '100%', alignItems: 'center', paddingHorizontal: SPACING.sm, paddingVertical: SPACING.lg, transform: [{ translateY: -30 }] },
   emptyOrdersGlow: { width: 92, height: 92, borderRadius: 46, backgroundColor: COLORS.gold + '18', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.lg },
   emptyOrdersIcon: { width: 62, height: 62, borderRadius: 31, backgroundColor: COLORS.gold, alignItems: 'center', justifyContent: 'center', shadowColor: COLORS.gold, shadowOpacity: 0.28, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
-  emptyEyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.gold, letterSpacing: 1.8, textAlign: 'center' },
+  emptyEyebrow: { ...TYPOGRAPHY.eyebrow, color: COLORS.goldText, letterSpacing: 1.8, textAlign: 'center' },
   emptyTitle: { ...TYPOGRAPHY.titleLarge, color: COLORS.bone, textAlign: 'center', marginTop: 8, maxWidth: 300 },
   privacyNote: { width: '100%', flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SPACING.md, marginTop: SPACING.lg, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.gold + '45', backgroundColor: COLORS.surface },
   privacyText: { ...TYPOGRAPHY.caption, flex: 1, color: COLORS.bone, lineHeight: 17 },
   recoveryArea: { width: '100%', marginTop: SPACING.md },
-  recoveryLink: { minHeight: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  recoveryLinkText: { ...TYPOGRAPHY.caption, color: COLORS.gold, fontWeight: '600' },
+  recoveryLink: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  recoveryLinkText: { ...TYPOGRAPHY.caption, color: COLORS.goldText, fontWeight: '600' },
   recoveryCard: { width: '100%', padding: SPACING.md, borderRadius: RADIUS.md, backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.border },
   recoveryTitle: { ...TYPOGRAPHY.bodyLarge, color: COLORS.bone, fontWeight: '700' },
   recoveryText: { ...TYPOGRAPHY.caption, color: COLORS.muted, lineHeight: 17, marginTop: 3, marginBottom: SPACING.sm },

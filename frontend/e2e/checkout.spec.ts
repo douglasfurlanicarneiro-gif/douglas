@@ -114,6 +114,18 @@ async function fillCustomer(page: Page) {
   await page.getByTestId('checkout-to-delivery').click();
 }
 
+test('recuperação de pedido tem campo identificado e alvo de toque confortável', async ({ page }) => {
+  await mockApi(page);
+  await openStore(page);
+  await page.getByTestId('orders-button').click();
+  const recover = page.getByTestId('order-recovery-open');
+  await expect(recover).toBeVisible();
+  const box = await recover.boundingBox();
+  expect(box?.height).toBeGreaterThanOrEqual(44);
+  await recover.click();
+  await expect(page.getByRole('textbox', { name: 'Código de acompanhamento do pedido', exact: true })).toBeVisible();
+});
+
 test('mantém checkout aberto ao fechar privacidade por teclado', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mockApi(page);
