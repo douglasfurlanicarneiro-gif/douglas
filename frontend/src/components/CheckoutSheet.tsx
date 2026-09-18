@@ -881,7 +881,7 @@ export function CheckoutSheet({
                 <View style={styles.paymentDiscountRow} testID="checkout-discount-row">
                   <View style={styles.paymentDiscountCopy}>
                     <Text style={styles.paymentDiscountLabel}>Cupom {appliedCoupon.codigo}</Text>
-                    <Text style={styles.paymentDiscountMeta}>{appliedCoupon.percentual}% somente nos perfumes</Text>
+                    <Text style={styles.paymentDiscountMeta}>{appliedCoupon.percentual}% de desconto</Text>
                   </View>
                   <Text style={styles.paymentDiscountValue}>− {brl(desconto)}</Text>
                 </View>
@@ -1245,7 +1245,6 @@ const styles = StyleSheet.create({
   },
   couponHeaderCopy: { flex: 1, minWidth: 0 },
   couponTitle: { ...TYPOGRAPHY.label, color: COLORS.bone },
-  couponHint: { ...TYPOGRAPHY.caption, color: COLORS.muted, marginTop: 2 },
   couponBody: {
     padding: SPACING.md,
     paddingTop: 0,
