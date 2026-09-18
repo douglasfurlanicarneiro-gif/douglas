@@ -807,7 +807,6 @@ export function CheckoutSheet({
                 </View>
                 <View style={styles.couponHeaderCopy}>
                   <Text style={styles.couponTitle}>Cupom de desconto</Text>
-                  <Text style={styles.couponHint}>O desconto vale somente para os perfumes, nunca para o frete.</Text>
                 </View>
                 <Feather name={couponOpen ? 'chevron-up' : 'chevron-down'} size={20} color={COLORS.muted} />
               </Pressable>
