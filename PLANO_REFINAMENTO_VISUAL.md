@@ -19,6 +19,16 @@ O tópico 5 está encerrado como entrega técnica com ressalvas de homologação
 
 ## Tópico 6 — performance e estabilidade
 
+### Primeira otimização atribuída por perfil de CPU — 19/09/2026
+
+- `AUDIT_PROFILE=1` adiciona amostragem de CPU à ferramenta, separando abertura e rolagem. A amostragem altera os tempos; não comparar diretamente com rodadas sem profiler.
+- No bundle publicado, a função `O` da linha 838 é exportada como `brl` (confirmado no módulo). Na amostra móvel, representou 75/104 ms de CPU amostrada durante rolagem sem/com cache. Outros custos incluem runtime, React e criação de elementos; não foram atribuídos integralmente.
+- Substituída criação implícita repetida de formatadores via `toLocaleString` por um `Intl.NumberFormat` compartilhado. Não altera cálculo, arredondamento configurado, moeda ou valores de pedidos.
+- Microbenchmark Node local de 10.000 preços: 431 ms antes, 6 ms depois. É ganho isolado da função, NÃO ganho de 70x do aplicativo nem medição final de rolagem.
+- Teste da função real do tema compara resultados anteriores para zero, centavos, desconto negativo, valores grandes e casos numéricos especiais. Integrado ao prebuild para CI.
+- Validação: build, TypeScript, lint e orçamento de bundle aprovados; 42 testes Chromium e 4 WebKit de frete/cupom aprovados. Brilho e layout preservados.
+- Falta medir novamente o fluxo completo com esta versão; tópico 6 permanece aberto.
+
 ### Medição reproduzível — 19/09/2026
 
 Comando: `cd frontend` e `node scripts/measure-storefront.mjs`. Consulta somente a vitrine pública; não cria pedidos nem altera cadastro. Chromium headless na máquina de desenvolvimento, sem limitação artificial de rede/CPU. Duas passagens por largura (393/1440), cache de navegador vazio e recarga no mesmo contexto. Servidor frio não foi controlado nem comprovado; não confundir navegador novo com Render acordando.

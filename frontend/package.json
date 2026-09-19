@@ -5,7 +5,7 @@
   "scripts": {
     "preinstall": "node ./scripts/cmd-guard.js --preinstall",
     "postinstall": "node ./scripts/patch-query-string.cjs",
-    "prebuild:web": "node ./scripts/patch-query-string.cjs --check && node --test ./scripts/url-decoding.test.cjs",
+    "prebuild:web": "node ./scripts/patch-query-string.cjs --check && node --test ./scripts/url-decoding.test.cjs ./scripts/currency.test.cjs",
     "start": "expo start",
     "reset-project": "node ./scripts/reset-project.js",
     "android": "expo start --android",

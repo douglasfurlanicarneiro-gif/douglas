@@ -3,10 +3,13 @@ import { chromium } from '@playwright/test';
 const browser = await chromium.launch();
 const url = process.env.AUDIT_URL || 'https://lessence-furlani-vitrine.onrender.com/';
 const stress = process.env.AUDIT_STRESS === '1';
+const profile = process.env.AUDIT_PROFILE === '1';
 try {
   for (const width of [393, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 900 } });
     const page = await context.newPage();
+    const profiler = profile ? await context.newCDPSession(page) : null;
+    if (profiler) await profiler.send('Profiler.enable');
     page.setDefaultNavigationTimeout(120000);
     if (stress) {
       const session = await context.newCDPSession(page);
@@ -23,12 +26,27 @@ try {
         .observe({ type: 'longtask', buffered: true });
     });
     for (const visit of ['fresh-browser', 'cached-reload']) {
+      if (profiler) await profiler.send('Profiler.start');
       await page.goto(url, { waitUntil: 'domcontentloaded' });
       await page.locator('[data-testid^="vitrine-card-"]').first().waitFor({ timeout: 120000 });
       await page.getByTestId('launch-intro').waitFor({ state: 'hidden', timeout: 30000 });
       const catalogVisibleMs = await page.evaluate(() => performance.now());
       await page.locator('#brand-preloader').waitFor({ state: 'hidden', timeout: 120000 });
       const catalogUncoveredMs = await page.evaluate(() => performance.now());
+      const summarizeProfile = async () => {
+        if (!profiler) return undefined;
+        const { profile: result } = await profiler.send('Profiler.stop');
+        const nodes = new Map(result.nodes.map(node => [node.id, node.callFrame]));
+        const totals = new Map();
+        result.samples?.forEach((id, index) => {
+          const frame = nodes.get(id);
+          const key = `${frame?.functionName || '(anonymous)'} ${frame?.url || ''}:${(frame?.lineNumber ?? -1) + 1}`;
+          totals.set(key, (totals.get(key) || 0) + (result.timeDeltas?.[index] || 0));
+        });
+        return [...totals].sort((a, b) => b[1] - a[1]).slice(0, 12)
+          .map(([frame, microseconds]) => ({ frame, sampledMs: Math.round(microseconds / 1000) }));
+      };
+      const startupProfile = await summarizeProfile();
       await page.waitForTimeout(1500);
       const metrics = await page.evaluate(() => {
         const nav = performance.getEntriesByType('navigation')[0];
@@ -45,6 +63,7 @@ try {
         };
       });
       await page.mouse.move(width / 2, 650);
+      if (profiler) await profiler.send('Profiler.start');
       for (let step = 0; step < (stress ? 40 : 6); step++) {
         await page.mouse.wheel(0, 700);
         await page.waitForTimeout(200);
@@ -55,7 +74,8 @@ try {
         maxLongTaskMs: Math.round(Math.max(0,...window.__longTasks)),
         horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
       }));
-      console.log(JSON.stringify({ width, visit, profile: stress ? '1.6Mbps-150ms-CPU4x-40scrolls' : 'unthrottled-6scrolls', catalogVisibleMs: Math.round(catalogVisibleMs), catalogUncoveredMs: Math.round(catalogUncoveredMs), ...metrics, afterScroll }));
+      const scrollProfile = await summarizeProfile();
+      console.log(JSON.stringify({ width, visit, profile: stress ? '1.6Mbps-150ms-CPU4x-40scrolls' : 'unthrottled-6scrolls', catalogVisibleMs: Math.round(catalogVisibleMs), catalogUncoveredMs: Math.round(catalogUncoveredMs), ...metrics, afterScroll, startupProfile, scrollProfile }));
     }
     await context.close();
   }

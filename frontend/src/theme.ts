@@ -146,6 +146,8 @@ export const nomeConcentracao = (concentracao?: string) => ({
   Extrait: 'Elixir',
 }[concentracao || ''] || concentracao || '');
 
-export const brl = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+// Reuse the locale formatter across cards instead of constructing it per price.
+const brlFormatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+export const brl = (v: number) => brlFormatter.format(v || 0);
 export const fmtDate = (iso?: string | null) => { if (!iso) return ''; try { return new Date(iso).toLocaleDateString('pt-BR'); } catch { return ''; } };
 export const padSeq = (n: number) => String(n || 0).padStart(3, '0');
