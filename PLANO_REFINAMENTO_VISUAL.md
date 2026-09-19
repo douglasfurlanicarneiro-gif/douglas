@@ -19,6 +19,15 @@ O tópico 5 está encerrado como entrega técnica com ressalvas de homologação
 
 ## Tópico 6 — performance e estabilidade
 
+### Comparação no navegador — formatador compartilhado
+
+- Ferramenta: `node scripts/compare-currency-render.mjs`. Substitui apenas a expressão do formatador dentro do navegador de teste, em uma cópia do mesmo bundle público; nenhum arquivo de produção é modificado. Intercepta somente GET da API e reapresenta as mesmas respostas entre variantes. Cache HTTP desabilitado igualmente por roteamento; não representa experiência real com cache.
+- Perfil: 393px, CPU 4x, rede configurada em 1,6 Mbps/150 ms, 40 movimentos de rolagem. Duas rodadas, ordem antes/depois e depois/antes. Respostas interceptadas não reproduzem integralmente latência real; primeira rodada inclui captura inicial da API. Não atribuir diferença de abertura ao formatador.
+- Tempo agregado em tarefas longas na rolagem: antes 2400/1987 ms; depois 1954/1727 ms (reduções observadas de 18,6%/13,1%). Amostra pequena e quantidades de cards renderizados diferentes: indício de melhora, não promessa percentual nem FPS medido.
+- Pior tarefa isolada: antes 540/462 ms; depois 454/495 ms. Portanto não houve melhora consistente do pior bloqueio, nem eliminação de travamentos.
+- Texto completo do primeiro card idêntico nas quatro execuções, incluindo preços e indisponibilidade. Teste específico da função e lint aprovados novamente.
+- Próxima prioridade: investigar bloqueios restantes de renderização. Ainda faltam validação física no iPhone e servidor comprovadamente frio; otimização local ainda não publicada.
+
 ### Primeira otimização atribuída por perfil de CPU — 19/09/2026
 
 - `AUDIT_PROFILE=1` adiciona amostragem de CPU à ferramenta, separando abertura e rolagem. A amostragem altera os tempos; não comparar diretamente com rodadas sem profiler.
