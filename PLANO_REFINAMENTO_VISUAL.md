@@ -19,6 +19,20 @@ O tópico 5 está encerrado como entrega técnica com ressalvas de homologação
 
 ## Tópico 6 — performance e estabilidade
 
+### Medição reproduzível — 19/09/2026
+
+Comando: `cd frontend` e `node scripts/measure-storefront.mjs`. Consulta somente a vitrine pública; não cria pedidos nem altera cadastro. Chromium headless na máquina de desenvolvimento, sem limitação artificial de rede/CPU. Duas passagens por largura (393/1440), cache de navegador vazio e recarga no mesmo contexto. Servidor frio não foi controlado nem comprovado; não confundir navegador novo com Render acordando.
+
+- Primeira rodada: catálogo visível em 5389 ms (393px) e 1181 ms (1440px); recargas 159/200 ms. A primeira resposta HTML levou 3024 ms; não atribuímos isso automaticamente a suspensão do servidor.
+- Segunda rodada: catálogo visível em 1098/1208 ms; recargas 167/257 ms. Não são LCP, média estatística, tempo de conclusão da atualização da API ou desempenho de iPhone físico.
+- Transferência de recursos da mesma origem: 712624/895737 bytes na primeira visita e 3600 bytes na recarga. Não inclui todos os recursos externos nem equivale ao tamanho descomprimido dos bundles.
+- Imagens solicitadas inicialmente: 9/21. Cards no DOM: 8/18 inicialmente, 18/28 após seis movimentos de rolagem na segunda rodada. A lista é virtualizada; não carrega o catálogo inteiro de uma vez.
+- Segunda rodada: 1/2 tarefas longas iniciais, máximo 70/65 ms; nenhuma tarefa longa adicional durante a rolagem amostrada, nem overflow horizontal. Não é certificação de FPS ou ausência de travamentos em aparelhos reais.
+- Oito verificações novas aprovadas (Chromium/WebKit, celular/computador): catálogo salvo com API indisponível e recuperação de cache inválido. Lint aprovado. Comprar offline não foi habilitado: a conclusão continua dependendo do servidor.
+- Nenhuma mudança especulativa em imagens/virtualização foi aplicada. Ferramenta e testes adicionados; visual e regras preservados.
+
+Pendências para fechar o tópico: rede lenta/CPU limitada, observação de servidor comprovadamente frio, Safari/iPhone físico e rolagem prolongada. A amostra atual não justifica nota 10/10 nem promessa de disponibilidade integral no Render gratuito.
+
 1. Registrar baseline de tamanho dos bundles e carregamento, separando primeira visita de cache e servidor frio de aquecido.
 2. Medir imagens, rolagem e renderização do catálogo; corrigir apenas gargalos demonstrados.
 3. Conferir recuperação de rede, cache e atualização da vitrine sem perder carrinho.

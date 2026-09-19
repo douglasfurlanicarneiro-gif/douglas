@@ -22,6 +22,27 @@ const catalog = {
   ],
 };
 
+test('catálogo salvo mantém vitrine disponível quando a API falha', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript((snapshot) => {
+    localStorage.setItem('storefront-snapshot-v1', JSON.stringify(JSON.stringify(snapshot)));
+  }, catalog);
+  await page.route('**/api/vitrine**', (route) => route.abort('failed'));
+  await openStore(page);
+  await expect(page.getByTestId('vitrine-card-ready')).toContainText('Perfume Pronta Entrega');
+  await page.getByTestId('buy-ready-50').click();
+  await expect(page.getByTestId('checkout-sheet')).toContainText('Perfume Pronta Entrega');
+});
+
+test('cache inválido não impede carregar catálogo da API', async ({ page }) => {
+  await mockApi(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('storefront-snapshot-v1', JSON.stringify('{invalid'));
+  });
+  await openStore(page);
+  await expect(page.getByTestId('vitrine-card-ready')).toContainText('Perfume Pronta Entrega');
+});
+
 test('reconexão atualiza catálogo sem perder o carrinho salvo', async ({ page, context }) => {
   await mockApi(page);
   await page.addInitScript(() => {
