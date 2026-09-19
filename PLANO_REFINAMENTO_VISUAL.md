@@ -2,6 +2,26 @@
 
 Preservar a paleta atual, o formato compacto dos cards e as regras de negócio.
 
+## Fechamento de implementação — 19/09/2026
+
+O tópico 5 está encerrado como entrega técnica com ressalvas de homologação, substituindo o estado intermediário abaixo. Não significa acessibilidade integral certificada: Safari/iPhone físico (teclado e VoiceOver), TalkBack e auditoria de todos os estados permanecem no checklist externo. É possível avançar ao tópico 6 sem apagar essas pendências.
+
+- Foco, Escape, campos, erros, proteção de envio, identificação de janelas e movimento reduzido revisados; brilho preservado.
+- Coração de favoritos e estrelas usam tom escuro da paleta. Estrelas interativas possuem alvos de 44px e estado aria-pressed verificável.
+- Alerta de título sobreposto: inspeção por captura antes/depois da rolagem confirmou título legível dentro do card, parcialmente encoberto apenas na borda da navegação fixa. Não houve redesenho do card.
+- Axe na amostra de vitrine/pedidos não confirmou violações, mas não avalia conclusivamente os ícones de fonte; essa limitação não é apresentada como aprovação integral.
+
+## Tópico 6 — performance e estabilidade
+
+1. Registrar baseline de tamanho dos bundles e carregamento, separando primeira visita de cache e servidor frio de aquecido.
+2. Medir imagens, rolagem e renderização do catálogo; corrigir apenas gargalos demonstrados.
+3. Conferir recuperação de rede, cache e atualização da vitrine sem perder carrinho.
+4. Repetir testes antes de publicar, sem prometer ausência de suspensão do Render gratuito.
+
+Baseline inicial local: 8 arquivos JavaScript, aproximadamente 1,80 MB no total e 1,40 MB no maior, dentro do orçamento existente. Não equivale a tempo real medido no celular.
+
+## Histórico das entregas
+
 1. Concluído: tipografia semântica unificada na vitrine, detalhes, descoberta, pedidos, checkout e conclusão. Títulos, corpo, legendas, rótulos e botões usam a escala central; somente a marca mantém a fonte editorial. A redução automática de letras foi removida e bloqueada pela verificação de qualidade. Preserva a composição compacta dos cards. TypeScript, build web e 54 testes funcionais aprovados em 393px e 1440px no Chromium. Não representa teste em iPhone físico.
 2. Concluído: observações recolhíveis (texto preservado), cupom aplicado sem repetir campo/botão Aplicar e remoção que permite inserir outro código. No computador, detalhes ficam à esquerda e resumo, prazos e privacidade à direita; no celular, o fluxo permanece em uma coluna. O bloco de pagamento seguro foi reduzido no desktop. TypeScript, tipografia, build e testes de checkout aprovados nas duas larguras, incluindo geometria, remover/reaplicar cupom e enviar observações recolhidas.
 3. Concluído: textos de entrega, prazo sob encomenda e conclusão revisados. Pronta entrega (até 3 dias úteis para postagem) foi distinguida de Sob encomenda (até 14 dias de disponibilidade, preparação e maturação), sempre somando o prazo da transportadora após a postagem. Pagamento pendente, Pix manual, pagamento confirmado e pedido apenas registrado agora usam mensagens diferentes e ações diretas. TypeScript, lint, build web e 18 testes do fluxo aprovados em 393px e 1440px no Chromium.

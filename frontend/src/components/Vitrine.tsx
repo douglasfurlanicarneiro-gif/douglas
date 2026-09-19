@@ -180,7 +180,7 @@ function VitrineCard({
           {favorite ? (
             <FontAwesome name="heart" size={18} color={COLORS.favorite} />
           ) : (
-            <Feather name="heart" size={18} color={PRODUCT_CARD_COLORS.gold} />
+            <Feather name="heart" size={18} color={COLORS.goldText} aria-hidden />
           )}
         </View>
       </Pressable>

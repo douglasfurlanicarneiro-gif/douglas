@@ -204,7 +204,7 @@ export function PerfumeDetailSheet({
               {favorite ? (
                 <FontAwesome name="heart" size={20} color={COLORS.favorite} />
               ) : (
-                <Feather name="heart" size={20} color={COLORS.gold} />
+                <Feather name="heart" size={20} color={COLORS.goldText} aria-hidden />
               )}
             </Pressable>
           </View>

@@ -103,12 +103,14 @@ export function Stars({ value, onChange, size = 16 }: { value: number; onChange?
           accessibilityRole={onChange ? 'button' : undefined}
           accessibilityLabel={`${n} estrela${n > 1 ? 's' : ''}`}
           accessibilityState={{ selected: n === value }}
+          aria-pressed={onChange ? n === value : undefined}
+          style={onChange ? { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' } : undefined}
         >
           <FontAwesome
             name={n <= value ? 'star' : 'star-o'}
             size={size}
-            color={n <= value ? COLORS.gold : COLORS.muted}
-            style={{ opacity: n <= value ? 1 : 0.55 }}
+            color={n <= value ? COLORS.goldText : COLORS.muted}
+            aria-hidden
           />
         </Pressable>
       ))}

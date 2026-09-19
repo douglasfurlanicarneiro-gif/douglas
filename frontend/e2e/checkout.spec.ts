@@ -114,6 +114,20 @@ async function fillCustomer(page: Page) {
   await page.getByTestId('checkout-to-delivery').click();
 }
 
+test('avaliação tem alvos de toque e seleção acessível', async ({ page }) => {
+  await mockApi(page);
+  await openStore(page);
+  await page.getByTestId('review-trigger-ready').click();
+  const stars = page.getByTestId('star-5');
+  await expect(stars).toBeVisible();
+  const box = await stars.boundingBox();
+  expect(box?.width).toBeGreaterThanOrEqual(44);
+  expect(box?.height).toBeGreaterThanOrEqual(44);
+  await stars.click();
+  await expect(stars).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('dialog', { name: 'Deixar avaliação' })).toBeVisible();
+});
+
 test('falha na consulta de pedidos não parece ausência de compras', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript(() => localStorage.setItem('customer-orders-v2', JSON.stringify(JSON.stringify(['SALVO123']))));
