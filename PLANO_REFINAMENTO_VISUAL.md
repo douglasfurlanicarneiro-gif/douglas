@@ -2,6 +2,12 @@
 
 Preservar a paleta atual, o formato compacto dos cards e as regras de negócio.
 
+## Tópico 6 — reconexão (19/09/2026)
+
+- A vitrine visível agora consulta o catálogo ao receber o evento online; em segundo plano, a atualização continua ocorrendo ao retornar à tela.
+- Teste automatizado alterna offline/online, recebe nome atualizado e verifica manutenção do produto, volume e quantidade do carrinho salvo. Aprovado em Chromium e WebKit, nos perfis celular e computador; não substitui iPhone físico.
+- Build, TypeScript e lint aprovados. Ainda pendentes: medição detalhada de carregamento inicial/cache e avaliação de imagens/rolagem. Esta entrega não encerra o tópico 6.
+
 ## Fechamento de implementação — 19/09/2026
 
 O tópico 5 está encerrado como entrega técnica com ressalvas de homologação, substituindo o estado intermediário abaixo. Não significa acessibilidade integral certificada: Safari/iPhone físico (teclado e VoiceOver), TalkBack e auditoria de todos os estados permanecem no checklist externo. É possível avançar ao tópico 6 sem apagar essas pendências.

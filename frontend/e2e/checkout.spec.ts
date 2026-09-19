@@ -22,6 +22,30 @@ const catalog = {
   ],
 };
 
+test('reconexão atualiza catálogo sem perder o carrinho salvo', async ({ page, context }) => {
+  await mockApi(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('customer-cart-v1', JSON.stringify(JSON.stringify([
+      { perfumeId: 'ready', ml: 50, quantidade: 2 },
+    ])));
+  });
+  await openStore(page);
+  await context.setOffline(true);
+  await page.route('**/api/vitrine**', (route) => route.fulfill({
+    contentType: 'application/json',
+    body: JSON.stringify({ ...catalog, itens: catalog.itens.map((item) => (
+      item.id === 'ready' ? { ...item, nome: 'Perfume Atualizado' } : item
+    )) }),
+  }));
+  await context.setOffline(false);
+  await expect(page.getByTestId('vitrine-card-ready')).toContainText('Perfume Atualizado');
+  await page.getByTestId('cart-button').click();
+  await expect(page.getByTestId('checkout-sheet')).toContainText('Perfume Atualizado');
+  await expect.poll(() => page.evaluate(() => JSON.parse(JSON.parse(
+    localStorage.getItem('customer-cart-v1') || '"[]"',
+  )))).toEqual([{ perfumeId: 'ready', ml: 50, quantidade: 2 }]);
+});
+
 async function mockApi(
   page: Page,
   options: { catalogDelayMs?: number; catalogFailures?: number; brokenImage?: boolean; confirmedOrder?: boolean } = {},

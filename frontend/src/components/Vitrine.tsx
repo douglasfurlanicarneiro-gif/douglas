@@ -471,9 +471,11 @@ export function Vitrine({
       if (document.visibilityState === 'visible') void load();
     };
     window.addEventListener('focus', refreshOnFocus);
+    window.addEventListener('online', refreshOnFocus);
     document.addEventListener('visibilitychange', refreshOnFocus);
     return () => {
       window.removeEventListener('focus', refreshOnFocus);
+      window.removeEventListener('online', refreshOnFocus);
       document.removeEventListener('visibilitychange', refreshOnFocus);
     };
   }, [load]);
