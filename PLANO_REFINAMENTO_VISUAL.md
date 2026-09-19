@@ -31,7 +31,16 @@ Comando: `cd frontend` e `node scripts/measure-storefront.mjs`. Consulta somente
 - Oito verificações novas aprovadas (Chromium/WebKit, celular/computador): catálogo salvo com API indisponível e recuperação de cache inválido. Lint aprovado. Comprar offline não foi habilitado: a conclusão continua dependendo do servidor.
 - Nenhuma mudança especulativa em imagens/virtualização foi aplicada. Ferramenta e testes adicionados; visual e regras preservados.
 
-Pendências para fechar o tópico: rede lenta/CPU limitada, observação de servidor comprovadamente frio, Safari/iPhone físico e rolagem prolongada. A amostra atual não justifica nota 10/10 nem promessa de disponibilidade integral no Render gratuito.
+### Rede limitada e rolagem ampliada — 19/09/2026
+
+- Reproduzir em PowerShell: `$env:AUDIT_STRESS='1'; node scripts/measure-storefront.mjs`. Chromium com download 1,6 Mbps, upload 750 kbps, latência configurada 150 ms e CPU 4x; 40 movimentos de 700px por visita. Limitação sintética, não equivale a modelo de telefone específico.
+- Correção de metodologia: `catalogVisibleMs` mede o card renderizado, que ainda pode estar atrás do preloader. Novo `catalogUncoveredMs` aguarda também o preloader desaparecer. Os números anteriores de ~0,2s NÃO representam liberação da interface ao cliente.
+- Rodada final: primeira visita com tela liberada em 5665 ms (393px) / 6392 ms (1440px); cache em 2313/2064 ms. Brilho preservado; nenhuma regra de negócio alterada.
+- Tarefas longas: máximos iniciais 456/473 ms sem cache e 221/265 ms com cache. A rolagem acrescentou 5/2 tarefas longas nas primeiras visitas e 6/3 nas recargas. Não se pode concluir que a rolagem é perfeitamente fluida sob limitação de CPU.
+- Cards no DOM após rolagem: 24/28 na primeira visita e 18/28 na recarga; sem overflow horizontal. Virtualização continua limitada nesta amostra. Não houve teste até o último produto nem medição de FPS.
+- Lint e diff-check aprovados. Alterações desta etapa são ferramenta de medição/documentação, não uma otimização publicada do app.
+
+Pendências para fechar o tópico: atribuir as tarefas longas e reduzir custo inicial onde comprovado, observar servidor comprovadamente frio e validar Safari/iPhone físico. Rede limitada e rolagem ampliada agora possuem baseline, não certificação de desempenho. A amostra não justifica nota 10/10 nem promessa de disponibilidade integral no Render gratuito.
 
 1. Registrar baseline de tamanho dos bundles e carregamento, separando primeira visita de cache e servidor frio de aquecido.
 2. Medir imagens, rolagem e renderização do catálogo; corrigir apenas gargalos demonstrados.

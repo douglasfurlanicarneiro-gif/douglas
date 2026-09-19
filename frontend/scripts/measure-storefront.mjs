@@ -2,10 +2,21 @@
 import { chromium } from '@playwright/test';
 const browser = await chromium.launch();
 const url = process.env.AUDIT_URL || 'https://lessence-furlani-vitrine.onrender.com/';
+const stress = process.env.AUDIT_STRESS === '1';
 try {
   for (const width of [393, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 900 } });
     const page = await context.newPage();
+    page.setDefaultNavigationTimeout(120000);
+    if (stress) {
+      const session = await context.newCDPSession(page);
+      await session.send('Network.enable');
+      await session.send('Network.emulateNetworkConditions', {
+        offline: false, latency: 150,
+        downloadThroughput: 1_600_000 / 8, uploadThroughput: 750_000 / 8,
+      });
+      await session.send('Emulation.setCPUThrottlingRate', { rate: 4 });
+    }
     await page.addInitScript(() => {
       window.__longTasks = [];
       new PerformanceObserver(list => window.__longTasks.push(...list.getEntries().map(e => e.duration)))
@@ -16,6 +27,8 @@ try {
       await page.locator('[data-testid^="vitrine-card-"]').first().waitFor({ timeout: 120000 });
       await page.getByTestId('launch-intro').waitFor({ state: 'hidden', timeout: 30000 });
       const catalogVisibleMs = await page.evaluate(() => performance.now());
+      await page.locator('#brand-preloader').waitFor({ state: 'hidden', timeout: 120000 });
+      const catalogUncoveredMs = await page.evaluate(() => performance.now());
       await page.waitForTimeout(1500);
       const metrics = await page.evaluate(() => {
         const nav = performance.getEntriesByType('navigation')[0];
@@ -32,7 +45,7 @@ try {
         };
       });
       await page.mouse.move(width / 2, 650);
-      for (let step = 0; step < 6; step++) {
+      for (let step = 0; step < (stress ? 40 : 6); step++) {
         await page.mouse.wheel(0, 700);
         await page.waitForTimeout(200);
       }
@@ -42,7 +55,7 @@ try {
         maxLongTaskMs: Math.round(Math.max(0,...window.__longTasks)),
         horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
       }));
-      console.log(JSON.stringify({ width, visit, catalogVisibleMs: Math.round(catalogVisibleMs), ...metrics, afterScroll }));
+      console.log(JSON.stringify({ width, visit, profile: stress ? '1.6Mbps-150ms-CPU4x-40scrolls' : 'unthrottled-6scrolls', catalogVisibleMs: Math.round(catalogVisibleMs), catalogUncoveredMs: Math.round(catalogUncoveredMs), ...metrics, afterScroll }));
     }
     await context.close();
   }
