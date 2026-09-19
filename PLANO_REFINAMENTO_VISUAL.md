@@ -12,6 +12,12 @@ Cada etapa deve terminar com testes de celular/computador e registro do que foi 
 
 ## Revisão corretiva de 18/09/2026
 
+### Acessibilidade — 19/09/2026
+
+- Axe nas telas vitrine e pedidos, em 393px e 1440px: nenhuma violação confirmada nesta amostra, com verificações de contraste inconclusivas (ícones de fonte e um título parcialmente sobreposto na área visível do celular). Não equivale a auditoria de todos os fluxos nem conformidade integral.
+- O nome da janela estava no contêiner genérico interno; movido para o Modal. A verificação ARIA inconclusiva desapareceu na repetição local, com respostas públicas GET reapresentadas e sem alterar CORS/CSP no servidor.
+- TypeScript/build e quatro testes de foco/recuperação aprovados. Evidência local em output/accessibility/axe-20260919-local.json. Ainda faltam inspeção visual dos ícones e da sobreposição, demais estados, VoiceOver e teclado no aparelho físico.
+
 - WebKit: primeira rodada teve 32/34 aprovações; dois casos perderam preenchimento antes da entrega e passaram isoladamente. Atualizações do formulário passaram a usar o estado atual, e o foco automático deixa de interromper interação já iniciada. Após ajustes, bateria completa WebKit passou 34/34 em perfil iPhone 15 e desktop. Não prova causa única nem substitui Safari/VoiceOver em aparelho real. Configuração reproduzível: frontend/playwright.webkit-check.config.ts (requer playwright install webkit).
 
 - Estados de pedidos: falha parcial/total de consulta deixa de mostrar falsa ausência de compras; aviso acessível e tentativa manual mantêm códigos salvos. Consultas antigas são ignoradas após fechar/trocar códigos. Recuperação distingue 404 de indisponibilidade; erros de recuperação e cancelamento são anunciáveis. Teste de falha/repetição preservando códigos adicionado em ambas as larguras. Não altera pagamento, estoque nem cancelamento no servidor.

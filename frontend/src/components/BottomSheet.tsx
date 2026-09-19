@@ -119,6 +119,7 @@ export function BottomSheet({
       onRequestClose={onClose}
       statusBarTranslucent
       accessibilityViewIsModal
+      accessibilityLabel={title}
     >
       <Pressable
         style={styles.backdrop}
@@ -141,7 +142,6 @@ export function BottomSheet({
             ]}
             onPress={() => {}}
             testID={testID}
-            accessibilityLabel={title}
           >
             <View style={[styles.header, tone === 'light' && styles.headerLight]}>
               <Text style={[styles.title, tone === 'light' && styles.titleLight]} numberOfLines={1}>{title}</Text>
