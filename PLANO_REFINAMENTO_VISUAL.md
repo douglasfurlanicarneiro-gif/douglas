@@ -2,6 +2,8 @@
 
 Preservar a paleta atual, o formato compacto dos cards e as regras de negócio.
 
+Orientação do usuário: publicar todas as alterações concluídas após validação, sem solicitar nova confirmação a cada etapa. Conferir CI e versão publicada; comunicar bloqueios reais. Não incluir arquivos temporários, relatórios privados ou trabalho incompleto na publicação.
+
 ## Tópico 6 — reconexão (19/09/2026)
 
 - A vitrine visível agora consulta o catálogo ao receber o evento online; em segundo plano, a atualização continua ocorrendo ao retornar à tela.
