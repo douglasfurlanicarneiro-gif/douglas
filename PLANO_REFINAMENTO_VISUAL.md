@@ -19,6 +19,13 @@ O tópico 5 está encerrado como entrega técnica com ressalvas de homologação
 
 ## Tópico 6 — performance e estabilidade
 
+### Renderizações de cards — continuação
+
+- Cards usam `React.memo` com comparação padrão de todas as propriedades, sem comparador que ignore ações ou dados. Compra/favorito têm callbacks estáveis com atualização funcional; detalhes/avaliação recebem os setters estáveis.
+- Evita renderizações provocadas apenas por estado alheio ao card (abrir janelas, carrinho, gesto de atualização), quando item/favorito permanecem iguais. Mudanças de catálogo, preço e favorito continuam invalidando a memoização.
+- Teste novo: favoritar, filtrar favoritos, comprar e desfavoritar. Reconexão já verifica nome atualizado no card e carrinho. Ambos passaram no WebKit móvel/desktop.
+- Build, TypeScript, lint e orçamento de bundle aprovados. Não há percentual de ganho atribuído a esta mudança; é necessário novo perfil para quantificá-lo. Ainda local, sem publicação.
+
 ### Comparação no navegador — formatador compartilhado
 
 - Ferramenta: `node scripts/compare-currency-render.mjs`. Substitui apenas a expressão do formatador dentro do navegador de teste, em uma cópia do mesmo bundle público; nenhum arquivo de produção é modificado. Intercepta somente GET da API e reapresenta as mesmas respostas entre variantes. Cache HTTP desabilitado igualmente por roteamento; não representa experiência real com cache.

@@ -140,7 +140,7 @@ const resumirCategorias = (valores: string[], limite: number, singular: string, 
   return `${visiveis.join(' · ')} · +${restantes} ${restantes === 1 ? singular : plural}`;
 };
 
-function VitrineCard({
+const VitrineCard = React.memo(function VitrineCard({
   item,
   favorite,
   onBuy,
@@ -150,10 +150,10 @@ function VitrineCard({
 }: {
   item: VitrineItem;
   favorite: boolean;
-  onBuy: (ml: number, preco: number) => void;
-  onReview: () => void;
-  onDetails: () => void;
-  onToggleFavorite: () => void;
+  onBuy: (item: VitrineItem, ml: number, preco: number) => void;
+  onReview: (item: VitrineItem) => void;
+  onDetails: (item: VitrineItem) => void;
+  onToggleFavorite: (id: string) => void;
 }) {
   const [imageFailed, setImageFailed] = useState(false);
   const notas = perfumeNotes(item);
@@ -168,7 +168,7 @@ function VitrineCard({
   return (
     <View style={styles.card} testID={`vitrine-card-${item.id}`}>
       <Pressable
-        onPress={onToggleFavorite}
+        onPress={() => onToggleFavorite(item.id)}
         style={styles.cardFavorite}
         hitSlop={8}
         testID={`favorite-${item.id}`}
@@ -188,7 +188,7 @@ function VitrineCard({
       <View style={styles.productTop}>
         <Pressable
           style={styles.imageFrame}
-          onPress={onDetails}
+          onPress={() => onDetails(item)}
           testID={`details-image-${item.id}`}
           accessibilityRole="button"
           accessibilityLabel={`Conhecer ${item.nome}`}
@@ -240,7 +240,7 @@ function VitrineCard({
               <Pressable
                 key={i}
                 disabled={!disponivel}
-                onPress={() => onBuy(pr.ml, pr.preco)}
+                onPress={() => onBuy(item, pr.ml, pr.preco)}
                 testID={`buy-${item.id}-${pr.ml}`}
                 accessibilityRole="button"
                 accessibilityHint={`${item.prontaEntrega ? 'Adicionar' : 'Solicitar'} ${item.nome}`}
@@ -272,7 +272,7 @@ function VitrineCard({
 
       <View style={styles.cardActions}>
         <Pressable
-          onPress={onReview}
+          onPress={() => onReview(item)}
           style={styles.reviewButton}
           testID={`review-trigger-${item.id}`}
           accessibilityRole="button"
@@ -282,7 +282,7 @@ function VitrineCard({
           <Text style={styles.reviewText}>Avaliar</Text>
         </Pressable>
       <Pressable
-        onPress={onDetails}
+        onPress={() => onDetails(item)}
         style={styles.detailsButton}
         testID={`details-${item.id}`}
         accessibilityRole="button"
@@ -294,7 +294,7 @@ function VitrineCard({
       </View>
     </View>
   );
-}
+});
 
 function NoteRow({ label, value }: { label: string; value: string }) {
   return (
@@ -615,7 +615,7 @@ export function Vitrine({
     return okBusca && okFam && okOcasiao && okDisponibilidade;
   }), [itens, search, familiaAtiva, ocasiaoAtiva, disponibilidadeAtiva, favorites]);
 
-  const toggleFavorite = (id: string) => {
+  const toggleFavorite = useCallback((id: string) => {
     setFavorites((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
@@ -623,9 +623,9 @@ export function Vitrine({
       storage.setItem(FAVORITES_KEY, JSON.stringify(Array.from(next)));
       return next;
     });
-  };
+  }, []);
 
-  const addToCart = (item: VitrineItem, ml: number, preco: number) => {
+  const addToCart = useCallback((item: VitrineItem, ml: number, preco: number) => {
     setCart((current) => {
       const index = current.findIndex((line) => line.perfume.id === item.id && line.option.ml === ml);
       if (index < 0) return [...current, { perfume: item, option: { ml, preco }, quantidade: 1 }];
@@ -634,7 +634,7 @@ export function Vitrine({
         : line);
     });
     setCartOpen(true);
-  };
+  }, []);
 
   const cartCount = cart.reduce((total, item) => total + item.quantidade, 0);
   const filtrosAtivos = (familiaAtiva !== 'Todas' && familiaAtiva !== 'Favoritos' ? 1 : 0)
@@ -949,10 +949,10 @@ export function Vitrine({
             <VitrineCard
               item={item}
               favorite={favorites.has(item.id)}
-              onBuy={(ml, preco) => addToCart(item, ml, preco)}
-              onReview={() => setReviewItem(item)}
-              onDetails={() => setDetailItem(item)}
-              onToggleFavorite={() => toggleFavorite(item.id)}
+              onBuy={addToCart}
+              onReview={setReviewItem}
+              onDetails={setDetailItem}
+              onToggleFavorite={toggleFavorite}
             />
           </View>
         )}

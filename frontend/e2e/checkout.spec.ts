@@ -22,6 +22,22 @@ const catalog = {
   ],
 };
 
+test('card atualiza favorito sem perder suas ações', async ({ page }) => {
+  await mockApi(page);
+  await openStore(page);
+  const favorite = page.getByTestId('favorite-ready');
+  await expect(favorite).toHaveAccessibleName(/Adicionar/);
+  await favorite.click();
+  await expect(favorite).toHaveAccessibleName(/Remover/);
+  await page.getByTestId('filter-favorites').click();
+  await expect(page.getByTestId('vitrine-card-ready')).toBeVisible();
+  await page.getByTestId('buy-ready-50').click();
+  await expect(page.getByTestId('checkout-sheet')).toContainText('Perfume Pronta Entrega');
+  await page.getByTestId('checkout-sheet').getByTestId('bottom-sheet-close').click();
+  await favorite.click();
+  await expect(page.getByTestId('vitrine-card-ready')).toHaveCount(0);
+});
+
 test('catálogo salvo mantém vitrine disponível quando a API falha', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript((snapshot) => {
